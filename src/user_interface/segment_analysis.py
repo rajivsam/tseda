@@ -49,10 +49,7 @@ def click_seg_visualization_button() -> None:
 
     return
 
-def click_eigen_value_plot_button() ->None:
-    st.session_state.seg_current_step = 2
 
-    return
 
 def click_decomp_plot_button() ->None:
     st.session_state.seg_current_step = 2
@@ -130,6 +127,12 @@ def parse_number_string(numbers_string: str) -> List[int]:
 
     return numbers_list
 
+@st.dialog("Enter the window size for SSA")
+def input_window_size():
+    window_size = st.number_input("window size for SSA",min_value=0, max_value=50, step=1, key="wsize")
+    if st.button("Submit"):
+        st.session_state.ssa_window_size = st.session_state.wsize
+        st.rerun()
 
 def run_ssa() ->None:
     
@@ -139,10 +142,11 @@ def run_ssa() ->None:
         df = st.session_state.get('df_seg', None)
 
         st.subheader("SSA Decomposition")
-        window_size = st.number_input("window size for SSA",min_value=0, max_value=50, step=1, key="wsize")
-            
-        st.button('Gen Eigen Value Plot', on_click=click_eigen_value_plot_button)
-        if st.session_state["wsize"] > 0 :
+        
+        if "ssa_window_size" not in st.session_state:
+            input_window_size()
+
+        if st.session_state.get('ssa_window_size', False) > 0 :
             ws = st.session_state["wsize"]
             ssa = SSADecomposition(df,ws)
             st.subheader("Eigen decomposition, vector view")
