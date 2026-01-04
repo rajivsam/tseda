@@ -14,12 +14,23 @@ from visualization.series_visualizer import SegmentedSeriesVisualizer
 
 def init_global()->None:
     
-    if 'current_step' not in st.session_state:
+    if "current_step" not in st.session_state:
         st.session_state.current_step = 1
-
     st.session_state.start_analysis_btn_disabled = True 
+    
 
     return
+
+def re_init_analysis_state() ->None:
+
+
+    keys = list(st.session_state.keys())
+    for key in keys:
+        del st.session_state[key]
+    
+
+    return
+
 
 
 def manage_global_state():
@@ -37,7 +48,9 @@ def manage_global_state():
 
 
 def click_start_analysis_button():
+
     st.session_state.current_step = 2
+
 
     return
 
@@ -45,6 +58,10 @@ def click_run_change_point_analysis_button():
      st.session_state.current_step = 3
 
      return
+
+def click_upload_segment_button() ->None:
+    re_init_analysis_state()
+    return
 
 
 
@@ -82,7 +99,6 @@ def step_1()->None:
 def step_2()->None:
 
 
-
     with st.container():
         st.title("Step 2: Visualize Density and Series - check for multiple modes")
 
@@ -101,6 +117,8 @@ def step_2()->None:
 
         st.button('Run Change Points', on_click=click_run_change_point_analysis_button, \
             disabled=False)
+
+        return
 
 
 
@@ -127,6 +145,16 @@ def get_series_plot(df: pd.DataFrame) -> plt.Figure:
     return plt_fig
 
 
+@st.dialog("Enter the penalty or accept the default for the change point estimator")
+def input_window_size():
+   
+    penalty = st.number_input("penalty for change point estimator",min_value=0.0, max_value=50.0, step=0.1, key="psize", value = 2.0)
+    
+    if st.button("Submit"):
+        st.session_state.PELT_penalty = st.session_state.psize
+        st.rerun()
+    
+
 def step_3() -> None:
     df = st.session_state.get('df', None)
     if df is None:
@@ -137,15 +165,27 @@ def step_3() -> None:
     
         series = pd.Series(df.loc[:, "signal"])  # Assuming the signal is in a column named "signal"
         series.index  = df.loc[:, "date"]  # Assuming the date is in a column named "date"
-        cpe = ChangePointEstimator(series)
-        cpe.estimate_change_points()
-        st.title("Step 3: Segment Series by Change Point Analysis")
-        ssv = SegmentedSeriesVisualizer(cpe._df)
-        fig = ssv.getVisualization()
-        st.plotly_chart(fig, use_container_width=True)
-        #st.write(cpe._df)
-        output_csv = cpe._df.to_csv(index=False).encode('utf-8')
-        st.download_button('Save Segmented Series', output_csv, file_name="segmented_series.csv", mime='text/csv')
+        
+        if "PELT_penalty" not in st.session_state:
+            input_window_size()
+        
+        if "PELT_penalty" in st.session_state:
+            cpe = ChangePointEstimator(series)
+            penalty = st.session_state["PELT_penalty"]
+            cpe.estimate_change_points(penalty)
+            st.title("Step 3: Segment Series by Change Point Analysis")
+            ssv = SegmentedSeriesVisualizer(cpe._df)
+            fig = ssv.getVisualization()
+            st.plotly_chart(fig, use_container_width=True)
+            #st.write(cpe._df)
+            output_csv = cpe._df.to_csv(index=False).encode('utf-8')
+            col1, col2 = st.columns(2)
+            with col1:      
+                st.download_button('Save Segmented Series', output_csv, file_name="segmented_series.csv", mime='text/csv')
+            with col2:
+                st.button('Upload Segement', on_click=click_upload_segment_button, \
+                    disabled=False)
+
 
     return
 

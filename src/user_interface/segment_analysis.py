@@ -62,11 +62,12 @@ def click_upload_segment_button() ->None:
     return
 
 def re_init_analysis_state() ->None:
-    st.session_state.seg_run_SSA_btn_disabled = True 
-    st.session_state.seg_upload_btn_disabled = True
-    st.session_state.seg_visualization_btn_disabled = True
-    st.session_state.df_seg = None
 
+    keys = list(st.session_state.keys())
+    for key in keys:
+        del st.session_state[key]
+
+    return
 
 
 def upload_segment_file()->None:
