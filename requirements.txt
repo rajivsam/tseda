@@ -1,0 +1,15 @@
+jupyter
+ipython
+scikit-learn
+scipy < 1.16.0
+pandas
+numpy
+matplotlib
+seaborn
+statsmodels
+plotly
+ruptures
+pytest
+pytest-cov
+streamlit
+ssalib

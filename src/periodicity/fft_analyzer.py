@@ -1,0 +1,41 @@
+import numpy as np
+from scipy.signal import lombscargle
+import matplotlib.pyplot as plt
+from pandas import DataFrame, Series
+
+class FFT_Analyzer:
+    def __init__(self, series: Series, fmin: float = 0.1, fmax: float = 2.0, num_freqs: int = 1000) -> None:
+        self._df: DataFrame = series.to_frame().reset_index()
+        self._df.columns = ["date", "signal"]
+        self._df["t"] = range(1, len(self._df) + 1)
+        self.fmin: float = fmin
+        self.fmax: float = fmax
+        self.num_freqs: int = num_freqs
+        self._df["signal_centered"] = self._df["signal"] - np.mean(self._df["signal"])
+        self.freqs: np.ndarray | None = None
+        self.power: np.ndarray | None = None
+        self.periods: np.ndarray | None = None
+        self.best_period: float | None = None
+    
+    def periodogram(self) -> tuple[np.ndarray, np.ndarray, float]:
+        self.freqs = np.linspace(self.fmin*2*np.pi, self.fmax*2*np.pi, self.num_freqs)
+        self.power = lombscargle(self._df["t"], self._df["signal_centered"], self.freqs, normalize=True)
+        self.periods = 2 * np.pi / self.freqs
+        
+        best_idx = np.argmax(self.power)
+        self.best_period = self.periods[best_idx]
+        return self.periods, self.power, self.best_period
+    
+    def plot(self) -> None:
+        if self.periods is None or self.power is None:
+            self.periodogram()
+        
+        plt.figure(figsize=(8, 4))
+        plt.plot(self.periods, self.power)
+        plt.xlabel('Period')
+        plt.ylabel('Normalized Power')
+        plt.title('Lomb-Scargle Periodogram (SciPy)')
+        plt.grid(True)
+        plt.show()
+
+ 

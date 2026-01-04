@@ -1,0 +1,23 @@
+Metadata-Version: 2.4
+Name: tseda
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+Requires-Dist: ipython>=9.8.0
+Requires-Dist: jupyter>=1.1.1
+Requires-Dist: matplotlib>=3.10.8
+Requires-Dist: numpy>=2.4.0
+Requires-Dist: pandas>=2.3.3
+Requires-Dist: plotly>=6.5.0
+Requires-Dist: pytest>=9.0.2
+Requires-Dist: pytest-cov>=7.0.0
+Requires-Dist: req>=1.0.0
+Requires-Dist: ruptures>=1.1.10
+Requires-Dist: scikit-learn>=1.8.0
+Requires-Dist: scipy>=1.16.3
+Requires-Dist: seaborn>=0.13.2
+Requires-Dist: statsmodels>=0.14.6
+Requires-Dist: streamlit>=1.52.2
+
+This is a package for exploring regularly sampled time series.
