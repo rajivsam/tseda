@@ -4,6 +4,7 @@ src/change_point/change_point_estimator.py
 src/dataloader/coffee_prices_data_loader.py
 src/dataloader/local_dataloader.py
 src/dataloader/synthetic_series_data_loader.py
+src/decomposition/ssa_decomposition.py
 src/periodicity/fft_analyzer.py
 src/series_stats/sampling_prop.py
 src/series_stats/summary_statistics.py
@@ -12,9 +13,10 @@ src/tseda.egg-info/SOURCES.txt
 src/tseda.egg-info/dependency_links.txt
 src/tseda.egg-info/requires.txt
 src/tseda.egg-info/top_level.txt
-src/user_interface/basic_workflow.py
-src/user_interface/workflow_segments.py
-src/user_interface/workflow_states.py
+src/user_interface/analysis_modes.py
+src/user_interface/global_analysis.py
+src/user_interface/segment_analysis.py
+src/user_interface/ts_analyze_ui.py
 src/visualization/autocorrelation_vis.py
 src/visualization/series_kde_visualizer.py
 src/visualization/series_visualizer.py

@@ -1,6 +1,7 @@
 change_point
 config
 dataloader
+decomposition
 periodicity
 series_stats
 user_interface
