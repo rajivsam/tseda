@@ -1,0 +1,15 @@
+# Ignore virtual environment directory
+venv/
+
+# Ignore Jupyter Notebook checkpoints and data
+.ipynb_checkpoints/
+*.ipynb
+
+# Ignore general cache directories and files
+__pycache__/
+.cache/
+.pytest_cache/
+*.pyc
+*.swp
+rajiv_github_key
+rajiv_github_key.pub
