@@ -11,5 +11,10 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *.swp
+# ignore my github key
 rajiv_github_key
 rajiv_github_key.pub
+#ignore document
+*.pdf
+#ignore the .env file
+.env

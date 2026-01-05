@@ -14,6 +14,7 @@ src/tseda.egg-info/dependency_links.txt
 src/tseda.egg-info/requires.txt
 src/tseda.egg-info/top_level.txt
 src/user_interface/analysis_modes.py
+src/user_interface/gemini_chat.py
 src/user_interface/global_analysis.py
 src/user_interface/segment_analysis.py
 src/user_interface/ts_analyze_ui.py

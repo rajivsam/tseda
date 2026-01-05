@@ -146,9 +146,18 @@ def get_series_plot(df: pd.DataFrame) -> plt.Figure:
 
 
 @st.dialog("Enter the penalty or accept the default for the change point estimator")
-def input_window_size():
+def input_parameters():
    
     penalty = st.number_input("penalty for change point estimator",min_value=0.0, max_value=50.0, step=0.1, key="psize", value = 2.0)
+    model_options = ['rbf', 'l2', 'l1']
+
+    #Create the selectbox
+    model_to_use = st.selectbox(
+    'Choose a model to use',  # This is the label (text above the box)
+    model_options,             # These are the options
+    index=0,             # Optional: sets the default to 'Banana' (index 1),
+    key="CP_model"
+    )
     
     if st.button("Submit"):
         st.session_state.PELT_penalty = st.session_state.psize
@@ -166,13 +175,16 @@ def step_3() -> None:
         series = pd.Series(df.loc[:, "signal"])  # Assuming the signal is in a column named "signal"
         series.index  = df.loc[:, "date"]  # Assuming the date is in a column named "date"
         
-        if "PELT_penalty" not in st.session_state:
-            input_window_size()
+        CP_params_defined = "PELT_penalty" in st.session_state and "CP_model" in st.session_state
         
-        if "PELT_penalty" in st.session_state:
+        if not CP_params_defined:
+            input_parameters()
+        
+        if CP_params_defined:
             cpe = ChangePointEstimator(series)
-            penalty = st.session_state["PELT_penalty"]
-            cpe.estimate_change_points(penalty)
+            input_penalty = st.session_state["PELT_penalty"]
+            input_model = st.session_state["CP_model"]
+            cpe.estimate_change_points(model_to_use = input_model, penalty_coeff = input_penalty)
             st.title("Step 3: Segment Series by Change Point Analysis")
             ssv = SegmentedSeriesVisualizer(cpe._df)
             fig = ssv.getVisualization()

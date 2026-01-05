@@ -40,7 +40,7 @@ class ChangePointEstimator:
         
         return row_label
         
-    def estimate_change_points(self, penalty_coeff: float = 2.0) -> None:
+    def estimate_change_points(self, model_to_use : str = "rbf",penalty_coeff: float = 2.0) -> None:
         """
         Estimates the change points in the time series.
 
@@ -52,7 +52,7 @@ class ChangePointEstimator:
                                              Pelt algorithm. Defaults to 2.0.
         """
         penalty_est: int = ceil(2*log(self._df.shape[0], 2))
-        algo: rpt.Pelt = rpt.Pelt(model="rbf").fit(self._df["signal"].values)
+        algo: rpt.Pelt = rpt.Pelt(model= model_to_use).fit(self._df["signal"].values)
         self._change_pts = algo.predict(pen=penalty_est)
         self._df["segment"] = self._df.apply(lambda row: self.label_segement(row), axis=1)
         

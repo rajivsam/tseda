@@ -7,7 +7,8 @@ def main():
     pages = {
         "Analysis": [
             st.Page("global_analysis.py", title="Global Analysis", default=True),
-            st.Page("segment_analysis.py", title="Segment Analysis")
+            st.Page("segment_analysis.py", title="Segment Analysis"),
+            st.Page("gemini_chat.py", title="Chatbot")
         ],
     
     }

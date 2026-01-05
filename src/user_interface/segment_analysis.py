@@ -38,6 +38,8 @@ def manage_segment_state():
 def click_run_SSA_button() -> None:
     """_summary_: Button handler for run ssa button click
     """
+    if "ssa_window_size" in st.session_state:
+        del st.session_state.ssa_window_size
     st.session_state.seg_current_step = 2
 
     return
@@ -144,11 +146,11 @@ def run_ssa() ->None:
 
         st.subheader("SSA Decomposition")
         
-        if "ssa_window_size" not in st.session_state:
+        if "ssa_window_size" not in st.session_state: 
             input_window_size()
 
         if st.session_state.get('ssa_window_size', False) > 0 :
-            ws = st.session_state["wsize"]
+            ws = st.session_state["ssa_window_size"]
             ssa = SSADecomposition(df,ws)
             st.subheader("Eigen decomposition, vector view")
             eig_decomp: plt.Figure  = ssa._ssa.plot(kind='vectors')[0]
