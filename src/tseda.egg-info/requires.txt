@@ -1,4 +1,4 @@
-google-generativeai>=0.8.6
+google-genai>=1.56.0
 ipython>=9.8.0
 jupyter>=1.1.1
 matplotlib>=3.10.8

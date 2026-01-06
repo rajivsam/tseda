@@ -13,5 +13,5 @@ pytest
 pytest-cov
 streamlit
 ssalib
-google-generativeai
+google-genai
 python-dotenv

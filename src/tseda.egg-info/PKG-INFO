@@ -4,7 +4,7 @@ Version: 0.1.0
 Summary: Add your description here
 Requires-Python: >=3.13
 Description-Content-Type: text/markdown
-Requires-Dist: google-generativeai>=0.8.6
+Requires-Dist: google-genai>=1.56.0
 Requires-Dist: ipython>=9.8.0
 Requires-Dist: jupyter>=1.1.1
 Requires-Dist: matplotlib>=3.10.8

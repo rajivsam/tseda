@@ -1,18 +1,18 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
 from dotenv import load_dotenv
 
 load_dotenv()   
 
-# Configure the Google API key (using secrets management is recommended)
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
 
 # Initialize chat history in session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-st.title("Google Generative AI Chatbot")
+st.title("Research your analysis questions with Gemini Chatbot")
 
 # Display past messages
 for message in st.session_state.messages:
@@ -27,11 +27,19 @@ if user_input := st.chat_input("How can I help you today?"):
         st.markdown(user_input)
 
     # Get AI response using the Gemini model
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    response = model.generate_content(user_input)
+    API_KEY = os.getenv("GEMINI_API_KEY")
+    client = genai.Client(api_key=API_KEY)
+
+    response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=user_input,)
+
+    #response = model.generate_content(user_input)
     ai_response = response.text
 
     # Add AI message to session state and display
     st.session_state.messages.append({"role": "assistant", "content": ai_response})
     with st.chat_message("assistant"):
         st.markdown(ai_response)
+    
+    client.close()
