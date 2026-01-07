@@ -23,3 +23,4 @@ rajiv_github_key.pub
 .env
 #ignore the .vscode folder
 .vscode/
+.python-version
