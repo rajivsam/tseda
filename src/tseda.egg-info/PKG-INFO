@@ -7,11 +7,12 @@ Description-Content-Type: text/markdown
 Requires-Dist: google-genai>=1.56.0
 Requires-Dist: ipython>=9.8.0
 Requires-Dist: jupyter>=1.1.1
+Requires-Dist: kmds>=0.2.16
 Requires-Dist: matplotlib>=3.10.8
 Requires-Dist: numpy>=2.4.0
 Requires-Dist: pandas>=2.3.3
 Requires-Dist: plotly>=6.5.0
-Requires-Dist: pytest>=9.0.2
+Requires-Dist: pytest>=8.0
 Requires-Dist: pytest-cov>=7.0.0
 Requires-Dist: python-dotenv>=1.2.1
 Requires-Dist: req>=1.0.0
@@ -44,3 +45,9 @@ An effective EDA can help you:
 Time series from economic or business sources are often provided at regular intervals (e.g., monthly unemployment rates, daily resource demand). Consequently, most time series analysis techniques are designed for data that is sampled at a consistent cadence.
 
 `tseda` is a simple exploratory tool that helps you analyze this regularly sampled data to understand and extract its most salient characteristics, setting you up for success in your broader time series application development.
+
+## Analysis Approach
+
+1. If you have sufficient data, then there are possibly change points in the time series. This is analyzed first. As a consequence, the time series is segmented into regimes of similar behavior. The segmentation information for the series is saved.
+2. We now analyze the components of variation in each segment of the time series with a time series decomposition method. Singular spectrum analysis is used for this purpose. The output from singular spectrum analysis is analyzed. This provides a component wise decomposition of the variance of the raw time series. This information can tell you what type of behavior accounts variation in each segment. For example, you may observe that the trend accounts for most of the variation and seasonal behavior accounts for a very small proportion of the behavior. 
+3. By consolidating the information from the above two steps we have a comprehensive picture of the components that explain the behavior of the time series. We can use LLM tools to prepare a clear concise description of the observed behavior and then capture this in a knowledge base.

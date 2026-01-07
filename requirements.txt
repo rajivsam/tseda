@@ -9,9 +9,11 @@ seaborn
 statsmodels
 plotly
 ruptures
-pytest
+pytest >= 8.00
 pytest-cov
 streamlit
 ssalib
 google-genai
 python-dotenv
+importlib-resources
+kmds
