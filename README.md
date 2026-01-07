@@ -22,6 +22,6 @@ Time series from economic or business sources are often provided at regular inte
 
 ## Analysis Approach
 
-1. If you have sufficient data, then there are possibly change points in the time series. This is analyzed first. As a consequence, the time series is segmented into regimes of similar behavior. The segmentation information for the series is saved.
+1. If you have sufficient data, then there are possibly change points in the time series. This is analyzed first. As a consequence, the time series is segmented into regimes of similar behavior. The segmentation information for the series is saved. If you have no change points, you can work with the entire time series as a single segment.
 2. We now analyze the components of variation in each segment of the time series with a time series decomposition method. Singular spectrum analysis is used for this purpose. The output from singular spectrum analysis is analyzed. This provides a component wise decomposition of the variance of the raw time series. This information can tell you what type of behavior accounts variation in each segment. For example, you may observe that the trend accounts for most of the variation and seasonal behavior accounts for a very small proportion of the behavior. 
 3. By consolidating the information from the above two steps we have a comprehensive picture of the components that explain the behavior of the time series. We can use LLM tools to prepare a clear concise description of the observed behavior and then capture this in a knowledge base.
