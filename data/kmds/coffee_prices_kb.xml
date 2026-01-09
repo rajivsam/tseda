@@ -268,25 +268,64 @@
 
 <owl:NamedIndividual rdf:about="#exploratoryobservation1">
   <rdf:type rdf:resource="#ExploratoryObservation"/>
-  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Coffee Price Series Analysis Report (1990-2025)
+  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">This series covers 35 years of coffee prices and has about 420 coffee prices reported over this period. The period ranges from 1990 to 2025. The approach to analysis was to use the PELT algorithm to segment this series based on distribution of prices. The RBF model was used for this purpose. If you are interested in the mean shifts of price behavior, then you should use the L1 or the L2 models. The number of price changes reported by the PELT algorithm is consistent with the number of density modes observed in the density plot of the prices over the period. The segmentation information is saved as an intermediate file. We then use the segmentation section of the tool to analyze the segment behaviors. If we have done the segmentation based on the RBF model, then the segments represent series of data points that behave similarly from a distribution perspective. In this analysis, we picked the second segment for analysis for illustrative purposes. The features in the segmentation view permit us to view a smoothed version of the of this series. We can then use the singular spectrum analysis tool to analyze the components of variation the second segment. Running SSA it is clear that the first three eigen values of the SSA decomposition accounnt for over 90 percent of the variation in the time series. The trend component explains most of the variation in the coffes prices for the second segment. The seasonal components explain or account for a small portion of the variation. The plots of the series for both smmothing and singular spectrum analysis are available in the tool. Another analyst could analyze section 1 and 3 to complete the analysis of this series.
 
-This report analyzes a time series of approximately 420 coffee prices, spanning a 35-year period from 1990 to 2025, using segmentation and Singular Spectrum Analysis (SSA) to understand price behavior.
+[prompt]: Can you write this analysis into a concise clear report with a paragraph for each of the major points.
+generated content:
+This report analyzes a 35-year time series of approximately 420 coffee prices, spanning from 1990 to 2025. The objective was to identify and analyze distinct periods within the series based on their price distribution characteristics, providing insights into underlying price dynamics over several decades.
 
-Segmentation Methodology The time series was segmented using the PELT algorithm with an RBF model to identify periods of similar price distribution. This method effectively detected shifts in the underlying price distribution, with the number of reported changes aligning well with observed density modes in the overall price plot. For analyses focused on mean shifts, L1 or L2 models would be more appropriate.
+The analysis employed the Pruned Exact Linear Time (PELT) algorithm, utilizing an RBF model, to segment the coffee price series based on changes in price distribution. This approach differs from L1 or L2 models, which would identify mean shifts. The number of segments identified by PELT was consistent with the density modes observed in the overall price distribution plot, and this segmentation information was saved for subsequent analysis.
 
-Segment Selection and Interpretation Following segmentation, individual segments, representing periods of consistent price distribution, were selected for further analysis. For illustrative purposes, the second identified segment was chosen to demonstrate the subsequent analytical steps, with segmentation information saved for future reference.
+Following segmentation, individual segments, characterized by similar price distributions, were analyzed. For illustrative purposes, the second segment was selected for detailed examination. This involved using the segmentation view to generate a smoothed representation of its price behavior, preparing it for further decomposition.
 
-Detailed Segment Analysis (SSA) The chosen segment underwent smoothing and subsequent Singular Spectrum Analysis (SSA) to decompose its variance. The SSA results indicated that the first three eigenvalues accounted for over 90% of the variation within this segment. Specifically, the trend component was the dominant factor, explaining the majority of price movements, while seasonal components contributed only a minor portion. Visualizations of both smoothed data and SSA components are available within the analytical tool.
+Singular Spectrum Analysis (SSA) was then applied to the smoothed second segment to decompose its components of variation. The analysis revealed that the first three eigenvalues of the SSA decomposition collectively account for over 90% of the segment's total variance. Notably, the primary driver of variation in this segment's coffee prices is the underlying trend component, with seasonal components explaining only a minor portion.
 
-Conclusion and Further Analysis This analysis focused on a single segment to illustrate the methodology. A complete understanding of the entire coffee price series would require similar detailed analysis of the remaining identified segments.</finding>
+Visualizations for both the smoothed series and the SSA decomposition are available within the analytical tool. This comprehensive approach provides a foundation, with segments one and three remaining available for further analysis by other analysts to complete the full series assessment.</finding>
   <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">1</finding_sequence>
   <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
   <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
 </owl:NamedIndividual>
 
-<owl:NamedIndividual rdf:about="#coffee_prices_modeling">
+<owl:NamedIndividual rdf:about="#data/kmds/coffee_prices_kb.xml">
   <rdf:type rdf:resource="#KnowledgeExtractionExperimentationWorkflow"/>
   <has_exploratory_observations rdf:resource="#exploratoryobservation1"/>
+  <has_exploratory_observations rdf:resource="#exploratoryobservation2"/>
+  <has_exploratory_observations rdf:resource="#exploratoryobservation3"/>
+  <has_exploratory_observations rdf:resource="#exploratoryobservation4"/>
+  <has_exploratory_observations rdf:resource="#exploratoryobservation5"/>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#exploratoryobservation2">
+  <rdf:type rdf:resource="#ExploratoryObservation"/>
+  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">add second obs</finding>
+  <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">2</finding_sequence>
+  <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
+  <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#exploratoryobservation3">
+  <rdf:type rdf:resource="#ExploratoryObservation"/>
+  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">THis is the third obs
+</finding>
+  <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">3</finding_sequence>
+  <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
+  <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#exploratoryobservation4">
+  <rdf:type rdf:resource="#ExploratoryObservation"/>
+  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">This is the fourth obs</finding>
+  <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">4</finding_sequence>
+  <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
+  <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#exploratoryobservation5">
+  <rdf:type rdf:resource="#ExploratoryObservation"/>
+  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">This is the 5 th obs</finding>
+  <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">5</finding_sequence>
+  <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
+  <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
 </owl:NamedIndividual>
 
 

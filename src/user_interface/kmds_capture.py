@@ -10,6 +10,11 @@ from kmds.utils.path_utils import get_package_kb_path
 from kmds.ontology.intent_types import IntentType
 from pathlib import Path
 import os
+from dataloader.kmds_data_loader import KMDSDataLoader
+from data_writers.kmds_writer import KMDSDataWriter
+
+
+
 
 class KMDS_Capture_Mode(Enum):
     GET_CAPTURE_MODE = 1
@@ -50,16 +55,13 @@ def click_create_new_kb_btn(observations: str, file_name: str, file_dir: str) ->
     e1.exploratory_observation_type = ExploratoryTags.DATA_QUALITY_OBSERVATION.value
     e1.intent = IntentType.DATA_UNDERSTANDING.value
     exp_obs_list.append(e1)
-
-
-
-    kaw = KnowledgeExtractionExperimentationWorkflow("coffee_prices_modeling", namespace=onto)
-    kaw.has_exploratory_observations = exp_obs_list
-
     full_file_path = os.path.join(file_dir, file_name)
 
-    KNOWLEDGE_BASE = full_file_path
-    onto.save(file=KNOWLEDGE_BASE, format="rdfxml")
+
+    kaw = KnowledgeExtractionExperimentationWorkflow(full_file_path, namespace=onto)
+    kaw.has_exploratory_observations = exp_obs_list
+    onto.save(file=full_file_path, format="rdfxml")
+
 
     return
 
@@ -160,32 +162,74 @@ def do_create_new_kb()->None:
     
     return
 
+def click_load_KnowledgeBase_btn(file_name: str, file_dir: str) -> None:
+    full_file_path = os.path.join(file_dir, file_name)
+
+    if not Path(full_file_path).exists():
+        error_dialog("The KMDS file path is incorrect, please verify!")
+    
+    kmds_data_loader = KMDSDataLoader(full_file_path)
+    exp_df = kmds_data_loader.load_exploratory_obs()
+
+    st.session_state.exp_df = exp_df
+    st.session_state.kb_file_path = full_file_path
+
+
+    return
+
+
+def click_add_to_kb_btn(obs: str) -> None:
+    file_path = st.session_state.get("kb_file_path", None)
+    kmds_writer = KMDSDataWriter(file_path)
+    kmds_writer.add_exploratory_obs(obs, file_path)
+    kmds_data_loader = KMDSDataLoader(file_path)
+    exp_df = kmds_data_loader.load_exploratory_obs()
+
+    st.session_state.exp_df = exp_df
+    
+
+    return
+    
+
+def enable_add_to_kb_btn() -> None:
+    st.session_state.no_addl_facts_added = False
+
+
+    return
+
+
+
 def do_update_existing_kb()->None:
     print("do_update_existing_kb")
 
     with st.container():
-        st.title("Upload existing KMDS file")
+        st.title("Enter the location of your KMDS Knowledge Base")
 
-        st.session_state.start_analysis_btn_disabled = True 
-        uploaded_file = st.file_uploader("Choose a KMDS file")
-        upload_done = uploaded_file is not None
-        if uploaded_file is not None:
+        file_name = st.text_input("File Name")
+        file_dir = st.text_input("File directory", on_change=validate_directory, key="file_dir")
 
-            # Can be used wherever a "file-like" object is accepted:
-            try:
-                pass
+        data_entered = len(file_dir) > 0 and len(file_name) > 0
 
-            except Exception as e:
-                st.write("Please upload a valid CSV file.")
-                #st.error(f"Error reading the file: {e}")
+
+
+        if "exp_df" in st.session_state:
+            exp_df = st.session_state["exp_df"]
+            st.table(exp_df)
+
+        else:
+            # You only need to load the KB if a load has not happened previously, in which case exp_df is in the session
+            st.button("Load Knowledge Base", on_click=click_load_KnowledgeBase_btn,\
+                    args=(file_name, file_dir),disabled=not data_entered,key="load_kb_btn")
         
-        col1, col2 = st.columns(2)
+        st.subheader("Input your next finding below")
+        user_input = st.text_area("Input text here", height=150, on_change=enable_add_to_kb_btn) # The label is "Input text here"
+        st.session_state.no_addl_facts_added = len(user_input) > 0
 
-        with col1:
-            st.button("Update Knowledge Base", on_click=click_update_existing_kb_btn, disabled=not upload_done, key="update_kb_btn")
-        with col2:
-            st.button("Create New KMDS Knowledge Base", on_click= click_go_to_new_kb_btn)
-     
+
+
+        st.button("Add to KB", on_click=click_add_to_kb_btn,\
+            args=(user_input,), disabled= not st.session_state.get("no_addl_facts_added", False))
+        
 
 
     return
