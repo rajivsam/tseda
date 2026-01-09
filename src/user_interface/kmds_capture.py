@@ -200,7 +200,7 @@ def enable_add_to_kb_btn() -> None:
 
 
 def do_update_existing_kb()->None:
-    print("do_update_existing_kb")
+
 
     with st.container():
         st.title("Enter the location of your KMDS Knowledge Base")
