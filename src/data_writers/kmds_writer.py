@@ -17,7 +17,7 @@ class KMDSDataWriter:
         onto2 :Ontology = load_kb(self._file_path)
         return onto2
     
-    def add_exploratory_obs(self, obs: str, file_path: str) -> pd.DataFrame:
+    def add_exploratory_obs(self, obs: str, file_path: str):
         the_workflow: Workflow = get_workflow(self._onto)
 
 
