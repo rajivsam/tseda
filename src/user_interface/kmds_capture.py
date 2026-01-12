@@ -197,6 +197,15 @@ def enable_add_to_kb_btn() -> None:
 
     return
 
+def click_delete_from_kb_btn(obs: str) -> None:
+
+    return
+
+def click_update_KB_entry_btn(obs: str) -> None:
+
+    return
+
+
 
 
 def do_update_existing_kb()->None:
@@ -210,11 +219,25 @@ def do_update_existing_kb()->None:
 
         data_entered = len(file_dir) > 0 and len(file_name) > 0
 
+        st.session_state.noselection = True
+
 
 
         if "exp_df" in st.session_state:
             exp_df = st.session_state["exp_df"]
-            st.table(exp_df)
+            wrap_width = 480
+            exp_df['finding'] = exp_df['finding'].str.wrap(wrap_width)
+            selection_event = st.dataframe(exp_df, on_select="rerun", selection_mode="single-row", row_height=80)
+
+                            # Check if any row is selected
+            if selection_event.selection and selection_event.selection["rows"]:
+                # Get the index of the selected row (positional index)
+                selected_index = selection_event.selection["rows"][0]
+                
+                # Retrieve the actual row data using .iloc
+                selected_row_data = exp_df.iloc[selected_index]
+                st.session_state.noselection = False
+
 
         else:
             # You only need to load the KB if a load has not happened previously, in which case exp_df is in the session
@@ -227,8 +250,20 @@ def do_update_existing_kb()->None:
 
 
 
-        st.button("Add to KB", on_click=click_add_to_kb_btn,\
-            args=(user_input,), disabled= not st.session_state.get("no_addl_facts_added", False))
+
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.button("Add to KB", on_click=click_add_to_kb_btn,\
+                args=(user_input,), disabled= not st.session_state.get("no_addl_facts_added", False))
+
+        with col2:
+            st.button("Update KB", on_click=click_update_KB_entry_btn, disabled= st.session_state.get("noselection", False))
+
+        with col3:
+            st.button("Delete from KB", on_click=click_delete_from_kb_btn,\
+                args=(user_input,), disabled= st.session_state.get("noselection", False))
         
 
 
