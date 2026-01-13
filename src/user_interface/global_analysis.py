@@ -7,6 +7,7 @@ from visualization.series_kde_visualizer import SeriesKDEVisualizer
 from visualization.series_visualizer import SeriesVisualizer
 from change_point.change_point_estimator import ChangePointEstimator
 from visualization.series_visualizer import SegmentedSeriesVisualizer
+from series_stats.sampling_prop import SamplingProp
 
 
 
@@ -84,7 +85,15 @@ def step_1()->None:
                 st.subheader("Sample of data")
                 st.write(df)
                 st.session_state.df = df
-                st.session_state.start_analysis_btn_disabled = False 
+                st.session_state.start_analysis_btn_disabled = False
+                series = df["signal"]
+                series.index  = df["date"]
+                sp = SamplingProp(series)
+                df_prop = sp.view_properties()
+                st.subheader("Sampling Properties")
+                st.write(df_prop)
+
+
             except Exception as e:
                 st.write("Please upload a valid CSV file.")
                 #st.error(f"Error reading the file: {e}")
