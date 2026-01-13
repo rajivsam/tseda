@@ -5,6 +5,10 @@ from typing import List
 from matplotlib import pyplot as plt
 import re
 from visualization.series_visualizer import SeriesVisualizer
+import statsmodels.graphics.tsaplots as tsa_plots
+
+
+
 
 
 def init_segment()->None:
@@ -31,6 +35,8 @@ def manage_segment_state():
         run_ssa()
     if current_state == 3:
         run_segment_visualization()
+    if current_state == 4:
+        run_acf_plots()
     
     return
 
@@ -38,8 +44,8 @@ def manage_segment_state():
 def click_run_SSA_button() -> None:
     """_summary_: Button handler for run ssa button click
     """
-    if "ssa_window_size" in st.session_state:
-        del st.session_state.ssa_window_size
+    if "window_size" in st.session_state:
+        del st.session_state.window_size
     st.session_state.seg_current_step = 2
 
     return
@@ -68,6 +74,11 @@ def re_init_analysis_state() ->None:
     keys = list(st.session_state.keys())
     for key in keys:
         del st.session_state[key]
+
+    return
+
+def click_acf_plots_button() ->None:
+    st.session_state.seg_current_step = 4
 
     return
 
@@ -103,7 +114,7 @@ def upload_segment_file()->None:
                 
 
             # layout the analysis option buttons in a row
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             st.session_state.start_analysis_btn_disabled = False 
             st.session_state.seg_visualization_btn_disabled = False 
             with col1:
@@ -111,6 +122,9 @@ def upload_segment_file()->None:
                     disabled=st.session_state.get('seg_run_SSA_btn_disabled',False))
             with col2:
                 st.button('Series Visualization', on_click=click_seg_visualization_button, \
+                    disabled=st.session_state.get('seg_visualization_btn_disabled',False))
+            with col3:
+                st.button('Autocorrelation Plots', on_click=click_acf_plots_button, \
                     disabled=st.session_state.get('seg_visualization_btn_disabled',False))
 
     return
@@ -130,11 +144,11 @@ def parse_number_string(numbers_string: str) -> List[int]:
 
     return numbers_list
 
-@st.dialog("Enter the window size for SSA")
+@st.dialog("Enter the window size for the analysis")
 def input_window_size():
-    window_size = st.number_input("window size for SSA",min_value=0, max_value=50, step=1, key="wsize")
+    window_size = st.number_input("window size for the analysis",min_value=0, max_value=50, step=1, key="wsize")
     if st.button("Submit"):
-        st.session_state.ssa_window_size = st.session_state.wsize
+        st.session_state.window_size = st.session_state.wsize
         st.rerun()
 
 def run_ssa() ->None:
@@ -146,11 +160,11 @@ def run_ssa() ->None:
 
         st.subheader("SSA Decomposition")
         
-        if "ssa_window_size" not in st.session_state: 
+        if "window_size" not in st.session_state: 
             input_window_size()
 
-        if st.session_state.get('ssa_window_size', False) > 0 :
-            ws = st.session_state["ssa_window_size"]
+        if st.session_state.get('window_size', False) > 0 :
+            ws = st.session_state["window_size"]
             ssa = SSADecomposition(df,ws)
             st.subheader("Eigen decomposition, vector view")
             eig_decomp: plt.Figure  = ssa._ssa.plot(kind='vectors')[0]
@@ -211,6 +225,39 @@ def run_segment_visualization() -> None:
  
 
     return
+
+def run_acf_plots() -> None:
+
+    with st.container():
+        st.title("Autocorrelation Plots")
+        df = st.session_state.get('df_seg', None)
+        series = pd.Series(df.loc[:, "signal"])  # Assuming the signal is in a column named "signal"
+        series.index  = df.loc[:, "date"]  # Assuming the date is in a column named "date"
+
+        if "window_size" not in st.session_state: 
+            input_window_size()
+
+        
+        if st.session_state.get('window_size', False) > 0 :
+            lag_reporting = st.session_state.get('window_size', None) - 1
+            
+            st.subheader("Autocorrelation Plots")
+            acf_fig = tsa_plots.plot_acf(series, lags=lag_reporting)
+            st.pyplot(acf_fig)
+            pacf_fig = tsa_plots.plot_pacf(series, lags=lag_reporting)
+            st.pyplot(pacf_fig)
+        
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.button('Run SSA', on_click=click_run_SSA_button, \
+                disabled=st.session_state.get('start_analysis_btn_disabled',False))
+        with col2:
+            st.button('Upload Segement', on_click=click_upload_segment_button)
+    
+    return
+
     
 
 init_segment()

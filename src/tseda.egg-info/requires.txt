@@ -1,4 +1,5 @@
 google-genai>=1.56.0
+importlib-resources>=6.5.2
 ipython>=9.8.0
 jupyter>=1.1.1
 kmds>=0.2.16

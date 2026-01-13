@@ -1,7 +1,9 @@
 README.md
 pyproject.toml
 src/change_point/change_point_estimator.py
+src/data_writers/kmds_writer.py
 src/dataloader/coffee_prices_data_loader.py
+src/dataloader/kmds_data_loader.py
 src/dataloader/local_dataloader.py
 src/dataloader/synthetic_series_data_loader.py
 src/decomposition/ssa_decomposition.py
