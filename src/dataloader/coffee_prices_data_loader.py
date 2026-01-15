@@ -19,8 +19,6 @@ class CoffeePricesDataLoader(LocalDataLoader):
             print("No data loaded.")
             return pd.DataFrame()
 
-        return data
-
     def get_series(self) -> pd.Series:
         """Get the 'signal' series from the coffee prices data."""
         data = self.load_coffee_prices()

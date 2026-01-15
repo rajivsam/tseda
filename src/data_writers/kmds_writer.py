@@ -1,11 +1,7 @@
-import kmds
-from kmds.tagging.tag_types import DataRepresentationTags
 from kmds.tagging.tag_types import ExploratoryTags
 from kmds.ontology.intent_types import IntentType
 from owlready2 import *
 from kmds.utils.load_utils import *
-from kmds.utils.path_utils import get_package_kb_path
-import pandas as pd
 
 class KMDSDataWriter:
     def __init__(self, file_path: str):
@@ -36,6 +32,3 @@ class KMDSDataWriter:
             self._onto.save(file=file_path, format="rdfxml")
 
         return
-        
-
-    

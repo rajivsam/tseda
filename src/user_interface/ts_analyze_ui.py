@@ -1,5 +1,5 @@
 import streamlit as st
-from analysis_modes import AnalysisMode
+
 
 
 def main():

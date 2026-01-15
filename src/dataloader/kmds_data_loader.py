@@ -1,8 +1,5 @@
-import kmds
-from kmds.tagging.tag_types import DataRepresentationTags
 from owlready2 import *
 from kmds.utils.load_utils import *
-from kmds.utils.path_utils import get_package_kb_path
 import pandas as pd
 
 class KMDSDataLoader:
@@ -30,10 +27,6 @@ class KMDSDataLoader:
             #a_row["obs_type"] = o.exploratory_observation_type
             a_row["finding"] = o.finding
             records.append(a_row)
-        df = DataFrame(records)
+        df = pd.DataFrame(records)
 
         return df
-    
-
-
-    

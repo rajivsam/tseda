@@ -6,7 +6,6 @@ import kmds
 from kmds.ontology.kmds_ontology import *
 from kmds.tagging.tag_types import ExploratoryTags
 from owlready2 import *
-from kmds.utils.path_utils import get_package_kb_path
 from kmds.ontology.intent_types import IntentType
 from pathlib import Path
 import os
@@ -20,12 +19,6 @@ class KMDS_Capture_Mode(Enum):
     GET_CAPTURE_MODE = 1
     DO_CREATE_NEW_KB = 2
     DO_UPDATE_KB = 3
-
-
-def click_load_KMDS_file_btn() -> None:
-
-
-    return
 
 
 def handle_capture_mode_decision(decision: str) -> None:
@@ -64,16 +57,6 @@ def click_create_new_kb_btn(observations: str, file_name: str, file_dir: str) ->
 
 
     return
-
-def click_go_to_new_kb_btn() -> None:
-    st.session_state.current_step = KMDS_Capture_Mode.DO_CREATE_NEW_KB.value
-
-    return
-
-
-
-
-
 
 def init_kmds_capture()->None:
 
@@ -225,8 +208,10 @@ def do_update_existing_kb()->None:
 
         if "exp_df" in st.session_state:
             exp_df = st.session_state["exp_df"]
-            wrap_width = 480
-            exp_df['finding'] = exp_df['finding'].str.wrap(wrap_width)
+            styles = [dict(selector="td", props=[('white-space', 'pre-wrap'),\
+                 ('word-wrap', 'break-word'), ('max-width', '480px')])]
+            exp_df.style.set_table_styles(styles)
+
             selection_event = st.dataframe(exp_df, on_select="rerun", selection_mode="single-row", row_height=80)
 
                             # Check if any row is selected
