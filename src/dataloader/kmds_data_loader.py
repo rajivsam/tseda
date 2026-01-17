@@ -30,3 +30,53 @@ class KMDSDataLoader:
         df = pd.DataFrame(records)
 
         return df
+    
+    def load_data_rep_obs(self) -> pd.DataFrame:
+        the_workflow: Workflow = get_workflow(self._onto)
+        dr_obs: List[DataRepresentationObservation] = the_workflow.has_data_representation_observations
+        records = []
+        for o in dr_obs:
+            a_row = {}
+            a_row["finding_seq"] = o.finding_sequence
+            a_row["obs_type"] = o.data_representation_observation_type
+            a_row["finding"] = o.finding
+            records.append(a_row)
+        df = pd.DataFrame(records)
+
+        return df
+    def load_modelling_choice_obs(self) -> pd.DataFrame:
+        the_workflow: Workflow = get_workflow(self._onto)
+        mc_obs: List[ModellingChoiceObservation] = the_workflow.has_modelling_choice_observations
+        records = []
+        for o in mc_obs:
+            a_row = {}
+            a_row["finding_seq"] = o.finding_sequence
+            a_row["obs_type"] = o.modelling_choice_observation_type
+            a_row["finding"] = o.finding
+            records.append(a_row)
+        df = pd.DataFrame(records)
+
+        return df   
+    
+    def load_modelling_selection_obs(self) -> pd.DataFrame:
+        the_workflow: Workflow = get_workflow(self._onto)
+        ms_obs: List[ModellingSelectionObservation] = the_workflow.has_modelling_selection_observations
+        records = []
+        for o in ms_obs:
+            a_row = {}
+            a_row["finding_seq"] = o.finding_sequence
+            a_row["obs_type"] = o.modelling_selection_observation_type
+            a_row["finding"] = o.finding
+            records.append(a_row)
+        df = pd.DataFrame(records)
+
+        return df
+    
+    def export_all_observations(self) -> pd.DataFrame:
+        exp_df  = load_exp_observations(self._onto)
+        dr_df = load_data_rep_observations(self._onto)
+        mc_df = load_modelling_choice_observations(self._onto)
+        ms_df = load_model_selection_observations(self._onto)
+        df_consolidated = pd.concat([exp_df, dr_df, mc_df, ms_df], ignore_index=True)
+
+        return df_consolidated

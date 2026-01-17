@@ -12,18 +12,22 @@ import os
 from dataloader.kmds_data_loader import KMDSDataLoader
 from data_writers.kmds_writer import KMDSDataWriter
 
-
+from kmds.utils.load_utils import *
+import pandas as pd
 
 
 class KMDS_Capture_Mode(Enum):
     GET_CAPTURE_MODE = 1
     DO_CREATE_NEW_KB = 2
     DO_UPDATE_KB = 3
+    DO_EXPORT_KB = 4
 
 
 def handle_capture_mode_decision(decision: str) -> None:
     if decision == "Create a new Knowledge Base":
         st.session_state.current_step = KMDS_Capture_Mode.DO_CREATE_NEW_KB.value
+    elif decision == "Export Knowledge Base":
+        st.session_state.current_step = KMDS_Capture_Mode.DO_EXPORT_KB.value
     else:
         st.session_state.current_step = KMDS_Capture_Mode.DO_UPDATE_KB.value
     
@@ -72,10 +76,42 @@ def manage_kmds_capture_state():
         do_capture_mode()
     elif current_state == KMDS_Capture_Mode.DO_CREATE_NEW_KB.value:
         do_create_new_kb()
+    elif current_state == KMDS_Capture_Mode.DO_EXPORT_KB.value:
+        export_KB()
     else:
         do_update_existing_kb()
     
     return
+
+def click_export_kb_btn(file_name: str, file_dir: str, dest_dir: str, dest_file_name: str) -> None:
+
+    full_file_path = os.path.join(file_dir, file_name)
+    dest_full_file_path = os.path.join(dest_dir, dest_file_name)
+
+    if not Path(full_file_path).exists():
+        error_dialog("The KMDS file path is incorrect, please verify!")
+    
+    df = create_export_dataframe(full_file_path)
+    df.to_csv(dest_full_file_path, index=False)
+
+    return
+
+def export_KB()->None:
+
+    with st.container():
+        st.title("Export KMDS Knowledge Base")
+
+        file_name = st.text_input("KB File Name")
+        file_dir = st.text_input("KB File directory", on_change=validate_directory, key="file_dir")
+
+        dest_dir = st.text_input("Destination Directory", on_change=validate_directory, key="dest_dir")
+        dest_file_name = st.text_input("Destination File Name")
+        data_entered = len(file_name) > 0 and len(file_dir) > 0 and len(dest_dir) >0 and len(dest_file_name) >0
+        st.button("Export Knowledge Base", on_click=click_export_kb_btn,\
+            args=(file_name, file_dir, dest_dir, dest_file_name), disabled= not data_entered)
+    return
+
+
 
 def do_capture_mode()->None:
 
@@ -90,10 +126,12 @@ def do_capture_mode()->None:
 
         page_selection = st.radio(
         "What do you want to do?",
-        ("Update an Existing Knowledge Base", "Create a new Knowledge Base"))
+        ("Update an Existing Knowledge Base", "Create a new Knowledge Base", "Export Knowledge Base"))
         
-    
+        
+
         st.button("Ok", on_click=handle_capture_mode_decision, args=(page_selection,))
+    
     
 
             
@@ -188,6 +226,16 @@ def click_update_KB_entry_btn(obs: str) -> None:
 
     return
 
+def create_export_dataframe(kmds_kb_path: str) -> pd.DataFrame:
+    
+    kmds_data_loader = KMDSDataLoader(kmds_kb_path)
+
+    obs_df  = kmds_data_loader.export_all_observations()
+
+
+    return obs_df
+
+
 
 
 
@@ -249,6 +297,7 @@ def do_update_existing_kb()->None:
         with col3:
             st.button("Delete from KB", on_click=click_delete_from_kb_btn,\
                 args=(user_input,), disabled= st.session_state.get("noselection", False))
+
         
 
 

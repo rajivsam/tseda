@@ -14,8 +14,8 @@ from series_stats.sampling_prop import SamplingProp
 
 def init_global()->None:
     
-    if "current_step" not in st.session_state:
-        st.session_state.current_step = 1
+    if "current_global_step" not in st.session_state:
+        st.session_state.current_global_step= 1
     st.session_state.start_analysis_btn_disabled = True 
     
 
@@ -34,7 +34,7 @@ def re_init_analysis_state() ->None:
 
 
 def manage_global_state():
-    current_state = st.session_state.current_step
+    current_state = st.session_state.current_global_step
 
     if current_state == 1:
         step_1()
@@ -49,13 +49,13 @@ def manage_global_state():
 
 def click_start_analysis_button():
 
-    st.session_state.current_step = 2
+    st.session_state.current_global_step= 2
 
 
     return
 
 def click_run_change_point_analysis_button():
-     st.session_state.current_step = 3
+     st.session_state.current_global_step= 3
 
      return
 
