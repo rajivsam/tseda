@@ -13,7 +13,7 @@ class KMDSDataWriter:
         onto2 :Ontology = load_kb(self._file_path)
         return onto2
     
-    def add_exploratory_obs(self, obs: str, file_path: str):
+    def add_exploratory_obs(self, obs: str, file_path: str) -> None:
         the_workflow: Workflow = get_workflow(self._onto)
 
 
@@ -32,3 +32,27 @@ class KMDSDataWriter:
             self._onto.save(file=file_path, format="rdfxml")
 
         return
+    
+    def delete_exploratory_obs(self, obs_seq: int) -> None:
+        the_workflow: Workflow = get_workflow(self._onto)
+        with self._onto:
+            del the_workflow.has_exploratory_observations[obs_seq - 1]
+
+            obs_len = len(the_workflow.has_exploratory_observations)
+            for idx in range(obs_len):
+                the_workflow.has_exploratory_observations[idx].finding_sequence = idx + 1
+
+            self._onto.save(file=self._file_path, format="rdfxml")
+
+        return
+    
+    def update_exploratory_obs(self, obs: str, obs_seq: int) -> None:
+        the_workflow: Workflow = get_workflow(self._onto)
+        with self._onto:
+            the_workflow.has_exploratory_observations[obs_seq - 1].finding = obs
+
+            self._onto.save(file=self._file_path, format="rdfxml")
+
+        return
+
+

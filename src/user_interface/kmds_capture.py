@@ -25,23 +25,23 @@ class KMDS_Capture_Mode(Enum):
 
 def handle_capture_mode_decision(decision: str) -> None:
     if decision == "Create a new Knowledge Base":
-        st.session_state.current_step = KMDS_Capture_Mode.DO_CREATE_NEW_KB.value
+        st.session_state.current_kmds_step = KMDS_Capture_Mode.DO_CREATE_NEW_KB.value
     elif decision == "Export Knowledge Base":
-        st.session_state.current_step = KMDS_Capture_Mode.DO_EXPORT_KB.value
+        st.session_state.current_kmds_step = KMDS_Capture_Mode.DO_EXPORT_KB.value
     else:
-        st.session_state.current_step = KMDS_Capture_Mode.DO_UPDATE_KB.value
+        st.session_state.current_kmds_step = KMDS_Capture_Mode.DO_UPDATE_KB.value
     
 
     return
 
 def click_update_existing_kb_btn() -> None:
-    st.session_state.current_step = KMDS_Capture_Mode.DO_UPDATE_KB.value
+    st.session_state.current_kmds_step = KMDS_Capture_Mode.DO_UPDATE_KB.value
 
     return
 
 def click_create_new_kb_btn(observations: str, file_name: str, file_dir: str) -> None:
 
-    st.session_state.current_step = KMDS_Capture_Mode.DO_CREATE_NEW_KB.value
+    st.session_state.current_kmds_step = KMDS_Capture_Mode.DO_CREATE_NEW_KB.value
 
     exp_obs_list = []
     observation_count :int = 1
@@ -64,13 +64,13 @@ def click_create_new_kb_btn(observations: str, file_name: str, file_dir: str) ->
 
 def init_kmds_capture()->None:
 
-    if "current_step" not in st.session_state:
-        st.session_state.current_step = KMDS_Capture_Mode.GET_CAPTURE_MODE.value
+    if "current_kmds_step" not in st.session_state:
+        st.session_state.current_kmds_step = KMDS_Capture_Mode.GET_CAPTURE_MODE.value
     
     return
 
 def manage_kmds_capture_state():
-    current_state = st.session_state.current_step
+    current_state = st.session_state.current_kmds_step
 
     if current_state == KMDS_Capture_Mode.GET_CAPTURE_MODE.value:
         do_capture_mode()
@@ -220,9 +220,26 @@ def enable_add_to_kb_btn() -> None:
 
 def click_delete_from_kb_btn(obs: str) -> None:
 
+
+    file_path = st.session_state.get("kb_file_path", None)
+    kmds_writer = KMDSDataWriter(file_path)
+    kmds_writer.delete_exploratory_obs(obs)
+    kmds_data_loader = KMDSDataLoader(file_path)
+    exp_df = kmds_data_loader.load_exploratory_obs()
+    st.session_state.exp_df = exp_df
+  
+
     return
 
-def click_update_KB_entry_btn(obs: str) -> None:
+def click_update_KB_entry_btn(obs: str, obs_seq: int) -> None:
+
+
+    file_path = st.session_state.get("kb_file_path", None)
+    kmds_writer = KMDSDataWriter(file_path)
+    kmds_writer.update_exploratory_obs(obs, obs_seq)
+    kmds_data_loader = KMDSDataLoader(file_path)
+    exp_df = kmds_data_loader.load_exploratory_obs()
+    st.session_state.exp_df = exp_df
 
     return
 
@@ -252,6 +269,14 @@ def do_update_existing_kb()->None:
 
         st.session_state.noselection = True
 
+        st.subheader("Input your next finding below")
+        user_input = st.text_area("Input text here", height=150, on_change=enable_add_to_kb_btn) # The label is "Input text here"
+        st.session_state.no_addl_facts_added = len(user_input) > 0
+
+
+        st.button("Add to KB", on_click=click_add_to_kb_btn,\
+                    args=(user_input,), disabled= not st.session_state.get("no_addl_facts_added", False))
+
 
 
         if "exp_df" in st.session_state:
@@ -271,34 +296,24 @@ def do_update_existing_kb()->None:
                 selected_row_data = exp_df.iloc[selected_index]
                 st.session_state.noselection = False
 
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.button("Update KB", on_click=click_update_KB_entry_btn, args=(user_input,selected_row_data['finding_seq']),\
+                         disabled= st.session_state.get("noselection", False))
+                with col2:
+                    st.button("Delete from KB", on_click=click_delete_from_kb_btn,\
+                    args=(selected_row_data['finding_seq'],), disabled= False)
+
+
 
         else:
             # You only need to load the KB if a load has not happened previously, in which case exp_df is in the session
             st.button("Load Knowledge Base", on_click=click_load_KnowledgeBase_btn,\
                     args=(file_name, file_dir),disabled=not data_entered,key="load_kb_btn")
         
-        st.subheader("Input your next finding below")
-        user_input = st.text_area("Input text here", height=150, on_change=enable_add_to_kb_btn) # The label is "Input text here"
-        st.session_state.no_addl_facts_added = len(user_input) > 0
 
-
-
-
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.button("Add to KB", on_click=click_add_to_kb_btn,\
-                args=(user_input,), disabled= not st.session_state.get("no_addl_facts_added", False))
-
-        with col2:
-            st.button("Update KB", on_click=click_update_KB_entry_btn, disabled= st.session_state.get("noselection", False))
-
-        with col3:
-            st.button("Delete from KB", on_click=click_delete_from_kb_btn,\
-                args=(user_input,), disabled= st.session_state.get("noselection", False))
-
-        
+            
 
 
     return
