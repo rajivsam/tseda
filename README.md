@@ -18,6 +18,7 @@ An effective EDA helps you:
 
 *   **Change Point Detection:** Automatically segment your time series into different regimes based on statistical shifts in the data.
 *   **Time Series Decomposition:** Analyze the components of variation (e.g., trend, seasonality) within each segment using Singular Spectrum Analysis (SSA).
+*   **Visualization of Time series** Use the tools like smoothers and density plots to analyze your time series. There are more features coming shortly.
 *   **Knowledge Base Integration:** Capture your findings in a `kmds` knowledge base for collaborative and incremental analysis.
 *   **LLM-Powered Summarization:** Use Large Language Models (LLMs) to generate concise summaries of your time series characteristics and save them to your knowledge base.
 
