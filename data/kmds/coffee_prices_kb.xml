@@ -288,7 +288,8 @@ Visualizations for both the smoothed series and the SSA decomposition are availa
 
 <owl:NamedIndividual rdf:about="#data/kmds/coffee_prices_kb.xml">
   <rdf:type rdf:resource="#KnowledgeExtractionExperimentationWorkflow"/>
-  <has_exploratory_observations rdf:resource="#exploratoryobservation1"/>
+  <has_exploratory_observations rdf:resource="#exploratoryobservation9"/>
+  <has_exploratory_observations rdf:resource="#exploratoryobservation10"/>
 </owl:NamedIndividual>
 
 <owl:NamedIndividual rdf:about="#exploratoryobservation8">
@@ -346,6 +347,22 @@ Visualizations for both the smoothed series and the SSA decomposition are availa
   <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">4</finding_sequence>
   <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
   <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#exploratoryobservation9">
+  <rdf:type rdf:resource="#ExploratoryObservation"/>
+  <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">1</finding_sequence>
+  <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
+  <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
+  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Add this second observation</finding>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#exploratoryobservation10">
+  <rdf:type rdf:resource="#ExploratoryObservation"/>
+  <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">2</finding_sequence>
+  <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
+  <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
+  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Add this second observation</finding>
 </owl:NamedIndividual>
 
 
