@@ -40,7 +40,7 @@ An effective EDA helps you:
 *   **Automated Summaries:** A template is provided to automatically generate and log concise data summaries into `kmds` based on the characteristics you input.
 
 ## You can use this with a notebook too
-If you have a new dataset that you want to analyze, look at the data loaders directory for example. Download your dataset, clean it, produce your time series and analyze it with `tseda`.
+If you have a new dataset that you want to analyze, look at the data loader directory for examples. Download your dataset, clean it, produce your time series and analyze it with `tseda`.
 
 
 
