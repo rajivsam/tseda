@@ -39,6 +39,11 @@ An effective EDA helps you:
 *   **Export for RAG:** Export the structured data from your knowledge graph to build features for applications like Retrieval Augmented Generation (RAG).
 *   **Automated Summaries:** A template is provided to automatically generate and log concise data summaries into `kmds` based on the characteristics you input.
 
+## You can use this with a notebook too
+If you have a new dataset that you want to analyze, look at the data loaders directory for example. Download your dataset, clean it, produce your time series and analyze it with `tseda`.
+
+
+
 ## Getting Started
 
 1.  **Set up Knowledge Repository:** `kmds` uses `git` for knowledge storage. Create a new Git repository for your knowledge base. To collaborate, team members can simply clone this repository.
