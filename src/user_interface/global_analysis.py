@@ -156,7 +156,7 @@ def get_series_plot(df: pd.DataFrame) -> plt.Figure:
 @st.dialog("Enter the penalty or accept the default for the change point estimator")
 def input_parameters():
    
-    penalty = st.number_input("penalty for change point estimator",min_value=0.0, max_value=50.0, step=0.1, key="psize", value = 2.0)
+    penalty = st.number_input("penalty for change point estimator",min_value=0.0, max_value=200.0, step=5.0, key="psize", value = 2.0)
     model_options = ['rbf', 'l2', 'l1']
 
     #Create the selectbox
@@ -168,8 +168,10 @@ def input_parameters():
     )
     
     if st.button("Submit"):
-        st.session_state.PELT_penalty = st.session_state.psize
+        st.session_state["PELT_penalty"] = st.session_state.psize
+        st.session_state["PELT_model"] = model_to_use
         st.rerun()
+    return
     
 
 def step_3() -> None:
@@ -183,7 +185,7 @@ def step_3() -> None:
         series = pd.Series(df.loc[:, "signal"])  # Assuming the signal is in a column named "signal"
         series.index  = df.loc[:, "date"]  # Assuming the date is in a column named "date"
         
-        CP_params_defined = "PELT_penalty" in st.session_state and "CP_model" in st.session_state
+        CP_params_defined = "PELT_penalty" in st.session_state and "PELT_model" in st.session_state
         
         if not CP_params_defined:
             input_parameters()
@@ -191,7 +193,7 @@ def step_3() -> None:
         if CP_params_defined:
             cpe = ChangePointEstimator(series)
             input_penalty = st.session_state["PELT_penalty"]
-            input_model = st.session_state["CP_model"]
+            input_model = st.session_state["PELT_model"]
             cpe.estimate_change_points(model_to_use = input_model, penalty_coeff = input_penalty)
             st.title("Step 3: Segment Series by Change Point Analysis")
             ssv = SegmentedSeriesVisualizer(cpe._df)
@@ -199,13 +201,24 @@ def step_3() -> None:
             st.plotly_chart(fig, use_container_width=True)
             #st.write(cpe._df)
             output_csv = cpe._df.to_csv(index=False).encode('utf-8')
-            col1, col2 = st.columns(2)
+            col1, col2, col3  = st.columns(3)
             with col1:      
                 st.download_button('Save Segmented Series', output_csv, file_name="segmented_series.csv", mime='text/csv')
             with col2:
                 st.button('Upload Segement', on_click=click_upload_segment_button, \
                     disabled=False)
+            with col3:
+                st.button('Try another CP model', on_click=click_try_another_cp_model, \
+                    disabled=False)
+    return
 
+def click_try_another_cp_model():
+
+    if "PELT_penalty" in st.session_state:
+        del st.session_state["PELT_penalty"]
+    if "PELT_model" in st.session_state:
+        del st.session_state["PELT_model"]
+    st.rerun()
 
     return
 
