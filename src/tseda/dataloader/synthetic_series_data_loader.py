@@ -15,7 +15,7 @@ class SyntheticSeriesDataLoader(LocalDataLoader):
         p1_peak = 5
         p2_peak = 7
         p1 = 6
-        p2 = 24
+        p2 = 10
         N = ceil(24*90/1)  # 90 days of hourly data
         time_idx = [float(i) for i in range(N)]
         p1_omega = [(2*np.pi* t)/(p1) for t in time_idx]
