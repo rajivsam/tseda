@@ -30,7 +30,10 @@ class SyntheticSeriesDataLoader(LocalDataLoader):
         df = pd.DataFrame.from_dict(data)
         df.index = df.time
         if not df.empty:
-            return df["signal"]
+            series = df["signal"]
+            series.index = df.time
+
+            return series
         else:
             print("No data available to extract series.")
             return pd.Series(dtype=float)

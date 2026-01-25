@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
-from series_stats.sampling_prop import SamplingProp
+from tseda.series_stats.sampling_prop import SamplingProp
 
 class TestSamplingProp:
     @pytest.fixture

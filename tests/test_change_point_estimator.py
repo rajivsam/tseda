@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from change_point.change_point_estimator import ChangePointEstimator
+from tseda.change_point.change_point_estimator import ChangePointEstimator
 
 class TestChangePointEstimator:
     

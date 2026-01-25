@@ -26,7 +26,11 @@ dependencies = [
     "statsmodels>=0.14.6",
     "streamlit>=1.52.2",
 ]
-[tool.hatch.build.targets.sdist]
-include = [
-    "src/user_interface/prompts_config.csv"
-]
+  [build-system]
+  requires = ["setuptools>=42"]
+  build-backend = "setuptools.build_meta"
+
+
+ [tool.setuptools.packages.find]
+  where = ['src']
+  include = ['tseda*']

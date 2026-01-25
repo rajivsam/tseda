@@ -9,8 +9,8 @@ from owlready2 import *
 from kmds.ontology.intent_types import IntentType
 from pathlib import Path
 import os
-from dataloader.kmds_data_loader import KMDSDataLoader
-from data_writers.kmds_writer import KMDSDataWriter
+from tseda.dataloader.kmds_data_loader import KMDSDataLoader
+from tseda.data_writers.kmds_writer import KMDSDataWriter
 
 from dataclasses import dataclass
 from kmds.utils.load_utils import *

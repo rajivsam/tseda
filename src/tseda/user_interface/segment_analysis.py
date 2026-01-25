@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
-from decomposition.ssa_decomposition import SSADecomposition
+from tseda.decomposition.ssa_decomposition import SSADecomposition
 from typing import List
 from matplotlib import pyplot as plt
 import re
-from visualization.series_visualizer import SeriesVisualizer
+from tseda.visualization.series_visualizer import SeriesVisualizer
 import statsmodels.graphics.tsaplots as tsa_plots
 
 

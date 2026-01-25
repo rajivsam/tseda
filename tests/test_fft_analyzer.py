@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
 from pandas import Series
-from periodicity.fft_analyzer import FFT_Analyzer
+from tseda.periodicity.fft_analyzer import FFT_Analyzer
 
 @pytest.fixture
 def sample_series():
     """Create a sample time series with known periodicity."""
     t = np.linspace(0, 10, 100)
-    signal = 5 * np.sin(2 * np.pi * 0.5 * t) + np.random.normal(0, 0.1, len(t))
+    signal = 5 * np.sin(2 * np.pi * 0.5 * t) + np.random.normal(0, 0.1, len(t)) + 0.1
     return Series(signal)
 
 

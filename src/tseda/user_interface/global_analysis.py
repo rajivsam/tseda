@@ -3,11 +3,11 @@ import streamlit as st
 import pandas as pd
 from matplotlib import pyplot as plt
 from plotly.graph_objects import Figure
-from visualization.series_kde_visualizer import SeriesKDEVisualizer
-from visualization.series_visualizer import SeriesVisualizer
-from change_point.change_point_estimator import ChangePointEstimator
-from visualization.series_visualizer import SegmentedSeriesVisualizer
-from series_stats.sampling_prop import SamplingProp
+from tseda.visualization.series_kde_visualizer import SeriesKDEVisualizer
+from tseda.visualization.series_histogram_visualizer import SeriesHistogramVisualizer
+from tseda.series_stats.sampling_prop import SamplingProp
+from tseda.change_point.change_point_estimator import ChangePointEstimator
+from tseda.visualization.series_visualizer import SegmentedSeriesVisualizer
 
 
 
@@ -72,6 +72,7 @@ def step_1()->None:
     with st.container():
         st.title("Step1: Upload Time Series Data")
 
+
         st.session_state.start_analysis_btn_disabled = True 
         uploaded_file = st.file_uploader("Choose a file")
         if uploaded_file is not None:
@@ -119,12 +120,17 @@ def step_2()->None:
         #st.divider
         # 3. Place the second plot in the second column using 'with' notation
         
-        st.subheader("Series Plot")
-        fig2 : Figure = get_series_plot(df)
-        st.plotly_chart(fig2)
+        st.subheader("Histogram")
+        fig2 : plt.Figure = get_histogram_plot(df)
+        st.pyplot(fig2)
 
-        st.button('Run Change Points', on_click=click_run_change_point_analysis_button, \
-            disabled=False)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.button('Run Change Points', on_click=click_run_change_point_analysis_button, \
+                disabled=False)
+        with col2:
+            st.button('Upload Segement', on_click=click_upload_segment_button, \
+                disabled=False)
 
         return
 
@@ -141,14 +147,14 @@ def get_kde_plot(df: pd.DataFrame) -> plt.Figure:
 
     return plt_fig 
 
-def get_series_plot(df: pd.DataFrame) -> plt.Figure:
+def get_histogram_plot(df: pd.DataFrame) -> plt.Figure:
     if df is None:
         st.warning("No data available to visualize. Please upload a file first.")
         return
     series = pd.Series(df.loc[:, "signal"])  # Assuming the signal is in a column named "signal"
     series.index  = df.loc[:, "date"]  # Assuming the date is in a column named "date"
-    series_visualizer = SeriesVisualizer(series)
-    plt_fig = series_visualizer.getVisualization()
+    histogram_visualizer = SeriesHistogramVisualizer(series)
+    plt_fig = histogram_visualizer.plot()
 
     return plt_fig
 

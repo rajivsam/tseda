@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from unittest.mock import patch, MagicMock
-from visualization.series_kde_visualizer import SeriesKDEVisualizer
+from tseda.visualization.series_kde_visualizer import SeriesKDEVisualizer
 
 import matplotlib.pyplot as plt
 

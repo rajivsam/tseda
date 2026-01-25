@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
-from visualization.autocorrelation_vis import ACFPlotter
+from tseda.visualization.autocorrelation_vis import ACFPlotter
 
 class TestACFPlotterInit:
     

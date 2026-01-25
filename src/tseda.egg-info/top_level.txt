@@ -1,9 +1,1 @@
-change_point
-config
-data_writers
-dataloader
-decomposition
-periodicity
-series_stats
-user_interface
-visualization
+tseda

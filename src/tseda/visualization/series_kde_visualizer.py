@@ -31,6 +31,8 @@ class SeriesKDEVisualizer:
         plt.grid(True)
         return plt
     
+    
+    
     def getInflectionPointsPlot(self, bandwidth: str = 'scott') -> plt.Figure:
         data = self._df["signal"].values
         kde = stats.gaussian_kde(data, bw_method = bandwidth) 
