@@ -4,7 +4,7 @@ import dash_bootstrap_components as dbc
 
 def analysis_layout():
     return html.Div([
-        html.H3("Step 2: Time Series Analysis"),
+        html.H3("Time Series Decomposition"),
         dbc.Container([
             # First Row: Eigen plots
             dbc.Row([

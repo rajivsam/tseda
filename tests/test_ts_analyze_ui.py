@@ -1,9 +1,16 @@
+import base64
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
 import tseda.user_interface.ts_analyze_ui as ui
+
+
+def _csv_upload_payload(csv_text: str) -> str:
+    encoded = base64.b64encode(csv_text.encode("utf-8")).decode("utf-8")
+    return f"data:text/csv;base64,{encoded}"
 
 
 def test_validate_components_reuses_existing_ssa_and_renders_outputs(monkeypatch):
@@ -131,3 +138,37 @@ def test_logging_rank_diagnostics_requires_analysis_completion(monkeypatch):
     assert result[0].color == "warning"
     assert isinstance(result[1], go.Figure)
     assert isinstance(result[2], go.Figure)
+
+
+def test_parse_upload_rejects_sub_hour_frequency():
+    csv_text = (
+        "timestamp,value\n"
+        "2024-01-01 00:00:00,1\n"
+        "2024-01-01 00:30:00,2\n"
+        "2024-01-01 01:00:00,3\n"
+    )
+
+    payload = _csv_upload_payload(csv_text)
+
+    try:
+        ui.parse_upload(payload, "sub_hour.csv")
+        assert False, "Expected ValueError for sub-hour sampling frequency"
+    except ValueError as exc:
+        assert "sampling frequency of one hour or higher" in str(exc)
+
+
+def test_parse_upload_rejects_missing_values_any_column():
+    csv_text = (
+        "timestamp,value,aux\n"
+        "2024-01-01 00:00:00,1,10\n"
+        "2024-01-01 01:00:00,,11\n"
+        "2024-01-01 02:00:00,3,12\n"
+    )
+
+    payload = _csv_upload_payload(csv_text)
+
+    try:
+        ui.parse_upload(payload, "has_missing.csv")
+        assert False, "Expected ValueError for missing values"
+    except ValueError as exc:
+        assert "requires data without missing values" in str(exc)

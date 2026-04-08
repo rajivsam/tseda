@@ -33,7 +33,7 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], suppress_cal
 
 def initial_assessment_layout():
     return html.Div([
-        html.H3("Step 1: Initial Assessment"),
+        html.H3("Initial Assessment of Time Series"),
         dbc.Row([
             dbc.Col(html.Div([
                 dcc.Upload(
@@ -100,7 +100,7 @@ def initial_assessment_layout():
 
 def logging_layout():
     return html.Div([
-        html.H3("Step 3: Observation Logging"),
+        html.H3("Observation Logging"),
         dbc.Card([
             dbc.CardHeader(html.H5("SSA Rank Diagnostics", className="mb-0")),
             dbc.CardBody([
@@ -129,7 +129,7 @@ app.layout = dbc.Container([
     dcc.Store(id='apply-grouping-trigger', data=0),
     dcc.Store(id='loess-fraction-store', data=0.05),
     
-    html.H1("Data Analysis Workflow", className="text-center my-4"),
+    html.H1("Time Series Explorer", className="text-center my-4"),
 
     # Progress Indicator
     dbc.Progress([
@@ -235,6 +235,12 @@ def parse_upload(contents, filename):
     if df.shape[1] < 2:
         raise ValueError('Uploaded file must contain at least two columns: timestamp and value.')
 
+    if df.isna().any().any():
+        raise ValueError(
+            'This application requires data without missing values (NA/NaN). '
+            'Please fix missing values and try again.'
+        )
+
     # Use the first column as the timestamp index and the second column as the series values.
     try:
         df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0])
@@ -242,6 +248,21 @@ def parse_upload(contents, filename):
         raise ValueError('Could not parse the first column as datetime.') from exc
 
     df = df.set_index(df.columns[0])
+    timestamp_index = pd.DatetimeIndex(df.index).sort_values()
+
+    if len(timestamp_index) < 2:
+        raise ValueError('Uploaded file must contain at least two timestamped rows.')
+
+    # Infer sampling cadence from observed timestamp spacing.
+    observed_deltas = timestamp_index.to_series().diff().dropna()
+    min_delta = observed_deltas.min() if not observed_deltas.empty else pd.Timedelta(0)
+
+    if min_delta < pd.Timedelta(hours=1):
+        raise ValueError(
+            'This application requires a sampling frequency of one hour or higher. '
+            'Please upload data sampled hourly or less frequently.'
+        )
+
     series = df.iloc[:, 0]
 
     if not pd.api.types.is_numeric_dtype(series):

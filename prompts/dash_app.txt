@@ -18,3 +18,21 @@ implement a seasonality check heuristic called seasonality_check_heuristic() tha
  4. Mention that the user should correlate these findings to their modeling, control and monitoring objectives.
 
  Populate the text you prepared as the suggested automatic report string and prompt the user to add to or modify this summary. Set this text in the observation control of the logging panel. Create modular methods for observation preparation in the ssa_result_summary module.
+
+ In the initial_assessment_layout, on file upload, verify the following:
+
+ 1. Read the file with pandas
+ 2. Infer the frequency. If the sampling frequency is less than an hour, (minute, second, millisecond etc.), indicate an error saying that this application requires a sampling frequency of an hour or higher.
+ 3. Check if any of the columns have missing values (NA, NaN), if missing values exist, indicate that this application requires data without missing values. Ask the user to try again after fixing the missing values.
+
+ Change the titles for the initial layout to be "Initial Assessment of Time Series". For the analysis layout, set the title to be "Time Series Decomposition". For the observation logging, set it to be "Observation Logging".
+
+ Change the main title that says "Data Analysis Workflow" to be "Time Series Explorer"
+
+ Redo the README.md file to say:
+ 1. This is an application for time series exploration.
+ 2. You can explore regularly sampled time series with sampling frequency of one hour or greater with it. It is currently limited to 2000 samples (this is configurable).
+ 3. There is a three step process to exploration:
+ (a) Initial Assessment: You can explore the distribution and spread of values using kernel density estimate and box plot. You get to see the raw distribution of the values. The PACF and ACF provide clues about seasonality and autoregressive components.
+ (b) Decomposition Using Singular Spectral Analysis: On the basis of the sampling frequency, a window for SSA is determined. This is a heuristic assignment. For example, a hourly sampled time series is assigned a window of size 24. A monthly time series is assigned a window of size of 12. A quarterly time series is assigned a window of size 4. This can be changed in the UI. Based on the eigen value distribution, observations from the ACF plot and the eigen vector plot. The seasonal components can be determined if present. Based on these initial plots, the user needs to input a set of groupings and reconstruct the series with these groupings. The reconstruction plots are shown. If there is structure in the series, then change point analysis can be done using the fact the the components are smooth. A change point plot is shown. The explained variance from signal and noise components, the assemement of the noise structure (independent or correlated) is provided.
+ (c) The SSA is based on the eigen decomposition of the trajectory matrix. Though the raw signal is correlated, the eigenvectors are uncorrelated.
