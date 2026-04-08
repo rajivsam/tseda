@@ -1,0 +1,20 @@
+For a given SSA decomposition, can you express the AIC as a function of the rank, r used with the model for reconstruction. Provide two expressions, one for variance explained and one for noise (variance unexplained). Check to see that the ssa object is initialized and available. Use this object for the code. Develop a plot for each of the variance explained and the noise variance as a function of the rank. Render the plot in the logging layout panel. This should be displayed when next is clicked on the analysis panel.
+
+Remove the second row of plots in the observation logging phase. Use Greek symbols and unicode if needed to render the symbols in the logging phase.
+
+Refactor the signal_reconstruction_plot() as follows. Collect the signal components for smooth, noise and each reconstruction group and store them as member variables. When apply grouping is called, before signal_reconstruction_plot() executes, set them to none. Add get methods that take a group key for example "trend", "noise", "smoothed_signal", "seasonality" and return the series stored in the member variables.
+
+implement a seasonality check heuristic called seasonality_check_heuristic() that scans the eigenvalues member variables.
+
+ In the first six elements if it finds two values that are almost similar (say the smaller by larger is 0.95 or more), then set a seasonality_check_heuristic flag member variable to true. call the seasonality_check_heuristic() function as part of the signal_reconstruction_plot() function.
+
+ Create methods to compute the explained variance by seasonality, trend and noise. 
+
+ In the result summary, construct a summary of the analysis so far using the following guidelines:
+
+ 1. Use the summary_statistics and sampling_prop modules to summarize the sampling properties and the summary statistics of the data
+ 2. Use the ssa decomposition object to summarize the details of the SSA decomposition. Report the window size used in the analysis. Report the number of components used in the decomposition, the variance explained by the smoothed signal and the variance of the noise signal. State that the percentage of noise variance is the estimate of the noise in the data. If the seasonality_check_heuristic is set to true, report that data appears to have seasonality.
+ 3. Report the durbin-watson noise statistic. Mention that a value of 1.5 to 2.5 is usually considered acceptable to consider the noise to be uncorrelated. If the value is higher, prompt the user to adjust the window size and grouping to see if this can bring the durbin-watson statistic to the desired range.
+ 4. Mention that the user should correlate these findings to their modeling, control and monitoring objectives.
+
+ Populate the text you prepared as the suggested automatic report string and prompt the user to add to or modify this summary. Set this text in the observation control of the logging panel. Create modular methods for observation preparation in the ssa_result_summary module.

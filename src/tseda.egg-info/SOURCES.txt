@@ -8,6 +8,7 @@ src/tseda.egg-info/top_level.txt
 src/tseda/change_point/change_point_estimator.py
 src/tseda/data_writers/kmds_writer.py
 src/tseda/dataloader/coffee_prices_data_loader.py
+src/tseda/dataloader/kaggle_data_loader.py
 src/tseda/dataloader/kmds_data_loader.py
 src/tseda/dataloader/local_dataloader.py
 src/tseda/dataloader/synthetic_series_data_loader.py
@@ -16,12 +17,14 @@ src/tseda/decomposition/ssa_decomposition.py
 src/tseda/periodicity/fft_analyzer.py
 src/tseda/series_stats/sampling_prop.py
 src/tseda/series_stats/summary_statistics.py
-src/tseda/user_interface/analysis_modes.py
+src/tseda/user_interface/analysis.py
 src/tseda/user_interface/gemini_chat.py
-src/tseda/user_interface/global_analysis.py
+src/tseda/user_interface/initial_assessment.py
+src/tseda/user_interface/initial_assessment_layout.py
 src/tseda/user_interface/kmds_capture.py
-src/tseda/user_interface/segment_analysis.py
 src/tseda/user_interface/ts_analyze_ui.py
+src/tseda/user_interface/components/analysis_assessment.py
+src/tseda/user_interface/components/initial_eval_components.py
 src/tseda/visualization/autocorrelation_vis.py
 src/tseda/visualization/series_histogram_visualizer.py
 src/tseda/visualization/series_kde_visualizer.py
@@ -32,3 +35,4 @@ tests/test_fft_analyzer.py
 tests/test_sampling_prop.py
 tests/test_series_histogram_visualizer.py
 tests/test_series_kde_visualizer.py
+tests/test_ts_analyze_ui.py

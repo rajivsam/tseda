@@ -16,7 +16,7 @@ class TestSamplingProp:
         assert sp._N == 10
         assert sp._start_ts == "2023-01-01"
         assert sp._end_ts == "2023-01-10"
-        assert sp._sampling_freq == "D"
+        assert sp._sampling_freq == "daily"
 
     def test_start_ts_format(self, sample_series):
         """Test that start_ts is formatted correctly as YYYY-MM-DD."""
@@ -40,7 +40,17 @@ class TestSamplingProp:
         sp = SamplingProp(sample_series)
         df = sp.view_properties()
         assert isinstance(df, pd.DataFrame)
-        assert df.shape[0] == 5
+        assert df.shape[0] == 6
         assert list(df.columns) == ["property", "value"]
         assert df[df["property"] == "start time"]["value"].values[0] == "2023-01-01"
         assert df[df["property"] == "end_time"]["value"].values[0] == "2023-01-10"
+
+    def test_properties_data_table(self, sample_series):
+        """Test properties_data_table returns correct AgGrid."""
+        from dash_ag_grid import AgGrid
+        sp = SamplingProp(sample_series)
+        ag = sp.properties_data_table()
+        assert isinstance(ag, AgGrid)
+        assert len(ag.rowData) == 6
+        assert ag.columnDefs[0]['field'] == 'property'
+        assert ag.columnDefs[1]['field'] == 'value'

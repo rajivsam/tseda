@@ -5,11 +5,17 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "dash>=4.1.0",
+    "dash-bootstrap-components>=2.0.4",
     "google-genai>=1.56.0",
     "importlib-resources>=6.5.2",
     "ipython>=9.8.0",
     "jupyter>=1.1.1",
-    "kmds>=0.2.16",
+    "jupyter-ai>=2.31.7",
+    "jupyter-dash>=0.4.2",
+    "kaggle>=2.0.0",
+    "kdepy>=1.1.12",
+    "kmds>=0.3.1",
     "matplotlib>=3.10.8",
     "numpy>=2.4.0",
     "pandas>=2.3.3",
@@ -22,6 +28,7 @@ dependencies = [
     "scikit-learn>=1.8.0",
     "scipy<1.16.0",
     "seaborn>=0.13.2",
+    "skrub>=0.7.2",
     "ssalib>=0.1.3",
     "statsmodels>=0.14.6",
     "streamlit>=1.52.2",

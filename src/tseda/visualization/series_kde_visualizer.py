@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
+from KDEpy import FFTKDE
 
 
 class SeriesKDEVisualizer:
@@ -12,24 +13,19 @@ class SeriesKDEVisualizer:
         self._title = title
         return
 
-    def KDEVisualizer(self, bandwidth: str = 'scott') -> plt.Figure:
+    def KDEVisualizer(self, bandwidth: str = 'ISJ') -> plt.Figure:
+
         data = self._df["signal"].values
-        kde = stats.gaussian_kde(data, bw_method = bandwidth) # nice feature is bandwidth selection by scott's rule is the default.
-        
-        # 3. Create a range of points where you want to evaluate the PDF
-        xmin = data.min()
-        xmax = data.max()
-        # Create 500 equally spaced points for a smooth plot
-        xs = np.linspace(xmin - (xmax - xmin) * 0.2, xmax + (xmax - xmin) * 0.2, 500)
-        
-        # 4. Evaluate the PDF at these points
-        y_values = kde(xs)
-        
-        # 5. Plot the results (optional, for visualization)
-        plt.plot(xs, y_values, color='dodgerblue')
-        plt.title('Kernel Density Estimation for the Signal')
-        plt.grid(True)
-        return plt
+
+        # Fit KDE using KDEpy's FFTKDE
+        kde = FFTKDE(bw=bandwidth)
+        grid, y_values = kde.fit(data).evaluate()
+
+        fig, ax = plt.subplots()
+        ax.plot(grid, y_values, color='dodgerblue')
+        ax.set_title('Kernel Density Estimation for the Signal')
+        ax.grid(True)
+        return fig
     
     
     

@@ -17,3 +17,8 @@ google-genai
 python-dotenv
 importlib-resources
 kmds
+skrub
+KDEPy
+kaggle
+dash 
+dash-bootstrap-components 
