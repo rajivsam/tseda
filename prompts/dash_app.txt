@@ -38,3 +38,7 @@ implement a seasonality check heuristic called seasonality_check_heuristic() tha
  (c) The SSA is based on the eigen decomposition of the trajectory matrix. Though the raw signal is correlated, the eigenvectors are uncorrelated. If we assume that the signal is Gaussian, this also implies independence. We can use the Akaike Information Criterion for model selection and determine the AIC as a function of the rank of the model. This is is shown in the observation page. An automatic summary of all the observations is provided.
 
  4. The package also provides a notebook interface to these features.
+
+ Can you review and make the design more modular per dash app design guidelines
+
+ When you are in the logging stage, the next button should be disabled. It can be enabled for the other two stages.

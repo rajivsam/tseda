@@ -83,7 +83,7 @@ def navigate_steps(
     # button states — do not change which step is visible.
     if button_id == 'analysis-complete-store':
         prev_disabled = (current_step == 1)
-        next_disabled = (current_step >= 3) or (current_step == 2 and not bool(analysis_complete))
+        next_disabled = (current_step >= 3)
         return dash.no_update, dash.no_update, dash.no_update, current_step, prev_disabled, next_disabled, dash.no_update, dash.no_update
 
     # Update step logic
@@ -106,7 +106,7 @@ def navigate_steps(
     p3_val = 34 if current_step == 3 else 0
 
     prev_disabled = (current_step == 1)
-    next_disabled = (current_step >= 3) or (current_step == 2 and not bool(analysis_complete))
+    next_disabled = (current_step >= 3)
 
     return s1, s2, s3, current_step, prev_disabled, next_disabled, p2_val, p3_val
 
