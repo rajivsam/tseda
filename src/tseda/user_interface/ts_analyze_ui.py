@@ -239,13 +239,13 @@ def update_ssa_plots(
     analysis_complete: bool,
     uploaded_file: dict[str, str] | None,
     slider_window_size: int | None,
-) -> tuple[go.Figure, str]:
-    """Generate SSA eigenvalue and eigenvector plots."""
+) -> tuple[go.Figure, str, bool, Any, bool]:
+    """Generate SSA plots and series-suitability state for grouping actions."""
     global series, window_size, ssa_obj
     
     if current_step != 2 or series is None or window_size <= 0:
         empty_fig = empty_figure("No data available")
-        return empty_fig, ""
+        return empty_fig, "", False, None, False
     
     try:
         if ssa_obj is None:
@@ -257,12 +257,27 @@ def update_ssa_plots(
         img_src = matplotlib_figure_to_data_url(mpl_fig)
         import matplotlib
         matplotlib.pyplot.close(mpl_fig)
+
+        # Flag series as noisy when leading SSA structure is too weak.
+        eigenvalues = np.asarray(getattr(ssa_obj, "_eigenvalues", []), dtype=float)
+        total_var = float(np.sum(eigenvalues)) if eigenvalues.size > 0 else 0.0
+        first_two_ratio = (float(np.sum(eigenvalues[:2])) / total_var) if total_var > 0 else 0.0
+        noisy_series = first_two_ratio <= 0.20
+        ssa_obj._noisy_series = noisy_series
+
+        noisy_message = None
+        if noisy_series:
+            noisy_message = dbc.Alert(
+                "This series is not suitable for this tool: the first two SSA eigenvectors explain 20% or less of total variance.",
+                color="warning",
+                className="mb-0",
+            )
         
-        return eigen_fig, img_src
+        return eigen_fig, img_src, noisy_series, noisy_message, noisy_series
         
     except Exception as err:
         empty_fig = empty_figure(f"Error: {str(err)[:80]}")
-        return empty_fig, ""
+        return empty_fig, "", False, None, False
 
 
 def validate_components(
@@ -531,7 +546,10 @@ def register_callbacks(dash_app: dash.Dash) -> None:
 
     dash_app.callback(
         [Output('eigen-plot', 'figure'),
-         Output('eigenvector-plot', 'src')],
+         Output('eigenvector-plot', 'src'),
+         Output('noisy-series-store', 'data'),
+         Output('noisy-series-message', 'children'),
+         Output('apply-components-btn', 'disabled')],
         [Input('step-tracker', 'data'),
          Input('analysis-complete-store', 'data'),
          Input('uploaded-file-store', 'data')],

@@ -54,6 +54,7 @@ def analysis_layout():
                             ], borderless=True, style={'width': '100%'}),
                             html.Div(id='component-validation-error', className='text-danger mt-2'),
                             dbc.Button("Apply Grouping", id='apply-components-btn', color='primary', className='mt-3'),
+                            html.Div(id='noisy-series-message', className='mt-2'),
                             html.Hr(),
                             dbc.Label("SSA Window Size", html_for='ssa-window-slider', className='mt-2'),
                             dcc.Slider(
