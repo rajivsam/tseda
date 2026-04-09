@@ -1,8 +1,10 @@
+"""Dash application entrypoint, layouts, and callback orchestration for TSEDA."""
+
 import base64
 import io
+from typing import Any
 
 import numpy as np
-from scipy import stats
 import matplotlib
 import dash
 from dash import dcc, html, Input, Output, State
@@ -12,7 +14,22 @@ import plotly.graph_objects as go
 
 from tseda.series_stats.sampling_prop import SamplingProp
 from tseda.user_interface.components.initial_eval_components import create_summary_table, create_kde_plot, create_box_plot, create_scatter_plot, create_acf_plot, create_pacf_plot, create_ssa_decomposition_plot
-from tseda.user_interface.components.analysis_assessment import analysis_layout
+from tseda.user_interface.components.analysis_assessment import analysis_layout as decomposition_layout
+from tseda.user_interface.analysis import (
+    assessment_placeholders,
+    build_initial_assessment_layout,
+    build_logging_layout,
+    build_main_layout,
+    empty_figure,
+)
+from tseda.user_interface.callback_services import (
+    build_noise_kde_figure,
+    build_reconstruction_metadata,
+    compute_window_slider_config,
+    matplotlib_figure_to_data_url,
+    parse_reconstruction_groups,
+    parse_uploaded_series,
+)
 from tseda.decomposition.ssa_decomposition import SSADecomposition
 from tseda.decomposition.ssa_result_summary import SSAResultSummary
 
@@ -22,154 +39,39 @@ matplotlib.use('Agg')
 # Configuration
 MAX_FILE_LINES = 2000  # Configurable maximum number of lines in uploaded files
 
-series = None
-window_size = 0
-ssa_obj = None
-
-# Initialize the app with a bootstrap theme
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], suppress_callback_exceptions=True)
+series: pd.Series | None = None
+window_size: int = 0
+ssa_obj: SSADecomposition | None = None
 
 # --- 1. Step Layouts ---
 
-def initial_assessment_layout():
-    return html.Div([
-        html.H3("Initial Assessment of Time Series"),
-        dbc.Row([
-            dbc.Col(html.Div([
-                dcc.Upload(
-                    id='upload-data',
-                    children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-                    style={'width': '100%', 'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px', 'borderStyle': 'dashed', 'textAlign': 'center'}
-                ),
-                dbc.Button("Clear Uploaded File", id='clear-upload-btn', color='danger', className='mt-3'),
-                html.Div(id='upload-error-message', className='mt-3')
-            ]), width=4),
-            dbc.Col(html.Div("Data Preview Table Placeholder", id='data-preview-container', className="p-3 border bg-light"), width=8),
-        ]),
-        dbc.Row([
-            dbc.Col(html.Div([
-                dbc.Checklist(
-                    options=[{"label": "Show KDE overlay", "value": "show"}],
-                    value=["show"],
-                    id='kde-overlay-toggle',
-                    switch=True,
-                    inline=True
-                ),
-                html.Div([
-                    dbc.Label("Histogram bin count", html_for='hist-bin-count-slider', className='mt-3'),
-                    dcc.Slider(
-                        id='hist-bin-count-slider',
-                        min=0,
-                        max=100,
-                        step=1,
-                        value=0,
-                        marks={0: 'Auto', 5: '5', 10: '10', 20: '20', 40: '40', 80: '80'},
-                        tooltip={"placement": "bottom", "always_visible": False}
-                    ),
-                    html.Small('Use 0 for automatic bin sizing based on data spread.', className='text-muted')
-                ])
-            ]), width=12)
-        ], className='mb-4'),
-        dbc.Row([
-            dbc.Col(dbc.Card([
-                dbc.CardHeader(html.H5("Kernel Density Estimate", className="mb-0")),
-                dbc.CardBody(html.Div("KDE Plot Placeholder", id='kde-plot-container', className="p-3 bg-light"))
-            ]), width=6),
-            dbc.Col(dbc.Card([
-                dbc.CardHeader(html.H5("Box Plot", className="mb-0")),
-                dbc.CardBody(html.Div("Box Plot Placeholder", id='box-plot-container', className="p-3 bg-light"))
-            ]), width=6),
-        ], className="mt-4"),
-        dbc.Row([
-            dbc.Col(dbc.Card([
-                dbc.CardHeader(html.H5("Series Scatter Plot", className="mb-0")),
-                dbc.CardBody(html.Div("Scatter Plot Placeholder", id='scatter-plot-container', className="p-3 bg-light"))
-            ]), width=12),
-        ], className="mt-4"),
-        dbc.Row([
-            dbc.Col(dbc.Card([
-                dbc.CardHeader(html.H5("Autocorrelation (ACF)", className="mb-0")),
-                dbc.CardBody(html.Div("ACF Plot Placeholder", id='acf-plot-container', className="p-3 bg-light"))
-            ]), width=6),
-            dbc.Col(dbc.Card([
-                dbc.CardHeader(html.H5("Partial Autocorrelation (PACF)", className="mb-0")),
-                dbc.CardBody(html.Div("PACF Plot Placeholder", id='pacf-plot-container', className="p-3 bg-light"))
-            ]), width=6),
-        ], className="mt-4")
-    ])
+def initial_assessment_layout() -> html.Div:
+    """Build the Step-1 initial assessment layout."""
+    return build_initial_assessment_layout()
 
-def logging_layout():
-    return html.Div([
-        html.H3("Observation Logging"),
-        dbc.Card([
-            dbc.CardHeader(html.H5("SSA Rank Diagnostics", className="mb-0")),
-            dbc.CardBody([
-                html.Div(id='ssa-aic-formulas', className='mb-3'),
-                dbc.Row([
-                    dbc.Col(dcc.Graph(id='variance-explained-rank-plot', style={"height": "320px"}), width=6),
-                    dbc.Col(dcc.Graph(id='noise-variance-rank-plot', style={"height": "320px"}), width=6),
-                ])
-            ])
-        ], className='mb-4'),
-        dbc.Textarea(id='observation-text', placeholder="Enter your expert observations here...", style={'height': '200px'}),
-        dbc.Button("Finalize & Save Report", color="success", className="mt-3")
-    ])
+def logging_layout() -> html.Div:
+    """Build the Step-3 observation logging layout."""
+    return build_logging_layout()
 
 # --- 2. Main App Layout ---
 
-app.layout = dbc.Container([
-    # Store to track current step (1, 2, or 3)
-    dcc.Store(id='step-tracker', data=1),
-    # Store to indicate analysis completion (set only after Apply Grouping succeeds)
-    dcc.Store(id='analysis-complete-store', data=False),
-    # Memory store for the uploaded file contents and filename (avoids session storage quota limits)
-    dcc.Store(id='uploaded-file-store', storage_type='memory', data=None),
-    # Bridge stores: relay dynamic Step-2 component values into permanent IDs so that
-    # global callbacks never reference IDs that exist only in the dynamic layout.
-    dcc.Store(id='apply-grouping-trigger', data=0),
-    dcc.Store(id='loess-fraction-store', data=0.05),
-    
-    html.H1("Time Series Explorer", className="text-center my-4"),
-
-    # Progress Indicator
-    dbc.Progress([
-        dbc.Progress(value=33, label="1. Assessment", id="p1", color="primary", bar=True),
-        dbc.Progress(value=0, label="2. Analysis", id="p2", color="secondary", bar=True),
-        dbc.Progress(value=0, label="3. Logging", id="p3", color="secondary", bar=True),
-    ], className="mb-4", style={"height": "30px"}),
-
-    # All three step containers are always present in the DOM.
-    # Dash 4.x validates all Output/Input IDs against the initial DOM, so keeping
-    # everything rendered (toggling display) avoids all reference errors at startup.
-    html.Div(id='step1-container', children=initial_assessment_layout(), style={'display': 'block'}),
-    html.Div(id='step2-container', children=analysis_layout(), style={'display': 'none'}),
-    html.Div(id='step3-container', children=logging_layout(), style={'display': 'none'}),
-
-    # Navigation Buttons
-    dbc.Row([
-        dbc.Col(dbc.Button("← Previous", id="prev-btn", color="secondary", disabled=True), width="auto"),
-        dbc.Col(dbc.Button("Next Step →", id="next-btn", color="primary"), width="auto"),
-    ], justify="center", className="mt-5"),
-
-], fluid=True)
+def build_app_layout() -> dbc.Container:
+    """Build the complete multi-step app layout container."""
+    return build_main_layout(
+        assessment_layout=initial_assessment_layout(),
+        decomposition_layout=decomposition_layout(),
+        logging_layout=logging_layout(),
+    )
 
 # --- 3. Callbacks for Navigation ---
 
-@app.callback(
-    [Output('step1-container', 'style'),
-     Output('step2-container', 'style'),
-     Output('step3-container', 'style'),
-     Output('step-tracker', 'data'),
-     Output('prev-btn', 'disabled'),
-     Output('next-btn', 'disabled'),
-     Output('p2', 'value'),
-     Output('p3', 'value')],
-    [Input('next-btn', 'n_clicks'),
-     Input('prev-btn', 'n_clicks'),
-     Input('analysis-complete-store', 'data')],
-    [State('step-tracker', 'data')]
-)
-def navigate_steps(next_clicks, prev_clicks, analysis_complete, current_step):
+def navigate_steps(
+    next_clicks: int | None,
+    prev_clicks: int | None,
+    analysis_complete: bool,
+    current_step: int,
+) -> tuple[dict[str, str] | Any, dict[str, str] | Any, dict[str, str] | Any, int, bool, bool, int | Any, int | Any]:
+    """Navigate the three-step workflow and update progress/navigation state."""
     # Determine which button was clicked
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -210,78 +112,19 @@ def navigate_steps(next_clicks, prev_clicks, analysis_complete, current_step):
 
 
 
-def parse_upload(contents, filename):
+def parse_upload(contents: str | None, filename: str) -> None:
+    """Parse uploaded content and store the validated series in module state."""
     global series
 
-    if contents is None:
-        series = None
-        return
-
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-
-    if filename.lower().endswith('.csv'):
-        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-    elif filename.lower().endswith(('.xls', '.xlsx')):
-        df = pd.read_excel(io.BytesIO(decoded))
-    else:
-        raise ValueError('Unsupported file format. Please upload a CSV or Excel file.')
-    
-    # Check if file has too many lines
-    if len(df) > MAX_FILE_LINES:
-        series = None
-        raise ValueError(f'File has {len(df)} rows, but maximum allowed is {MAX_FILE_LINES} rows. Please upload a smaller file.')
-
-    if df.shape[1] < 2:
-        raise ValueError('Uploaded file must contain at least two columns: timestamp and value.')
-
-    if df.isna().any().any():
-        raise ValueError(
-            'This application requires data without missing values (NA/NaN). '
-            'Please fix missing values and try again.'
-        )
-
-    # Use the first column as the timestamp index and the second column as the series values.
-    try:
-        df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0])
-    except Exception as exc:
-        raise ValueError('Could not parse the first column as datetime.') from exc
-
-    df = df.set_index(df.columns[0])
-    timestamp_index = pd.DatetimeIndex(df.index).sort_values()
-
-    if len(timestamp_index) < 2:
-        raise ValueError('Uploaded file must contain at least two timestamped rows.')
-
-    # Infer sampling cadence from observed timestamp spacing.
-    observed_deltas = timestamp_index.to_series().diff().dropna()
-    min_delta = observed_deltas.min() if not observed_deltas.empty else pd.Timedelta(0)
-
-    if min_delta < pd.Timedelta(hours=1):
-        raise ValueError(
-            'This application requires a sampling frequency of one hour or higher. '
-            'Please upload data sampled hourly or less frequently.'
-        )
-
-    series = df.iloc[:, 0]
-
-    if not pd.api.types.is_numeric_dtype(series):
-        series = pd.to_numeric(series, errors='coerce')
-
-    if series.isna().all():
-        raise ValueError('The selected value column does not contain numeric data.')
+    series = parse_uploaded_series(contents=contents, filename=filename, max_file_lines=MAX_FILE_LINES)
 
 
-@app.callback(
-    [Output('uploaded-file-store', 'data'),
-     Output('upload-error-message', 'children'),
-     Output('analysis-complete-store', 'data', allow_duplicate=True)],
-    Input('upload-data', 'contents'),
-    State('upload-data', 'filename'),
-    Input('clear-upload-btn', 'n_clicks'),
-    prevent_initial_call=True,
-)
-def store_uploaded_file(contents, filename, clear_clicks):
+def store_uploaded_file(
+    contents: str | None,
+    filename: str | None,
+    clear_clicks: int | None,
+) -> tuple[dict[str, str] | None, Any | None, bool]:
+    """Persist uploaded file metadata and initialize decomposition prerequisites."""
     global series, window_size, ssa_obj
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -320,35 +163,19 @@ def store_uploaded_file(contents, filename, clear_clicks):
         return None, dbc.Alert(str(e), color="danger", className="mt-2"), False
 
 
-@app.callback(
-    [Output('data-preview-container', 'children'),
-     Output('kde-plot-container', 'children'),
-     Output('box-plot-container', 'children'),
-     Output('scatter-plot-container', 'children'),
-     Output('acf-plot-container', 'children'),
-     Output('pacf-plot-container', 'children')],
-    [
-        Input('uploaded-file-store', 'data'),
-        Input('kde-overlay-toggle', 'value'),
-        Input('hist-bin-count-slider', 'value')
-    ]
-)
-def update_summary_table(uploaded_file, kde_toggle, hist_bin_count):
+def update_summary_table(
+    uploaded_file: dict[str, str] | None,
+    kde_toggle: list[str] | None,
+    hist_bin_count: int | None,
+) -> tuple[Any, Any, Any, Any, Any, Any]:
+    """Render summary table and exploratory plots for the uploaded series."""
     global series, window_size, ssa_obj
 
     if not uploaded_file:
         series = None
         window_size = 0
         ssa_obj = None
-        placeholder = html.Div('Data Preview Table Placeholder', className='p-3 border bg-light')
-        return (
-            placeholder,
-            html.Div('KDE Plot Placeholder', className='p-3 border bg-light'),
-            html.Div('Box Plot Placeholder', className='p-3 border bg-light'),
-            html.Div('Scatter Plot Placeholder', className='p-3 border bg-light'),
-            html.Div('ACF Plot Placeholder', className='p-3 border bg-light'),
-            html.Div('PACF Plot Placeholder', className='p-3 border bg-light')
-        )
+        return assessment_placeholders()
 
     try:
         if series is None:
@@ -374,93 +201,50 @@ def update_summary_table(uploaded_file, kde_toggle, hist_bin_count):
             dcc.Graph(figure=acf_fig, style={"height": "400px", "width": "100%"}),
             dcc.Graph(figure=pacf_fig, style={"height": "400px", "width": "100%"})
         )
-    except Exception as err:
+    except Exception:
         series = None
         window_size = 0
         ssa_obj = None
         # Clear error messages and show placeholders
-        placeholder = html.Div('Data Preview Table Placeholder', className='p-3 border bg-light')
-        return (
-            placeholder,
-            html.Div('KDE Plot Placeholder', className='p-3 border bg-light'),
-            html.Div('Box Plot Placeholder', className='p-3 border bg-light'),
-            html.Div('Scatter Plot Placeholder', className='p-3 border bg-light'),
-            html.Div('ACF Plot Placeholder', className='p-3 border bg-light'),
-            html.Div('PACF Plot Placeholder', className='p-3 border bg-light')
-        )
+        return assessment_placeholders()
 
 
-@app.callback(
-    [Output('ssa-window-slider', 'marks'),
-     Output('ssa-window-slider', 'value'),
-     Output('ssa-window-slider', 'min'),
-     Output('ssa-window-slider', 'max'),
-     Output('ssa-window-slider', 'step')],
-    [Input('step-tracker', 'data'),
-     Input('uploaded-file-store', 'data')]
-)
-def configure_redo_slider(current_step, uploaded_file):
+def configure_redo_slider(
+    current_step: int,
+    uploaded_file: dict[str, str] | None,
+) -> tuple[dict[int, str], int, int, int, None]:
     """Configure valid redo SSA window values as integer multiples of the default window."""
     global series, window_size
 
-    if current_step != 2 or series is None or window_size <= 0:
-        return {}, 0, 0, 0, None
-
-    series_length = len(series)
-    if series_length <= 0:
-        return {}, 0, 0, 0, None
-
-    # Stop at the next valid multiple at or above N/4 (e.g., N=422, W=12 => max=108).
-    max_k = (series_length + (4 * window_size) - 1) // (4 * window_size)
-    valid_windows = [k * window_size for k in range(1, max_k + 1)]
-
-    if not valid_windows:
-        return {}, 0, 0, 0, None
-
-    marks = {val: str(val) for val in valid_windows}
-    return marks, valid_windows[0], valid_windows[0], valid_windows[-1], None
+    series_length = len(series) if series is not None else 0
+    return compute_window_slider_config(
+        current_step=current_step,
+        series_length=series_length,
+        default_window_size=window_size,
+    )
 
 
-@app.callback(
-    Output('apply-grouping-trigger', 'data'),
-    Input('apply-components-btn', 'n_clicks'),
-    prevent_initial_call=True,
-)
-def relay_apply_grouping(n_clicks):
+def relay_apply_grouping(n_clicks: int | None) -> int:
     """Relay Apply Grouping button clicks into a permanent store."""
     return n_clicks or 0
 
 
-@app.callback(
-    Output('loess-fraction-store', 'data'),
-    Input('loess-fraction-slider', 'value'),
-    prevent_initial_call=True,
-)
-def relay_loess_fraction(value):
+def relay_loess_fraction(value: float | None) -> float:
     """Relay loess slider value into a permanent store."""
     return value if value is not None else 0.05
 
 
-@app.callback(
-    [Output('eigen-plot', 'figure'),
-     Output('eigenvector-plot', 'src')],
-    [Input('step-tracker', 'data'),
-     Input('analysis-complete-store', 'data'),
-     Input('uploaded-file-store', 'data')],
-    State('ssa-window-slider', 'value'),
-    prevent_initial_call=True,
-)
-def update_ssa_plots(current_step, analysis_complete, uploaded_file, slider_window_size):
+def update_ssa_plots(
+    current_step: int,
+    analysis_complete: bool,
+    uploaded_file: dict[str, str] | None,
+    slider_window_size: int | None,
+) -> tuple[go.Figure, str]:
     """Generate SSA eigenvalue and eigenvector plots."""
     global series, window_size, ssa_obj
     
     if current_step != 2 or series is None or window_size <= 0:
-        empty_fig = go.Figure()
-        empty_fig.update_layout(
-            title="No data available",
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=False)
-        )
+        empty_fig = empty_figure("No data available")
         return empty_fig, ""
     
     try:
@@ -470,50 +254,33 @@ def update_ssa_plots(current_step, analysis_complete, uploaded_file, slider_wind
         eigen_fig = ssa_obj.eigenplot()
         
         mpl_fig = ssa_obj.eigen_vector_plot()
-        buf = io.BytesIO()
-        mpl_fig.savefig(buf, format='png', bbox_inches='tight')
-        buf.seek(0)
-        img_b64 = base64.b64encode(buf.read()).decode('utf-8')
-        buf.close()
+        img_src = matplotlib_figure_to_data_url(mpl_fig)
         import matplotlib
         matplotlib.pyplot.close(mpl_fig)
         
-        return eigen_fig, f"data:image/png;base64,{img_b64}"
+        return eigen_fig, img_src
         
     except Exception as err:
-        empty_fig = go.Figure()
-        empty_fig.update_layout(title=f"Error: {str(err)[:80]}")
+        empty_fig = empty_figure(f"Error: {str(err)[:80]}")
         return empty_fig, ""
 
 
-@app.callback(
-    [Output('component-validation-error', 'children'),
-     Output('signal-reconstruction-plot', 'figure'),
-    Output('change-point-plot', 'figure'),
-    Output('wcorr-plot', 'src'),
-    Output('reconstruction-metadata', 'children'),
-    Output('noise-kde-plot', 'figure'),
-    Output('analysis-complete-store', 'data')],
-
-    [Input('apply-grouping-trigger', 'data'),
-     Input('uploaded-file-store', 'data')],
-    [State('component-name-1', 'value'), State('component-list-1', 'value'),
-     State('component-name-2', 'value'), State('component-list-2', 'value'),
-     State('component-name-3', 'value'), State('component-list-3', 'value'),
-     State('ssa-window-slider', 'value'),
-     State('loess-fraction-store', 'data')],
-    prevent_initial_call=True,
-)
-def validate_components(apply_trigger, uploaded_file, name1, list1, name2, list2, name3, list3, slider_window_size, loess_fraction):
+def validate_components(
+    apply_trigger: int,
+    uploaded_file: dict[str, str] | None,
+    name1: str | None,
+    list1: str | None,
+    name2: str | None,
+    list2: str | None,
+    name3: str | None,
+    list3: str | None,
+    slider_window_size: int | None,
+    loess_fraction: float | None,
+) -> tuple[Any, go.Figure, go.Figure, str, Any, go.Figure, bool]:
     """Validate component inputs."""
     global series, window_size, ssa_obj
 
-    empty_fig = go.Figure()
-    empty_fig.update_layout(
-        title="No reconstruction available",
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=False)
-    )
+    empty_fig = empty_figure("No reconstruction available")
     empty_metadata = "Reconstruction metadata will appear here after applying grouping."
 
     if uploaded_file is None and series is None:
@@ -550,68 +317,8 @@ def validate_components(apply_trigger, uploaded_file, name1, list1, name2, list2
 
     rows = [(name1, list1), (name2, list2), (name3, list3)]
 
-    def parse_group_list(comp_str, label, is_noise):
-        if not comp_str or comp_str.strip() == '':
-            return []
-
-        tokens = [token.strip() for token in comp_str.split(',') if token.strip()]
-        if not tokens:
-            return []
-
-        if is_noise and len(tokens) == 1 and tokens[0] == '*':
-            return '*'
-
-        if '*' in tokens:
-            raise ValueError(
-                f'"{label}": wildcard * is allowed only as the entire Noise list.'
-            )
-
-        try:
-            components = [int(token) for token in tokens]
-        except ValueError as exc:
-            raise ValueError(
-                f'"{label}": component list must contain comma-separated integers only (e.g., 0,1,2).'
-            ) from exc
-
-        for comp in components:
-            if comp < 0 or comp >= window_size:
-                raise ValueError(f'"{label}": component {comp} is out of range [0, {window_size - 1}]')
-
-        return components
-
     try:
-        recon_dict = {}
-        used_non_noise_indices = set()
-        noise_wildcard_label = None
-
-        for name, comp_str in rows:
-            if not name or not name.strip():
-                continue
-
-            label = name.strip()
-            is_noise = label.lower() == "noise"
-
-            parsed_value = parse_group_list(comp_str, label, is_noise)
-            if parsed_value == '*':
-                if noise_wildcard_label is not None:
-                    raise ValueError("Noise wildcard can only be specified once.")
-                noise_wildcard_label = label
-                continue
-
-            if parsed_value:
-                recon_dict[label] = parsed_value
-                if not is_noise:
-                    used_non_noise_indices.update(parsed_value)
-
-        if noise_wildcard_label is not None:
-            recon_dict[noise_wildcard_label] = [
-                idx for idx in range(window_size) if idx not in used_non_noise_indices
-            ]
-
-        all_indices = [idx for indices in recon_dict.values() for idx in indices]
-
-        if len(set(all_indices)) != len(all_indices):
-            return dbc.Alert("Error: Overlapping components detected. Each component can only be assigned once.", color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+        recon_dict = parse_reconstruction_groups(rows=rows, window_size=window_size)
 
         if recon_dict:
             print(f"[DEBUG] Reconstruction groups: {recon_dict}", flush=True)
@@ -624,52 +331,9 @@ def validate_components(apply_trigger, uploaded_file, name1, list1, name2, list2
             change_point_fig = ssa_obj.change_point_plot()
             wcorr_mpl_fig = ssa_obj.wcorr_plot()
 
-            dw = ssa_obj._durbin_watson
-            dw_text = f"{dw:.4f}" if dw is not None else "N/A"
-
-            variation_items = [
-                html.Li([
-                    html.Strong(f"Variation Associated with {group_name} (%): "),
-                    f"{ssa_obj.explained_variance_by_group(group_name):.2f}",
-                ])
-                for group_name in recon_dict.keys()
-            ]
-
-            metadata = html.Div([
-                html.Ul([
-                    *variation_items,
-                    html.Li([html.Strong("Durbin-Watson Statistic: "), dw_text]),
-                ]),
-                html.Small(
-                    "A Durbin-Watson value between 1.5 and 2.5 implies that the noise is uncorrelated.",
-                    className="text-muted"
-                ),
-            ])
-
-            noise_signal = ssa_obj.get_reconstructed_series("noise")
-            if noise_signal is not None:
-                noise_data = noise_signal.dropna().values.astype(float)
-                kde_estimator = stats.gaussian_kde(noise_data)
-                xs = np.linspace(noise_data.min(), noise_data.max(), 300)
-                ys = kde_estimator(xs)
-                noise_kde_fig = go.Figure()
-                noise_kde_fig.add_trace(go.Scatter(
-                    x=xs, y=ys, mode='lines', name='Noise KDE',
-                    line=dict(color='steelblue')
-                ))
-                noise_kde_fig.update_layout(
-                    title="Noise Kernel Density Estimate",
-                    xaxis_title="Value",
-                    yaxis_title="Density",
-                )
-            else:
-                noise_kde_fig = empty_fig
-
-            buf = io.BytesIO()
-            wcorr_mpl_fig.savefig(buf, format='png', bbox_inches='tight')
-            buf.seek(0)
-            wcorr_b64 = base64.b64encode(buf.read()).decode('utf-8')
-            buf.close()
+            metadata = build_reconstruction_metadata(ssa_obj=ssa_obj, recon_dict=recon_dict)
+            noise_kde_fig = build_noise_kde_figure(ssa_obj=ssa_obj, fallback_fig=empty_fig)
+            wcorr_src = matplotlib_figure_to_data_url(wcorr_mpl_fig)
             import matplotlib
             matplotlib.pyplot.close(wcorr_mpl_fig)
 
@@ -678,33 +342,28 @@ def validate_components(apply_trigger, uploaded_file, name1, list1, name2, list2
             else:
                 status_alert = dbc.Alert("Components applied successfully!", color="success")
 
-            return status_alert, signal_fig, change_point_fig, f"data:image/png;base64,{wcorr_b64}", metadata, noise_kde_fig, True
+            return status_alert, signal_fig, change_point_fig, wcorr_src, metadata, noise_kde_fig, True
 
         return dbc.Alert("No valid component groups were provided.", color="warning"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
 
     except ValueError as e:
-        return dbc.Alert(f"Validation error: {str(e)}", color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+        err_msg = str(e)
+        if err_msg.startswith("Error: Overlapping components detected"):
+            return dbc.Alert(err_msg, color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+        return dbc.Alert(f"Validation error: {err_msg}", color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
     except Exception as e:
         return dbc.Alert(f"Error: {str(e)}", color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
 
 
-@app.callback(
-    Output('verification-plot', 'figure'),
-    [Input('loess-fraction-store', 'data'),
-    Input('analysis-complete-store', 'data'),
-    Input('uploaded-file-store', 'data')],
-    prevent_initial_call=True,
-)
-def update_verification_plot(loess_fraction, analysis_complete, uploaded_file):
+def update_verification_plot(
+    loess_fraction: float | None,
+    analysis_complete: bool,
+    uploaded_file: dict[str, str] | None,
+) -> go.Figure:
     """Render LOESS verification plot after grouping is applied and when slider changes."""
     global ssa_obj
 
-    empty_fig = go.Figure()
-    empty_fig.update_layout(
-        title="Verification plot will appear after SSA is initialized",
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=False)
-    )
+    empty_fig = empty_figure("Verification plot will appear after SSA is initialized")
 
     if uploaded_file is None or ssa_obj is None or not hasattr(ssa_obj, "_recon"):
         return empty_fig
@@ -714,33 +373,20 @@ def update_verification_plot(loess_fraction, analysis_complete, uploaded_file):
     return ssa_obj.loess_smother(fraction)
 
 
-@app.callback(
-    [Output('ssa-aic-formulas', 'children'),
-     Output('variance-explained-rank-plot', 'figure'),
-    Output('noise-variance-rank-plot', 'figure')],
-    [Input('step-tracker', 'data'),
-    Input('uploaded-file-store', 'data'),
-    Input('analysis-complete-store', 'data')]
-)
-def update_logging_rank_diagnostics(current_step, uploaded_file, analysis_complete):
+def update_logging_rank_diagnostics(
+    current_step: int,
+    uploaded_file: dict[str, str] | None,
+    analysis_complete: bool,
+) -> tuple[Any, go.Figure, go.Figure]:
     """Render SSA rank diagnostics and AIC expressions in the logging panel."""
     global series, window_size
-
-    def empty_fig(title):
-        fig = go.Figure()
-        fig.update_layout(
-            title=title,
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=False),
-        )
-        return fig
 
     blank_formula = html.Div(
         "Rank-based AIC formulas and plots will appear here after SSA is available.",
         className='text-muted'
     )
-    empty_1 = empty_fig("Variance Explained vs Rank")
-    empty_2 = empty_fig("Noise Variance vs Rank")
+    empty_1 = empty_figure("Variance Explained vs Rank")
+    empty_2 = empty_figure("Noise Variance vs Rank")
 
     if current_step != 3:
         return blank_formula, empty_1, empty_2
@@ -791,14 +437,11 @@ def update_logging_rank_diagnostics(current_step, uploaded_file, analysis_comple
         return dbc.Alert(f"Could not compute rank diagnostics: {str(err)}", color="danger"), empty_1, empty_2
 
 
-@app.callback(
-    Output('observation-text', 'value'),
-    [Input('step-tracker', 'data'),
-     Input('analysis-complete-store', 'data'),
-     Input('uploaded-file-store', 'data')],
-    prevent_initial_call=True,
-)
-def populate_observation_text(current_step, analysis_complete, uploaded_file):
+def populate_observation_text(
+    current_step: int,
+    analysis_complete: bool,
+    uploaded_file: dict[str, str] | None,
+) -> str | Any:
     """Auto-generate the observation summary text and pre-populate the textarea."""
     global series, window_size, ssa_obj
 
@@ -821,6 +464,134 @@ def populate_observation_text(current_step, analysis_complete, uploaded_file):
         return summary.build_observation_text()
     except Exception:
         return dash.no_update
+
+
+def register_callbacks(dash_app: dash.Dash) -> None:
+    """Register all app callbacks explicitly to separate wiring from logic."""
+    dash_app.callback(
+        [Output('step1-container', 'style'),
+         Output('step2-container', 'style'),
+         Output('step3-container', 'style'),
+         Output('step-tracker', 'data'),
+         Output('prev-btn', 'disabled'),
+         Output('next-btn', 'disabled'),
+         Output('p2', 'value'),
+         Output('p3', 'value')],
+        [Input('next-btn', 'n_clicks'),
+         Input('prev-btn', 'n_clicks'),
+         Input('analysis-complete-store', 'data')],
+        [State('step-tracker', 'data')],
+    )(navigate_steps)
+
+    dash_app.callback(
+        [Output('uploaded-file-store', 'data'),
+         Output('upload-error-message', 'children'),
+         Output('analysis-complete-store', 'data', allow_duplicate=True)],
+        Input('upload-data', 'contents'),
+        State('upload-data', 'filename'),
+        Input('clear-upload-btn', 'n_clicks'),
+        prevent_initial_call=True,
+    )(store_uploaded_file)
+
+    dash_app.callback(
+        [Output('data-preview-container', 'children'),
+         Output('kde-plot-container', 'children'),
+         Output('box-plot-container', 'children'),
+         Output('scatter-plot-container', 'children'),
+         Output('acf-plot-container', 'children'),
+         Output('pacf-plot-container', 'children')],
+        [
+            Input('uploaded-file-store', 'data'),
+            Input('kde-overlay-toggle', 'value'),
+            Input('hist-bin-count-slider', 'value'),
+        ],
+    )(update_summary_table)
+
+    dash_app.callback(
+        [Output('ssa-window-slider', 'marks'),
+         Output('ssa-window-slider', 'value'),
+         Output('ssa-window-slider', 'min'),
+         Output('ssa-window-slider', 'max'),
+         Output('ssa-window-slider', 'step')],
+        [Input('step-tracker', 'data'),
+         Input('uploaded-file-store', 'data')],
+    )(configure_redo_slider)
+
+    dash_app.callback(
+        Output('apply-grouping-trigger', 'data'),
+        Input('apply-components-btn', 'n_clicks'),
+        prevent_initial_call=True,
+    )(relay_apply_grouping)
+
+    dash_app.callback(
+        Output('loess-fraction-store', 'data'),
+        Input('loess-fraction-slider', 'value'),
+        prevent_initial_call=True,
+    )(relay_loess_fraction)
+
+    dash_app.callback(
+        [Output('eigen-plot', 'figure'),
+         Output('eigenvector-plot', 'src')],
+        [Input('step-tracker', 'data'),
+         Input('analysis-complete-store', 'data'),
+         Input('uploaded-file-store', 'data')],
+        State('ssa-window-slider', 'value'),
+        prevent_initial_call=True,
+    )(update_ssa_plots)
+
+    dash_app.callback(
+        [Output('component-validation-error', 'children'),
+         Output('signal-reconstruction-plot', 'figure'),
+         Output('change-point-plot', 'figure'),
+         Output('wcorr-plot', 'src'),
+         Output('reconstruction-metadata', 'children'),
+         Output('noise-kde-plot', 'figure'),
+         Output('analysis-complete-store', 'data')],
+        [Input('apply-grouping-trigger', 'data'),
+         Input('uploaded-file-store', 'data')],
+        [State('component-name-1', 'value'), State('component-list-1', 'value'),
+         State('component-name-2', 'value'), State('component-list-2', 'value'),
+         State('component-name-3', 'value'), State('component-list-3', 'value'),
+         State('ssa-window-slider', 'value'),
+         State('loess-fraction-store', 'data')],
+        prevent_initial_call=True,
+    )(validate_components)
+
+    dash_app.callback(
+        Output('verification-plot', 'figure'),
+        [Input('loess-fraction-store', 'data'),
+         Input('analysis-complete-store', 'data'),
+         Input('uploaded-file-store', 'data')],
+        prevent_initial_call=True,
+    )(update_verification_plot)
+
+    dash_app.callback(
+        [Output('ssa-aic-formulas', 'children'),
+         Output('variance-explained-rank-plot', 'figure'),
+         Output('noise-variance-rank-plot', 'figure')],
+        [Input('step-tracker', 'data'),
+         Input('uploaded-file-store', 'data'),
+         Input('analysis-complete-store', 'data')],
+    )(update_logging_rank_diagnostics)
+
+    dash_app.callback(
+        Output('observation-text', 'value'),
+        [Input('step-tracker', 'data'),
+         Input('analysis-complete-store', 'data'),
+         Input('uploaded-file-store', 'data')],
+        prevent_initial_call=True,
+    )(populate_observation_text)
+
+
+def create_app() -> dash.Dash:
+    """Create and configure the Dash app instance."""
+    dash_app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], suppress_callback_exceptions=True)
+    dash_app.layout = build_app_layout()
+    register_callbacks(dash_app)
+    return dash_app
+
+
+app = create_app()
 
 
 if __name__ == '__main__':

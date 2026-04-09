@@ -1,12 +1,15 @@
+"""Singular Spectrum Analysis decomposition and reconstruction utilities."""
+
 from ssalib import SingularSpectrumAnalysis
 from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from typing import List
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
+
 
 class SSADecomposition:
     """
@@ -17,11 +20,11 @@ class SSADecomposition:
 
     def __init__(self, series: pd.Series, window: int) -> None:
         """
-        Initializes the SSADecomposition with a time series DataFrame.
+        Initialize SSA decomposition for a timestamp-indexed series.
 
         Args:
-            df (pd.DataFrame): The input DataFrame with "date" and "signal" columns.
-            window (int): The window size for SSA.
+            series: Input numeric series indexed by datetime.
+            window: Window size for SSA trajectory matrix construction.
         """
         self._series = series
         self._window = window
@@ -33,7 +36,6 @@ class SSADecomposition:
         self._cum_var = {"var_comp-" + str(i) : (np.sum(self._eigenvalues[:i+1])/self._total_variance).item() for i in range(self._eigenvalues.shape[0])}
         self._seasonality_check_heuristic = False
         self._reset_reconstruction_cache()
-        return
 
     def seasonality_check_heuristic(self) -> bool:
         """Heuristic seasonality check based on near-equal leading eigenvalues.
@@ -97,11 +99,19 @@ class SSADecomposition:
             self._durbin_watson = None
 
     def _ensure_reconstruction_cache(self) -> None:
+        """Build the reconstruction cache on first access."""
         if self._raw_signal is None:
             self._build_reconstruction_cache()
 
-    def get_reconstructed_series(self, group_key: str):
-        """Return a cached reconstructed series by case-insensitive group key."""
+    def get_reconstructed_series(self, group_key: str) -> pd.Series | None:
+        """Return a cached reconstructed series by case-insensitive group key.
+
+        Args:
+            group_key: Requested group label.
+
+        Returns:
+            Reconstructed series for the key, or None if unavailable.
+        """
         self._ensure_reconstruction_cache()
 
         normalized_key = group_key.strip().casefold()
@@ -113,20 +123,16 @@ class SSADecomposition:
             return self._noise_signal
         return self._group_signals.get(normalized_key)
 
-    def get_group_series(self, group_key: str):
+    def get_group_series(self, group_key: str) -> pd.Series | None:
         """Alias for get_reconstructed_series for external callers."""
         return self.get_reconstructed_series(group_key)
 
-    def eigenplot(self) -> plt.Figure:
+    def eigenplot(self) -> go.Figure:
         """
-        Creates a plot of the SSA decomposition.
-
-        Args:
-            comp1 (List[int]): A list of integers representing the components for the trend.
-            comp2 (List[int]): A list of integers representing the components for seasonality.
+        Create the explained-variance-by-component line plot.
 
         Returns:
-            plt.Figure: A matplotlib Figure object containing the decomposition plot.
+            Plotly figure with component explained variance.
         """
         df_eig = pd.DataFrame.from_dict(self._exp_var, orient="index").reset_index()
         df_eig.columns = ["component", "explained_variance"]
@@ -146,31 +152,25 @@ class SSADecomposition:
         return fig
     
     def eigen_vector_plot(self) -> plt.Figure:
+        """Return the SSA eigenvector matplotlib figure."""
 
         fig, axes = self._ssa.plot(kind='vectors')
 
         return fig
     
-    def set_reconstruction(self, recon: dict[str, List[int]]) -> None:
+    def set_reconstruction(self, recon: dict[str, list[int]]) -> None:
         """
-        Sets the components for trend and seasonality reconstruction.
+        Set decomposition groups used for signal reconstruction.
 
         Args:
-            comp1 (List[int]): A list of integers representing the components for the trend.
-            comp2 (List[int]): A list of integers representing the components for seasonality.
+            recon: Mapping of group names to component index lists.
         """
         self._reset_reconstruction_cache()
         self._recon = recon
         self._ssa.reconstruct(recon)
-        return
     
     def wcorr_plot(self) -> plt.Figure:
-        """
-        Creates a plot of the w-correlation matrix.
-
-        Returns:
-            plt.Figure: A matplotlib Figure object containing the w-correlation matrix plot.
-        """
+        """Create a plot of the w-correlation matrix."""
         
         fig, ax = self._ssa.plot(kind='wcorr', n_components=self._window)
         _ = ax.set_xlabel('Component Index')
@@ -179,10 +179,11 @@ class SSADecomposition:
         cbar.set_label('Weighted Correlation Values')
         return fig
     
-    def signal_reconstruction_plot(self):
-        """
-        Returns a Plotly figure with raw signal and smoothed signal curves over date.
-        Also stores per-group variation and the noise signal on the instance.
+    def signal_reconstruction_plot(self) -> go.Figure:
+        """Return a signal reconstruction plot for raw, smoothed, and grouped series.
+
+        This call also refreshes and caches reconstruction products and updates
+        the seasonality heuristic flag.
         """
 
         if not hasattr(self, "_recon"):
@@ -196,7 +197,6 @@ class SSADecomposition:
         smoothed_signal = self.get_reconstructed_series("smoothed_signal")
         dates = self._series.index
 
-        import plotly.graph_objects as go
         fig = go.Figure()
 
         fig.add_trace(go.Scatter(
@@ -236,15 +236,14 @@ class SSADecomposition:
 
         return fig
 
-    def loess_smother(self, fraction: float):
-        """
-        Fits a LOESS curve to the SSA preprocessed signal and returns a Plotly figure.
+    def loess_smother(self, fraction: float) -> go.Figure:
+        """Fit a LOESS curve to the SSA preprocessed signal.
 
         Args:
-            fraction (float): Fraction of data used for each local regression in LOESS.
+            fraction: Fraction of data used for each local regression in LOESS.
 
         Returns:
-            plotly.graph_objects.Figure: Figure with raw and LOESS-smoothed signals.
+            Figure with raw and LOESS-smoothed signals.
         """
 
         if not 0 < fraction <= 1:
@@ -286,10 +285,8 @@ class SSADecomposition:
 
         return fig
 
-    def change_point_plot(self):
-        """
-        Returns a Plotly figure for change-point analysis using the reconstructed smoothed signal.
-        """
+    def change_point_plot(self) -> go.Figure:
+        """Return a change-point analysis plot using the smoothed signal."""
 
         if not hasattr(self, "_recon"):
             raise ValueError("Reconstruction map is not set. Call set_reconstruction() first.")

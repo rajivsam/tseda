@@ -1,3 +1,7 @@
+"""SSA summary generation for diagnostics and observation logging text."""
+
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -9,17 +13,25 @@ from tseda.series_stats.summary_statistics import SummaryStatistics
 class SSAResultSummary:
     """Summarize rank-wise SSA explained/noise variance and AIC diagnostics."""
 
-    def __init__(self, ssa_obj, series: pd.Series, window_size: int, eps: float = 1e-12) -> None:
+    def __init__(self, ssa_obj: Any, series: pd.Series, window_size: int, eps: float = 1e-12) -> None:
+        """Initialize the summary engine and compute rank-wise diagnostics.
+
+        Args:
+            ssa_obj: Active SSA decomposition object.
+            series: Input series used for baseline variance estimates.
+            window_size: SSA window size (max rank cap).
+            eps: Minimum positive floor used in log-variance terms.
+        """
         self._ssa_obj = ssa_obj
         self._series = series
         self._window_size = int(window_size)
         self._eps = float(eps)
 
-        self._ranks = None
-        self._explained_ratio = None
-        self._noise_ratio = None
-        self._aic_exp_var = None
-        self._aic_noise_var = None
+        self._ranks: np.ndarray | None = None
+        self._explained_ratio: np.ndarray | None = None
+        self._noise_ratio: np.ndarray | None = None
+        self._aic_exp_var: np.ndarray | None = None
+        self._aic_noise_var: np.ndarray | None = None
         self._n_obs = 0
         self._compute()
 
@@ -62,6 +74,7 @@ class SSAResultSummary:
         self._aic_noise_var = (self._n_obs * np.log(sigma2_noise_var)) + (2.0 * self._ranks)
 
     def formulas(self) -> dict[str, str]:
+        """Return symbolic formulas used in rank-based diagnostics."""
         return {
             "ev": "EV(r) = sum_{i=1..r}(lambda_i) / sum_{i=1..L}(lambda_i)",
             "noise_var": "sigma2_noise(r) = sigma2_total * (1 - EV(r))",

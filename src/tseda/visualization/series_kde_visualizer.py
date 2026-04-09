@@ -1,19 +1,37 @@
+"""KDE-based distribution visualization helpers for time-series values."""
+
 from scipy import stats
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
 from KDEpy import FFTKDE
+from types import ModuleType
 
 
 class SeriesKDEVisualizer:
+    """Render KDE curves and inflection-point diagnostics."""
+
     def __init__(self, series: pd.Series, title: str = "Signal KDE") -> None:
+        """Initialize KDE plotting state.
+
+        Args:
+            series: Input numeric series.
+            title: Plot title.
+        """
         self._df = series.to_frame().reset_index()
         self._df.columns = ["date", "signal"]
         self._title = title
-        return
 
     def KDEVisualizer(self, bandwidth: str = 'ISJ') -> plt.Figure:
+        """Plot a KDE estimate using ``KDEpy.FFTKDE``.
+
+        Args:
+            bandwidth: KDE bandwidth strategy passed to FFTKDE.
+
+        Returns:
+            Matplotlib figure object containing the KDE curve.
+        """
 
         data = self._df["signal"].values
 
@@ -29,7 +47,15 @@ class SeriesKDEVisualizer:
     
     
     
-    def getInflectionPointsPlot(self, bandwidth: str = 'scott') -> plt.Figure:
+    def getInflectionPointsPlot(self, bandwidth: str = 'scott') -> ModuleType:
+        """Plot KDE with estimated inflection points.
+
+        Args:
+            bandwidth: Bandwidth method used by ``scipy.stats.gaussian_kde``.
+
+        Returns:
+            The ``matplotlib.pyplot`` module (legacy behavior).
+        """
         data = self._df["signal"].values
         kde = stats.gaussian_kde(data, bw_method = bandwidth) 
         
@@ -59,8 +85,8 @@ class SeriesKDEVisualizer:
         plt.title('Kernel Density Estimation for the Signal')
         plt.grid(True)
         return plt
-        
-    
-    
 
-    
+
+
+
+

@@ -1,15 +1,31 @@
+"""Histogram plotting utilities for one-dimensional signals."""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from types import ModuleType
+
 
 class SeriesHistogramVisualizer:
+    """Render a normalized histogram with rule-based bin sizing."""
+
     def __init__(self, series: pd.Series, title: str = "Signal Histogram") -> None:
+        """Initialize histogram plotting state.
+
+        Args:
+            series: Input numeric series.
+            title: Plot title.
+        """
         self._df = series.to_frame().reset_index()
         self._df.columns = ["date", "signal"]
         self._title = title
-        return
 
-    def plot(self) -> plt.Figure:
+    def plot(self) -> ModuleType:
+        """Draw the histogram and return ``matplotlib.pyplot``.
+
+        Returns:
+            The ``matplotlib.pyplot`` module (legacy behavior).
+        """
         data = self._df["signal"].values
         
         # Calculate bin width using Scott's rule
