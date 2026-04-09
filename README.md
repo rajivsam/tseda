@@ -32,7 +32,35 @@ The SSA is based on the eigen decomposition of the trajectory matrix. Though the
 
 The package also provides a notebook interface to these features. If you have a new dataset that you want to analyze, look at the data loader directory for examples. Download your dataset, clean it, produce your time series, and analyze it with `tseda`.
 
+## Requirements
+
+**Python 3.13 or higher** is required to run this package.
+
+Before starting the installation, verify your Python version:
+
+```bash
+python --version
+```
+
+Ensure the output shows Python 3.13 or higher. If not, please upgrade Python before proceeding.
+
 ## Install And Run From PyPI
+
+### Recommended: Using Conda
+
+Conda is the recommended package manager for development and installation (development was done with conda):
+
+```bash
+conda create -n tseda python=3.13
+conda activate tseda
+pip install tseda
+```
+
+Then run the app:
+
+```bash
+tseda
+```
 
 ## Non-Developer Quick Start
 
@@ -55,6 +83,12 @@ tseda
 If `pipx` is not available, use the standard Python install instructions below.
 
 ### 1. Install
+
+Verify you have Python 3.13 or higher installed:
+
+```bash
+python --version
+```
 
 Create and activate a virtual environment, then install from PyPI:
 
