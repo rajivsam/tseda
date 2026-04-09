@@ -44,3 +44,5 @@ implement a seasonality check heuristic called seasonality_check_heuristic() tha
  When you are in the logging stage, the next button should be disabled. It can be enabled for the other two stages.
 
  If the variance explained by the first two eigenvectors is less than or equal to 20 percent, set a noisy_series flag and disable the apply grouping button. Put up a message box saying that this series is not suitable for this tool.
+
+ can you do a uv build and publish this package to pypi
