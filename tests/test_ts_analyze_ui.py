@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import tseda.user_interface.ts_analyze_ui as ui
+import tseda.user_interface.callback_services as callback_services
 
 
 def _csv_upload_payload(csv_text: str) -> str:
@@ -172,3 +173,26 @@ def test_parse_upload_rejects_missing_values_any_column():
         assert False, "Expected ValueError for missing values"
     except ValueError as exc:
         assert "requires data without missing values" in str(exc)
+
+
+def test_parse_uploaded_series_handles_arrow_string_timestamp_mode():
+    csv_text = (
+        "timestamp,value\n"
+        "1990-01-01,75.8\n"
+        "1990-02-01,84.0\n"
+        "1990-03-01,93.9\n"
+    )
+    payload = _csv_upload_payload(csv_text)
+
+    # Exercise parser in an environment that prefers Arrow-backed string storage.
+    with pd.option_context("future.infer_string", True, "mode.string_storage", "pyarrow"):
+        parsed = callback_services.parse_uploaded_series(
+            contents=payload,
+            filename="coffee_prices.csv",
+            max_file_lines=2000,
+        )
+
+    assert parsed is not None
+    assert len(parsed) == 3
+    assert pd.api.types.is_datetime64_any_dtype(parsed.index)
+    assert float(parsed.iloc[0]) == 75.8

@@ -1,6 +1,6 @@
 [project]
 name = "tseda"
-version = "0.1.0"
+version = "0.1.6"
 description = "A package for exploration of regularly sampled time series."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -15,6 +15,7 @@ classifiers = [
 ]
 dependencies = [
     "dash>=4.1.0",
+  "dash-ag-grid>=31.3.1",
     "dash-bootstrap-components>=2.0.4",
     "google-genai>=1.56.0",
     "importlib-resources>=6.5.2",
@@ -46,6 +47,9 @@ dependencies = [
     "pytest>=8.0",
     "pytest-cov>=7.0.0",
   ]
+
+  [project.scripts]
+  tseda = "tseda.user_interface.ts_analyze_ui:main"
 
   [build-system]
   requires = ["setuptools>=68", "wheel"]

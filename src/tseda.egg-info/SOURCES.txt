@@ -1,8 +1,11 @@
 README.md
 pyproject.toml
+src/tseda/__init__.py
+src/tseda/__main__.py
 src/tseda.egg-info/PKG-INFO
 src/tseda.egg-info/SOURCES.txt
 src/tseda.egg-info/dependency_links.txt
+src/tseda.egg-info/entry_points.txt
 src/tseda.egg-info/requires.txt
 src/tseda.egg-info/top_level.txt
 src/tseda/change_point/change_point_estimator.py

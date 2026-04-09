@@ -2,6 +2,7 @@
 
 import base64
 import io
+import os
 from typing import Any
 
 import numpy as np
@@ -612,5 +613,13 @@ def create_app() -> dash.Dash:
 app = create_app()
 
 
+def main() -> None:
+    """Run the installed Dash application via the console script entrypoint."""
+    host = os.getenv("TSEDA_HOST", "127.0.0.1")
+    port = int(os.getenv("TSEDA_PORT", "8050"))
+    debug = os.getenv("TSEDA_DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}
+    app.run(host=host, port=port, debug=debug)
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    main()

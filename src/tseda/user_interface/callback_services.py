@@ -29,11 +29,11 @@ def parse_uploaded_series(contents: str | None, filename: str, max_file_lines: i
     if contents is None:
         return None
 
-    _, content_string = contents.split(",")
+    _, content_string = contents.split(",", 1)
     decoded = base64.b64decode(content_string)
 
     if filename.lower().endswith(".csv"):
-        df = pd.read_csv(io.StringIO(decoded.decode("utf-8")))
+        df = pd.read_csv(io.StringIO(decoded.decode("utf-8-sig")))
     elif filename.lower().endswith((".xls", ".xlsx")):
         df = pd.read_excel(io.BytesIO(decoded))
     else:
@@ -53,17 +53,34 @@ def parse_uploaded_series(contents: str | None, filename: str, max_file_lines: i
             "Please fix missing values and try again."
         )
 
-    try:
-        df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0])
-    except Exception as exc:
-        raise ValueError("Could not parse the first column as datetime.") from exc
-
-    df = df.set_index(df.columns[0])
-    timestamp_index = pd.DatetimeIndex(df.index).sort_values()
+    _col = df.iloc[:, 0]
+    _parsed = None
+    _last_exc: Exception | None = None
+    for _kwargs in [
+        {"format": "mixed", "dayfirst": False},
+        {"format": "mixed", "dayfirst": True},
+        {"infer_datetime_format": True},
+        {},
+    ]:
+        try:
+            _parsed = pd.to_datetime(_col, **_kwargs)
+            break
+        except Exception as _exc:
+            _last_exc = _exc
+            continue
+    if _parsed is None:
+        _sample = str(_col.iloc[0]) if len(_col) > 0 else "(empty)"
+        raise ValueError(
+            f"Could not parse the first column as datetime "
+            f"(first value seen: {_sample!r}). "
+            "Ensure the first column contains dates in a recognisable format "
+            "(e.g. 2023-01-15, 01/15/2023, Jan 2023, or 2023-01)."
+        ) from _last_exc
+    timestamp_index = pd.DatetimeIndex(_parsed)
     if len(timestamp_index) < 2:
         raise ValueError("Uploaded file must contain at least two timestamped rows.")
 
-    observed_deltas = timestamp_index.to_series().diff().dropna()
+    observed_deltas = timestamp_index.to_series().sort_values().diff().dropna()
     min_delta = observed_deltas.min() if not observed_deltas.empty else pd.Timedelta(0)
 
     if min_delta < pd.Timedelta(hours=1):
@@ -72,7 +89,9 @@ def parse_uploaded_series(contents: str | None, filename: str, max_file_lines: i
             "Please upload data sampled hourly or less frequently."
         )
 
-    series = df.iloc[:, 0]
+    series = df.iloc[:, 1].copy()
+    series.index = timestamp_index
+    series = series.sort_index()
     if not pd.api.types.is_numeric_dtype(series):
         series = pd.to_numeric(series, errors="coerce")
 
