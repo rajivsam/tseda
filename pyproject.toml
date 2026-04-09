@@ -1,9 +1,18 @@
 [project]
 name = "tseda"
 version = "0.1.0"
-description = "Add your description here"
+description = "A package for exploration of regularly sampled time series."
 readme = "README.md"
 requires-python = ">=3.13"
+license = "LicenseRef-Proprietary"
+keywords = ["time-series", "ssa", "dash", "analytics", "decomposition"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
 dependencies = [
     "dash>=4.1.0",
     "dash-bootstrap-components>=2.0.4",
@@ -20,8 +29,6 @@ dependencies = [
     "numpy>=2.4.0",
     "pandas>=2.3.3",
     "plotly>=6.5.0",
-    "pytest>=8.0",
-    "pytest-cov>=7.0.0",
     "python-dotenv>=1.2.1",
     "req>=1.0.0",
     "ruptures>=1.1.10",
@@ -33,11 +40,24 @@ dependencies = [
     "statsmodels>=0.14.6",
     "streamlit>=1.52.2",
 ]
+
+  [project.optional-dependencies]
+  dev = [
+    "pytest>=8.0",
+    "pytest-cov>=7.0.0",
+  ]
+
   [build-system]
-  requires = ["setuptools>=42"]
+  requires = ["setuptools>=68", "wheel"]
   build-backend = "setuptools.build_meta"
 
 
- [tool.setuptools.packages.find]
-  where = ['src']
-  include = ['tseda*']
+  [tool.setuptools.packages.find]
+  where = ["src"]
+  include = ["tseda*"]
+
+  [tool.setuptools.package-data]
+  tseda = [
+    "config/*.csv",
+    "images/*",
+  ]

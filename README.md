@@ -73,3 +73,31 @@ The app will start a local web server. Open your browser and navigate to the URL
 | 1 | **Initial Assessment of Time Series** | Review distribution plots (KDE, box plot) and the ACF / PACF for autocorrelation patterns. |
 | 2 | **Time Series Decomposition** | Review the eigenvalue plot, then enter component groupings (e.g., Trend, Seasonal, Noise) and click **Apply Grouping**. |
 | 3 | **Observation Logging** | Review the AIC rank diagnostics, read the auto-generated summary, and add your own observations before saving the report. |
+
+## Build And Publish With uv
+
+1. Build source and wheel distributions:
+
+```bash
+uv build
+```
+
+2. Validate distributions before upload:
+
+```bash
+uvx twine check dist/*
+```
+
+3. Publish to PyPI using an API token:
+
+```bash
+export UV_PUBLISH_TOKEN="pypi-..."
+uv publish
+```
+
+4. Publish to TestPyPI first (recommended):
+
+```bash
+export UV_PUBLISH_TOKEN="pypi-..."
+uv publish --publish-url https://test.pypi.org/legacy/
+```

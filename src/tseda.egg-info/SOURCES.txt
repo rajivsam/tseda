@@ -6,6 +6,7 @@ src/tseda.egg-info/dependency_links.txt
 src/tseda.egg-info/requires.txt
 src/tseda.egg-info/top_level.txt
 src/tseda/change_point/change_point_estimator.py
+src/tseda/config/prompts_config.csv
 src/tseda/data_writers/kmds_writer.py
 src/tseda/dataloader/coffee_prices_data_loader.py
 src/tseda/dataloader/kaggle_data_loader.py
@@ -14,10 +15,13 @@ src/tseda/dataloader/local_dataloader.py
 src/tseda/dataloader/synthetic_series_data_loader.py
 src/tseda/dataloader/white_noise_data_loader.py
 src/tseda/decomposition/ssa_decomposition.py
+src/tseda/decomposition/ssa_result_summary.py
+src/tseda/images/tseda_workflow.png
 src/tseda/periodicity/fft_analyzer.py
 src/tseda/series_stats/sampling_prop.py
 src/tseda/series_stats/summary_statistics.py
 src/tseda/user_interface/analysis.py
+src/tseda/user_interface/callback_services.py
 src/tseda/user_interface/gemini_chat.py
 src/tseda/user_interface/initial_assessment.py
 src/tseda/user_interface/initial_assessment_layout.py
@@ -35,4 +39,6 @@ tests/test_fft_analyzer.py
 tests/test_sampling_prop.py
 tests/test_series_histogram_visualizer.py
 tests/test_series_kde_visualizer.py
+tests/test_ssa_decomposition.py
+tests/test_ssa_result_summary.py
 tests/test_ts_analyze_ui.py

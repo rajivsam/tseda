@@ -1,26 +1,51 @@
-# Ignore virtual environment directory
-venv/
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
 
-# Ignore Jupyter Notebook checkpoints and data
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Tooling caches
+.cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# Notebooks
 .ipynb_checkpoints/
 *.ipynb
 
-# Python compiled files
-*.pyc
-__pycache__/
-# Ignore general cache directories and files
-__pycache__/
-.cache/
-.pytest_cache/
-*.pyc
+# Editor and OS files
+.vscode/
+.idea/
 *.swp
-# ignore my github key
+*.swo
+.DS_Store
+
+# Local environment/config
+.env
+.env.*
+.python-version
+
+# Project-specific local files
 rajiv_github_key
 rajiv_github_key.pub
-#ignore document
 *.pdf
-#ignore the .env file
-.env
-#ignore the .vscode folder
-.vscode/
-.python-version
