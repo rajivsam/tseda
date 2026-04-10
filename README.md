@@ -145,7 +145,7 @@ pip install -e .
 tseda
 ```
 
-## Build And Publish With uv
+## Build With uv
 
 1. Build source and wheel distributions:
 
@@ -159,16 +159,6 @@ uv build
 uvx twine check dist/*
 ```
 
-3. Publish to PyPI using an API token:
+## Contributing & Feature Requests
 
-```bash
-export UV_PUBLISH_TOKEN="pypi-..."
-uv publish
-```
-
-4. Publish to TestPyPI first (recommended):
-
-```bash
-export UV_PUBLISH_TOKEN="pypi-..."
-uv publish --publish-url https://test.pypi.org/legacy/
-```
+If you'd like to request a feature or report an issue, please [open an issue](https://github.com/rajivsam/tseda/issues) on GitHub. You're also welcome to reach out to me directly.
