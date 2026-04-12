@@ -15,6 +15,8 @@ dist/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
+docs/_build/
+docs/source/api/*.rst
 
 # Test and coverage artifacts
 .pytest_cache/

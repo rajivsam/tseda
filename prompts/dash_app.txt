@@ -46,3 +46,5 @@ implement a seasonality check heuristic called seasonality_check_heuristic() tha
  If the variance explained by the first two eigenvectors is less than or equal to 20 percent, set a noisy_series flag and disable the apply grouping button. Put up a message box saying that this series is not suitable for this tool.
 
  can you do a uv build and publish this package to pypi
+
+ can generate the documentation using sphynx, use best practices, upload the generated documentation to read the docs.

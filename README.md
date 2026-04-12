@@ -159,6 +159,41 @@ uv build
 uvx twine check dist/*
 ```
 
+## Documentation (Sphinx)
+
+### Build locally
+
+```bash
+pip install -r docs/requirements.txt
+sphinx-build -b html docs/source docs/_build/html
+```
+
+You can also use the Makefile:
+
+```bash
+make -C docs html
+```
+
+The generated site will be available in `docs/_build/html`.
+
+### Publish on Read the Docs
+
+This repository includes `.readthedocs.yaml` configured to build docs from `docs/source/conf.py`.
+
+1. Push the repository to GitHub (or another supported provider).
+2. Sign in to Read the Docs and import the project.
+3. In Read the Docs project settings:
+	- Set the default branch.
+	- Confirm the config file path is `.readthedocs.yaml`.
+4. Trigger a build from the Read the Docs dashboard.
+5. Optionally enable a custom domain and versioned docs.
+
+If the build fails, inspect the Read the Docs build logs and replicate locally using:
+
+```bash
+make -C docs html
+```
+
 ## Contributing & Feature Requests
 
 If you'd like to request a feature or report an issue, please [open an issue](https://github.com/rajivsam/tseda/issues) on GitHub. You're also welcome to reach out to me directly.

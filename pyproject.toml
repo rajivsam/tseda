@@ -47,6 +47,12 @@ dependencies = [
     "pytest>=8.0",
     "pytest-cov>=7.0.0",
   ]
+  docs = [
+    "sphinx>=8.0",
+    "furo>=2024.8.6",
+    "myst-parser>=3.0",
+    "sphinx-copybutton>=0.5",
+  ]
 
   [project.scripts]
   tseda = "tseda.user_interface.ts_analyze_ui:main"
