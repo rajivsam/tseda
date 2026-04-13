@@ -1,8 +1,17 @@
+"""Data loader for the ICO coffee prices dataset."""
+
 from .local_dataloader import LocalDataLoader
 import pandas as pd
 
 class CoffeePricesDataLoader(LocalDataLoader):
+    """Load and expose the coffee prices CSV as a named ``signal`` series."""
+
     def __init__(self, file_path: str = "data/coffee_prices.csv"):
+        """Configure the loader with the default coffee prices CSV path.
+
+        Args:
+            file_path: Path to the coffee prices CSV file.
+        """
         super().__init__(file_path)
 
     def load_coffee_prices(self) -> pd.DataFrame:

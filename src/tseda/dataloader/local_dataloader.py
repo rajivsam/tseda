@@ -1,8 +1,16 @@
+"""Base CSV data-loading utility."""
 
 import pandas as pd
 
 class LocalDataLoader:
+    """Load tabular data from a local CSV file into a pandas DataFrame."""
+
     def __init__(self, file_path: str):
+        """Store the file path for later use by :meth:`load_data`.
+
+        Args:
+            file_path: Path to the CSV file to load.
+        """
         self.file_path = file_path
 
     def load_data(self) -> pd.DataFrame:

@@ -1,3 +1,5 @@
+"""Reusable Plotly/Dash component factories for the Step-1 initial assessment panel."""
+
 from tseda.series_stats.sampling_prop import SamplingProp
 from dash import Dash, html, dcc
 from dash_ag_grid import AgGrid
@@ -10,6 +12,14 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from tseda.decomposition.ssa_decomposition import SSADecomposition
 
 def create_summary_table(sampling_prop: SamplingProp) -> AgGrid:
+    """Build an AG Grid table displaying sampling properties.
+
+    Args:
+        sampling_prop: Populated :class:`~tseda.series_stats.sampling_prop.SamplingProp` instance.
+
+    Returns:
+        Dash AgGrid component showing property/value rows.
+    """
     df = sampling_prop.view_properties()
     
     return AgGrid(
@@ -41,6 +51,17 @@ def create_summary_table(sampling_prop: SamplingProp) -> AgGrid:
     )
 
 def create_kde_plot(series: pd.Series, show_kde: bool = True, bin_count: int | None = None) -> go.Figure:
+    """Build a combined histogram and KDE figure.
+
+    Args:
+        series: Numeric time series to visualize.
+        show_kde: Whether to overlay the KDE curve on the histogram.
+        bin_count: Explicit bin count; when ``None`` or ``<= 0`` bins are
+            sized automatically using the IQR rule.
+
+    Returns:
+        Plotly figure with the histogram (and optional KDE curve).
+    """
     clean_series = series.dropna()
     if clean_series.empty:
         raise ValueError('Series contains no numeric values for KDE/histogram plotting.')
@@ -83,6 +104,14 @@ def create_kde_plot(series: pd.Series, show_kde: bool = True, bin_count: int | N
 
 
 def create_box_plot(series: pd.Series) -> go.Figure:
+    """Build a box-plot figure showing value distribution.
+
+    Args:
+        series: Numeric time series to visualize.
+
+    Returns:
+        Plotly box-plot figure.
+    """
     fig = go.Figure(
         go.Box(
             y=series,
@@ -107,6 +136,14 @@ def create_box_plot(series: pd.Series) -> go.Figure:
 
 
 def create_scatter_plot(series: pd.Series) -> go.Figure:
+    """Build a scatter/line plot with a trend line overlay.
+
+    Args:
+        series: Timestamp-indexed numeric series.
+
+    Returns:
+        Plotly figure with raw data markers, connecting lines, and an OLS trend line.
+    """
     x_values = series.index
     y_values = series.values
 

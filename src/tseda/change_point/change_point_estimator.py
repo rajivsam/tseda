@@ -1,3 +1,5 @@
+"""Change-point detection utilities based on the PELT algorithm."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -9,6 +11,12 @@ class PELT_ChangePointEstimator:
 	"""Estimate change points with the PELT algorithm and return a predicted segment series."""
 
 	def __init__(self, series: pd.Series, model: str = "rbf") -> None:
+		"""Initialize PELT estimator and fit the algorithm on the input series.
+
+		Args:
+			series: Non-empty numeric series indexed by datetimes.
+			model: Cost model used by PELT (default ``"rbf"``).
+		"""
 		if series is None or len(series) == 0:
 			raise ValueError("Input series must be a non-empty pandas Series.")
 
@@ -23,6 +31,14 @@ class PELT_ChangePointEstimator:
 		self._predicted_series = self._build_predicted_series(self._change_pts)
 
 	def _build_predicted_series(self, change_points: list[int]) -> pd.Series:
+		"""Build a segment-label series aligned to the input index.
+
+		Args:
+			change_points: Predicted break-point indices returned by PELT.
+
+		Returns:
+			Series of segment labels (e.g. ``"segment-1"``) with the same index as the input.
+		"""
 		segment_labels: list[str] = []
 		start_idx = 0
 
@@ -45,6 +61,11 @@ class ChangePointEstimator:
 	"""Compatibility wrapper used by existing tests and call sites."""
 
 	def __init__(self, series: pd.Series) -> None:
+		"""Initialize the estimator with the input series.
+
+		Args:
+			series: Non-empty numeric series indexed by datetimes.
+		"""
 		if series is None or len(series) == 0:
 			raise ValueError("Input series must be a non-empty pandas Series.")
 

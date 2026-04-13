@@ -1,3 +1,5 @@
+"""Streamlit page for the initial time-series screening step."""
+
 import streamlit as st
 import pandas as pd
 

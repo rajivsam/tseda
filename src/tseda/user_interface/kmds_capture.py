@@ -1,3 +1,4 @@
+"""Streamlit knowledge-management capture UI for KMDS ontology workflows."""
 
 import streamlit as st
 from enum import Enum
@@ -40,6 +41,12 @@ class KMDS_Capture_Mode(Enum):
 
 
 def handle_capture_mode_decision(decision: str) -> None:
+    """Update the session state step based on the user's mode selection.
+
+    Args:
+        decision: One of ``"Create a new Knowledge Base"``, ``"Export Knowledge Base"``,
+            or any other string (treated as *Update Existing*).
+    """
     if decision == "Create a new Knowledge Base":
         st.session_state.current_kmds_step = KMDS_Capture_Mode.DO_CREATE_NEW_KB.value
     elif decision == "Export Knowledge Base":
@@ -51,11 +58,19 @@ def handle_capture_mode_decision(decision: str) -> None:
     return
 
 def click_update_existing_kb_btn() -> None:
+    """Transition the session state to the *Update Knowledge Base* step."""
     st.session_state.current_kmds_step = KMDS_Capture_Mode.DO_UPDATE_KB.value
 
     return
 
 def click_create_new_kb_btn(observations: str, file_name: str, file_dir: str) -> None:
+    """Create a new KMDS knowledge base with an initial exploratory observation.
+
+    Args:
+        observations: Plain-text observation to store in the new KB.
+        file_name: Desired KB file name (without directory).
+        file_dir: Target directory for the new KB file.
+    """
 
     st.session_state.current_kmds_step = KMDS_Capture_Mode.DO_CREATE_NEW_KB.value
 
@@ -78,7 +93,8 @@ def click_create_new_kb_btn(observations: str, file_name: str, file_dir: str) ->
 
     return
 
-def init_kmds_capture()->None:
+def init_kmds_capture() -> None:
+    """Initialize KMDS session-state keys if they have not been set yet."""
 
     if "current_kmds_step" not in st.session_state:
         st.session_state.current_kmds_step = KMDS_Capture_Mode.GET_CAPTURE_MODE.value
@@ -87,7 +103,8 @@ def init_kmds_capture()->None:
     
     return
 
-def manage_kmds_capture_state():
+def manage_kmds_capture_state() -> None:
+    """Dispatch to the correct Streamlit page based on the current capture step."""
     current_state = st.session_state.current_kmds_step
 
     if current_state == KMDS_Capture_Mode.GET_CAPTURE_MODE.value:
@@ -102,6 +119,14 @@ def manage_kmds_capture_state():
     return
 
 def click_export_kb_btn(file_name: str, file_dir: str, dest_dir: str, dest_file_name: str) -> None:
+    """Export the KMDS knowledge base to a CSV file.
+
+    Args:
+        file_name: Source KB file name.
+        file_dir: Directory containing the source KB file.
+        dest_dir: Directory where the exported CSV will be written.
+        dest_file_name: File name for the exported CSV.
+    """
 
     full_file_path = os.path.join(file_dir, file_name)
     dest_full_file_path = os.path.join(dest_dir, dest_file_name)
@@ -114,7 +139,8 @@ def click_export_kb_btn(file_name: str, file_dir: str, dest_dir: str, dest_file_
 
     return
 
-def export_KB()->None:
+def export_KB() -> None:
+    """Render the Streamlit export-KB page and handle the export button click."""
 
     with st.container():
         st.title("Export KMDS Knowledge Base")
@@ -131,8 +157,8 @@ def export_KB()->None:
 
 
 
-def do_capture_mode()->None:
-
+def do_capture_mode() -> None:
+    """Render the mode-selection page and route to the chosen sub-workflow."""
 
     st.title("Select your knowledge capture mode")
 
@@ -164,7 +190,8 @@ def error_dialog(error_message):
     if st.button("OK"):
         st.rerun() # Closes the dialog and reruns the main app script
 
-def validate_directory()->None:
+def validate_directory() -> None:
+    """Validate the directory path stored in ``st.session_state["file_dir"]``."""
 
     dir_entered = st.session_state["file_dir"]
     directory_path = Path(dir_entered)
@@ -176,8 +203,8 @@ def validate_directory()->None:
 
 
 
-def do_create_new_kb()->None:
-
+def do_create_new_kb() -> None:
+    """Render the new-KB creation form and handle button click events."""
 
     with st.container():
 

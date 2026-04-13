@@ -1,3 +1,5 @@
+"""Streamlit chat interface backed by the Google Gemini generative model."""
+
 import streamlit as st
 from google import genai
 from google.genai import types

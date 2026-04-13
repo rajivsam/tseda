@@ -1,8 +1,19 @@
+"""Dash layout for the Time Series Decomposition (Step 2) analysis panel."""
+
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
 
-def analysis_layout():
+def analysis_layout() -> html.Div:
+    """Build and return the full Step-2 decomposition layout.
+
+    The layout includes component grouping inputs, a signal reconstruction
+    plot, a LOESS verification plot, a change-point plot, a W-correlation
+    matrix image, and a reconstruction summary card.
+
+    Returns:
+        Dash ``html.Div`` containing the complete decomposition panel.
+    """
     return html.Div([
         html.H3("Time Series Decomposition"),
         dbc.Container([

@@ -1,3 +1,5 @@
+"""Synthetic multi-periodic time-series generator used for testing and demos."""
+
 from .local_dataloader import LocalDataLoader
 import pandas as pd
 from datetime import datetime, timedelta
@@ -6,7 +8,14 @@ from scipy.stats import norm
 from math import ceil
 
 class SyntheticSeriesDataLoader(LocalDataLoader):
+    """Generate a deterministic synthetic time series with two superimposed periodicities."""
+
     def __init__(self, file_path: str = "data/synthetic_series.csv"):
+        """Initialize with the synthetic series CSV path (unused; series is generated in memory).
+
+        Args:
+            file_path: Placeholder path; the series is always generated programmatically.
+        """
         super().__init__(file_path)
 
     def get_series(self) -> pd.Series:
