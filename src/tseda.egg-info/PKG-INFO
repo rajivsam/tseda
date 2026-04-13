@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: tseda
-Version: 0.1.6
+Version: 0.1.7
 Summary: A package for exploration of regularly sampled time series.
 License-Expression: LicenseRef-Proprietary
 Keywords: time-series,ssa,dash,analytics,decomposition
@@ -40,6 +40,11 @@ Requires-Dist: streamlit>=1.52.2
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0; extra == "dev"
 Requires-Dist: pytest-cov>=7.0.0; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx>=8.0; extra == "docs"
+Requires-Dist: furo>=2024.8.6; extra == "docs"
+Requires-Dist: myst-parser>=3.0; extra == "docs"
+Requires-Dist: sphinx-copybutton>=0.5; extra == "docs"
 
 # Time Series Explorer (`tseda`)
 
@@ -75,7 +80,35 @@ The SSA is based on the eigen decomposition of the trajectory matrix. Though the
 
 The package also provides a notebook interface to these features. If you have a new dataset that you want to analyze, look at the data loader directory for examples. Download your dataset, clean it, produce your time series, and analyze it with `tseda`.
 
+## Requirements
+
+**Python 3.13 or higher** is required to run this package.
+
+Before starting the installation, verify your Python version:
+
+```bash
+python --version
+```
+
+Ensure the output shows Python 3.13 or higher. If not, please upgrade Python before proceeding.
+
 ## Install And Run From PyPI
+
+### Recommended: Using Conda
+
+Conda is the recommended package manager for development and installation (development was done with conda):
+
+```bash
+conda create -n tseda python=3.13
+conda activate tseda
+pip install tseda
+```
+
+Then run the app:
+
+```bash
+tseda
+```
 
 ## Non-Developer Quick Start
 
@@ -98,6 +131,12 @@ tseda
 If `pipx` is not available, use the standard Python install instructions below.
 
 ### 1. Install
+
+Verify you have Python 3.13 or higher installed:
+
+```bash
+python --version
+```
 
 Create and activate a virtual environment, then install from PyPI:
 
@@ -154,7 +193,7 @@ pip install -e .
 tseda
 ```
 
-## Build And Publish With uv
+## Build With uv
 
 1. Build source and wheel distributions:
 
@@ -168,16 +207,41 @@ uv build
 uvx twine check dist/*
 ```
 
-3. Publish to PyPI using an API token:
+## Documentation (Sphinx)
+
+### Build locally
 
 ```bash
-export UV_PUBLISH_TOKEN="pypi-..."
-uv publish
+pip install -r docs/requirements.txt
+sphinx-build -b html docs/source docs/_build/html
 ```
 
-4. Publish to TestPyPI first (recommended):
+You can also use the Makefile:
 
 ```bash
-export UV_PUBLISH_TOKEN="pypi-..."
-uv publish --publish-url https://test.pypi.org/legacy/
+make -C docs html
 ```
+
+The generated site will be available in `docs/_build/html`.
+
+### Publish on Read the Docs
+
+This repository includes `.readthedocs.yaml` configured to build docs from `docs/source/conf.py`.
+
+1. Push the repository to GitHub (or another supported provider).
+2. Sign in to Read the Docs and import the project.
+3. In Read the Docs project settings:
+	- Set the default branch.
+	- Confirm the config file path is `.readthedocs.yaml`.
+4. Trigger a build from the Read the Docs dashboard.
+5. Optionally enable a custom domain and versioned docs.
+
+If the build fails, inspect the Read the Docs build logs and replicate locally using:
+
+```bash
+make -C docs html
+```
+
+## Contributing & Feature Requests
+
+If you'd like to request a feature or report an issue, please [open an issue](https://github.com/rajivsam/tseda/issues) on GitHub. You're also welcome to reach out to me directly.
