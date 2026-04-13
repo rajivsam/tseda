@@ -38,6 +38,11 @@ extensions = [
 ]
 autodoc_member_order = "bysource"
 autodoc_typehints = "description"
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
+    "show-inheritance": True,
+}
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 
