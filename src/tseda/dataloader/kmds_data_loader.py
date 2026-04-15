@@ -20,12 +20,20 @@ class KMDSDataLoader:
         return
     
     def load_kb(self) -> Ontology:
-        """Load and return the OWL knowledge base from the configured file path."""
+        """Load the OWL knowledge base from the configured file path.
+
+        Returns:
+            Loaded ontology object.
+        """
         onto2 :Ontology = load_kb(self._file_path)
         return onto2
     
     def load_exploratory_obs(self) -> pd.DataFrame:
-        """Return all exploratory observations as a DataFrame with columns ``finding_seq`` and ``finding``."""
+        """Load exploratory observations from the workflow node.
+
+        Returns:
+            DataFrame with columns ``finding_seq`` and ``finding``.
+        """
         
 
         the_workflow: Workflow = get_workflow(self._onto)
@@ -43,7 +51,11 @@ class KMDSDataLoader:
         return df
     
     def load_data_rep_obs(self) -> pd.DataFrame:
-        """Return all data-representation observations as a DataFrame."""
+        """Load data-representation observations from the workflow node.
+
+        Returns:
+            DataFrame containing sequence, observation type, and finding text.
+        """
         the_workflow: Workflow = get_workflow(self._onto)
         dr_obs: List[DataRepresentationObservation] = the_workflow.has_data_representation_observations
         records = []
@@ -57,7 +69,11 @@ class KMDSDataLoader:
 
         return df
     def load_modelling_choice_obs(self) -> pd.DataFrame:
-        """Return all modelling-choice observations as a DataFrame."""
+        """Load modelling-choice observations from the workflow node.
+
+        Returns:
+            DataFrame containing sequence, observation type, and finding text.
+        """
         the_workflow: Workflow = get_workflow(self._onto)
         mc_obs: List[ModellingChoiceObservation] = the_workflow.has_modelling_choice_observations
         records = []
@@ -72,7 +88,11 @@ class KMDSDataLoader:
         return df   
     
     def load_modelling_selection_obs(self) -> pd.DataFrame:
-        """Return all modelling-selection observations as a DataFrame."""
+        """Load modelling-selection observations from the workflow node.
+
+        Returns:
+            DataFrame containing sequence, observation type, and finding text.
+        """
         the_workflow: Workflow = get_workflow(self._onto)
         ms_obs: List[ModellingSelectionObservation] = the_workflow.has_modelling_selection_observations
         records = []
@@ -87,7 +107,12 @@ class KMDSDataLoader:
         return df
     
     def export_all_observations(self) -> pd.DataFrame:
-        """Concatenate all observation types into a single consolidated DataFrame."""
+        """Export all observation categories as a single table.
+
+        Returns:
+            Consolidated DataFrame containing exploratory, data representation,
+            modelling choice, and modelling selection observations.
+        """
         exp_df  = load_exp_observations(self._onto)
         dr_df = load_data_rep_observations(self._onto)
         mc_df = load_modelling_choice_observations(self._onto)

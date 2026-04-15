@@ -38,13 +38,17 @@ extensions = [
 ]
 autodoc_member_order = "bysource"
 autodoc_typehints = "description"
+autoclass_content = "both"
 autodoc_default_options = {
     "members": True,
+    "special-members": "__init__",
     "undoc-members": True,
     "show-inheritance": True,
 }
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
+napoleon_use_param = True
+napoleon_use_rtype = True
 
 # Keep API doc generation deterministic for local and RTD builds.
 def run_apidoc(app):

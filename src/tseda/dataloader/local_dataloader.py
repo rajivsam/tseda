@@ -14,7 +14,12 @@ class LocalDataLoader:
         self.file_path = file_path
 
     def load_data(self) -> pd.DataFrame:
-        """Load data from a local CSV file into a pandas DataFrame."""
+        """Load data from a local CSV file.
+
+        Returns:
+            DataFrame containing CSV contents, or an empty DataFrame when the
+            file is missing, empty, or unreadable.
+        """
         try:
             data = pd.read_csv(self.file_path)
             return data

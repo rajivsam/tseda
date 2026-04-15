@@ -19,7 +19,12 @@ class SyntheticSeriesDataLoader(LocalDataLoader):
         super().__init__(file_path)
 
     def get_series(self) -> pd.Series:
-        """Get the 'signal' series from the synthetic series data."""
+        """Generate and return a synthetic multi-periodic signal series.
+
+        Returns:
+            Numeric series indexed by hourly timestamps. Returns an empty float
+            series only if generation fails.
+        """
         now = datetime.now()
         p1_peak = 5
         p2_peak = 7

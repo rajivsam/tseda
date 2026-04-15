@@ -17,7 +17,11 @@ class WhiteNoiseDataLoader(LocalDataLoader):
         super().__init__(file_path)
 
     def get_series(self) -> pd.Series:
-        """Generate a white noise series for 30 days with hourly frequency."""
+        """Generate a Gaussian white-noise series for 30 days (hourly).
+
+        Returns:
+            Numeric series indexed by hourly timestamps.
+        """
         num_days = 30
         samples_per_day = 24
         num_samples = num_days * samples_per_day

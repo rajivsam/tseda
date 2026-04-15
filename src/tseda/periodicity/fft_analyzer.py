@@ -45,7 +45,11 @@ class FFT_Analyzer:
         return self.periods, self.power, self.best_period
     
     def plot(self) -> None:
-        """Render the periodogram plot using matplotlib."""
+        """Render the periodogram plot using matplotlib.
+
+        Returns:
+            ``None``. Displays the active matplotlib figure.
+        """
         if self.periods is None or self.power is None:
             self.periodogram()
         

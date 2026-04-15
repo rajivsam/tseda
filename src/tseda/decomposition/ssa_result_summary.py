@@ -74,7 +74,11 @@ class SSAResultSummary:
         self._aic_noise_var = (self._n_obs * np.log(sigma2_noise_var)) + (2.0 * self._ranks)
 
     def formulas(self) -> dict[str, str]:
-        """Return symbolic formulas used in rank-based diagnostics."""
+        """Return symbolic formulas used in rank-based diagnostics.
+
+        Returns:
+            Mapping of short formula names to display strings.
+        """
         return {
             "ev": "EV(r) = sum_{i=1..r}(lambda_i) / sum_{i=1..L}(lambda_i)",
             "noise_var": "sigma2_noise(r) = sigma2_total * (1 - EV(r))",
@@ -82,6 +86,11 @@ class SSAResultSummary:
         }
 
     def plot_variance_explained(self) -> go.Figure:
+        """Plot cumulative explained variance as a function of rank.
+
+        Returns:
+            Plotly figure for explained variance ratio vs rank.
+        """
         fig = go.Figure()
         fig.add_trace(
             go.Scatter(
@@ -100,6 +109,11 @@ class SSAResultSummary:
         return fig
 
     def plot_noise_variance(self) -> go.Figure:
+        """Plot unexplained (noise) variance ratio as a function of rank.
+
+        Returns:
+            Plotly figure for noise variance ratio vs rank.
+        """
         fig = go.Figure()
         fig.add_trace(
             go.Scatter(

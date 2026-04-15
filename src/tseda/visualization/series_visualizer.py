@@ -23,7 +23,11 @@ class SeriesVisualizer:
         self._title: str = title
 
     def getVisualization(self) -> Figure:
-        """Return an interactive scatter plot coloured by signal value."""
+        """Create an interactive scatter plot coloured by signal value.
+
+        Returns:
+            Plotly figure object for the raw signal visualization.
+        """
         # Create the figure and add a scatter trace
         fig = px.scatter(self._df, x="date", y="signal", color="signal")
         return fig
@@ -93,7 +97,11 @@ class SegmentedSeriesVisualizer(SeriesVisualizer):
         self._title: str = title
 
     def getVisualization(self) -> Figure:
-        """Return a line plot coloured by segment label."""
+        """Create a segmented line plot coloured by segment label.
+
+        Returns:
+            Plotly figure object showing segment-wise signal trajectories.
+        """
         # Create the line plot with the 'color' attribute
         fig = px.line(
             self._df,

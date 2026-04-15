@@ -15,7 +15,12 @@ class CoffeePricesDataLoader(LocalDataLoader):
         super().__init__(file_path)
 
     def load_coffee_prices(self) -> pd.DataFrame:
-        """Load coffee prices data from a local CSV file."""
+        """Load coffee prices and normalize expected column names.
+
+        Returns:
+            DataFrame with columns ``date`` and ``signal``. Returns an empty
+            DataFrame if source data cannot be loaded.
+        """
         data = self.load_data()
         data.columns = ["date", "signal"]
         data.date = pd.to_datetime(data.date)
@@ -29,7 +34,12 @@ class CoffeePricesDataLoader(LocalDataLoader):
             return pd.DataFrame()
 
     def get_series(self) -> pd.Series:
-        """Get the 'signal' series from the coffee prices data."""
+        """Extract the signal series from the normalized coffee dataset.
+
+        Returns:
+            ``signal`` series indexed by ``date``. Returns an empty float series
+            when no data is available.
+        """
         data = self.load_coffee_prices()
         data.index = data.date
         if not data.empty:

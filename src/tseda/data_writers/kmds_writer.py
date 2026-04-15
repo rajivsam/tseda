@@ -19,7 +19,11 @@ class KMDSDataWriter:
         return
     
     def load_kb(self) -> Ontology:
-        """Load and return the OWL knowledge base from the configured file path."""
+        """Load the OWL knowledge base from the configured file path.
+
+        Returns:
+            Loaded ontology object.
+        """
         onto2 :Ontology = load_kb(self._file_path)
         return onto2
     
@@ -29,6 +33,9 @@ class KMDSDataWriter:
         Args:
             obs: Text of the observation finding.
             file_path: Destination file path used when saving the updated ontology.
+
+        Returns:
+            ``None``. The ontology is updated and written to disk.
         """
         the_workflow: Workflow = get_workflow(self._onto)
 
@@ -54,6 +61,9 @@ class KMDSDataWriter:
 
         Args:
             obs_seq: 1-based index of the observation to delete.
+
+        Returns:
+            ``None``. The ontology is updated and written to disk.
         """
         the_workflow: Workflow = get_workflow(self._onto)
         with self._onto:
@@ -73,6 +83,9 @@ class KMDSDataWriter:
         Args:
             obs: Updated observation text.
             obs_seq: 1-based index of the observation to update.
+
+        Returns:
+            ``None``. The ontology is updated and written to disk.
         """
         the_workflow: Workflow = get_workflow(self._onto)
         with self._onto:

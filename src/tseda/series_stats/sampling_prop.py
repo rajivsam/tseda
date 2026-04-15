@@ -33,7 +33,11 @@ class SamplingProp:
             print("could not infer sampling frequency of the series")
 
     def view_properties(self) -> pd.DataFrame:
-        """Return a tabular view of sampling metadata."""
+        """Return a tabular view of sampling metadata.
+
+        Returns:
+            DataFrame with ``property`` and ``value`` columns.
+        """
         data: dict[str, Any] = {
             "N": str(self._N),
             "start time": self._start_ts,
@@ -53,6 +57,9 @@ class SamplingProp:
 
         This compatibility method is kept for callers/tests that rely on the
         previous API surface.
+
+        Returns:
+            Dash ``AgGrid`` component with the sampling property rows.
         """
         from dash_ag_grid import AgGrid
 

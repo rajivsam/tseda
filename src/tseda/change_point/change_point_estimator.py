@@ -53,7 +53,12 @@ class PELT_ChangePointEstimator:
 		return pd.Series(segment_labels[: self._n], index=self._series.index, name="segment")
 
 	def predict_series(self) -> pd.Series:
-		"""Return the predicted segment label series."""
+		"""Return the predicted segment label series.
+
+		Returns:
+			Series with the same index as the input series and values such as
+			``"segment-1"``, ``"segment-2"``, etc.
+		"""
 		return self._predicted_series.copy()
 
 
@@ -74,7 +79,15 @@ class ChangePointEstimator:
 		self._change_pts: list[int] | None = None
 
 	def estimate_change_points(self, penalty_coeff: float = 2.0) -> pd.Series:
-		"""Run PELT and assign segment labels for each observation."""
+		"""Run PELT and assign segment labels for each observation.
+
+		Args:
+			penalty_coeff: Multiplier applied to ``log(n)`` when building the PELT
+				penalty term.
+
+		Returns:
+			Series of segment labels aligned to the original input index.
+		"""
 		n = len(self._series)
 		penalty = float(penalty_coeff * np.log(n))
 		values = self._series.to_numpy().reshape(-1, 1)
