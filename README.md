@@ -1,5 +1,26 @@
 # Time Series Explorer (`tseda`)
 
+<p align="center">
+	<a href="#non-developer-quick-start">
+		<img src="assets/images/tseda_logo.png" alt="tseda banner" width="820">
+	</a>
+</p>
+
+<p align="center">
+	<strong>Time series exploration and decomposition for fast, reliable insights.</strong>
+</p>
+
+<p align="center">
+	<a href="https://pypi.org/project/tseda/"><img src="https://img.shields.io/pypi/v/tseda" alt="PyPI"></a>
+	<a href="https://pypi.org/project/tseda/"><img src="https://img.shields.io/pypi/pyversions/tseda" alt="Python"></a>
+	<a href="https://tseda.readthedocs.io/en/latest/"><img src="https://readthedocs.org/projects/tseda/badge/?version=latest" alt="Read the Docs"></a>
+	<img src="https://img.shields.io/badge/license-Proprietary-red" alt="License">
+</p>
+
+<p align="center">
+	<a href="https://tseda.readthedocs.io/en/latest/"><strong>Read the Docs</strong></a>
+</p>
+
 An application for time series exploration.
 
 ## Overview
