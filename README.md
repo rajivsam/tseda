@@ -14,7 +14,7 @@
 	<a href="https://pypi.org/project/tseda/"><img src="https://img.shields.io/pypi/v/tseda" alt="PyPI"></a>
 	<a href="https://pypi.org/project/tseda/"><img src="https://img.shields.io/pypi/pyversions/tseda" alt="Python"></a>
 	<a href="https://tseda.readthedocs.io/en/latest/"><img src="https://readthedocs.org/projects/tseda/badge/?version=latest" alt="Read the Docs"></a>
-	<img src="https://img.shields.io/badge/license-Proprietary-red" alt="License">
+	<img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0">
 </p>
 
 <p align="center">
