@@ -217,7 +217,7 @@ make -C docs html
 
 ## User Guide
 
-A detailed user guide is available at [`docs/user_guide.md`](docs/user_guide.md). A video version of the user guide is also available at [`docs/video/tseda_how_to_use_notebookLM.mp4`](docs/video/tseda_how_to_use_notebookLM.mp4). The written guide covers:
+A detailed user guide is available at [`docs/user_guide.md`](docs/user_guide.md). A video version of the user guide is also available on [YouTube](https://youtu.be/baoJrIpSTE8). The written guide covers:
 
 - Data requirements and input format
 - Step-by-step walkthrough of all three workflow phases
