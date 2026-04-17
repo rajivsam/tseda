@@ -215,6 +215,18 @@ If the build fails, inspect the Read the Docs build logs and replicate locally u
 make -C docs html
 ```
 
+## User Guide
+
+A detailed user guide is available at [`docs/user_guide.md`](docs/user_guide.md). It covers:
+
+- Data requirements and input format
+- Step-by-step walkthrough of all three workflow phases
+- Interpreting SSA decomposition outputs (eigenvalue profile, component groupings, Durbin-Watson test)
+- Change point detection
+- AIC-based model order selection
+- Exporting reports and knowledge base entries
+- Setting up the Gemini chatbot integration
+
 ## Contributing & Feature Requests
 
 If you'd like to request a feature or report an issue, please [open an issue](https://github.com/rajivsam/tseda/issues) on GitHub. You're also welcome to reach out to me directly.
