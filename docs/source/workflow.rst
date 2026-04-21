@@ -50,6 +50,15 @@ Component grouping is intentionally analyst-driven. You can regroup components b
 on domain context and the diagnostic plots until the decomposition matches the
 intended downstream objective.
 
+API quick links
+~~~~~~~~~~~~~~~
+
+For implementation-level details, method signatures, and source links:
+
+- :doc:`SSA decomposition module <api/tseda.decomposition.ssa_decomposition>`
+- :doc:`SSA result summary module <api/tseda.decomposition.ssa_result_summary>`
+- :doc:`Decomposition namespace <api/tseda.decomposition>`
+
 Observation Logging
 -------------------
 

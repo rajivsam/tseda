@@ -1,5 +1,7 @@
 """Singular Spectrum Analysis decomposition and reconstruction utilities."""
 
+from __future__ import annotations
+
 from ssalib import SingularSpectrumAnalysis
 from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
