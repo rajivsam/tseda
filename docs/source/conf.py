@@ -30,6 +30,7 @@ version = release
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
@@ -37,7 +38,9 @@ extensions = [
     "myst_parser",
 ]
 autodoc_member_order = "bysource"
-autodoc_typehints = "description"
+autodoc_typehints = "signature"
+autodoc_typehints_format = "short"
+autodoc_class_signature = "mixed"
 autoclass_content = "both"
 autodoc_default_options = {
     "members": True,
@@ -45,6 +48,8 @@ autodoc_default_options = {
     "undoc-members": True,
     "show-inheritance": True,
 }
+autosummary_generate = True
+autosummary_imported_members = False
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 napoleon_use_param = True

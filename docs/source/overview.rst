@@ -26,6 +26,7 @@ Core capabilities
 
 - Initial assessment: data profile, spread, distribution, and autocorrelation cues.
 - SSA decomposition: component extraction, grouping, reconstruction, and diagnostics.
-- Observation logging: AIC-by-rank summaries and editable narrative reporting.
+- Observation logging: AIC-by-rank summaries, editable narrative reporting, and
+	validated knowledge-base save locations.
 
 For installation and usage details, see :doc:`installation` and :doc:`workflow`.

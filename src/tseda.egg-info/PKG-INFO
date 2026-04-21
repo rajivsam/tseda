@@ -48,6 +48,27 @@ Requires-Dist: sphinx-copybutton>=0.5; extra == "docs"
 
 # Time Series Explorer (`tseda`)
 
+<p align="center">
+	<a href="#non-developer-quick-start">
+		<img src="assets/images/tseda_logo.png" alt="tseda banner" width="820">
+	</a>
+</p>
+
+<p align="center">
+	<strong>Time series exploration and decomposition for fast, reliable insights.</strong>
+</p>
+
+<p align="center">
+	<a href="https://pypi.org/project/tseda/"><img src="https://img.shields.io/pypi/v/tseda" alt="PyPI"></a>
+	<a href="https://pypi.org/project/tseda/"><img src="https://img.shields.io/pypi/pyversions/tseda" alt="Python"></a>
+	<a href="https://tseda.readthedocs.io/en/latest/"><img src="https://readthedocs.org/projects/tseda/badge/?version=latest" alt="Read the Docs"></a>
+	<img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0">
+</p>
+
+<p align="center">
+	<a href="https://tseda.readthedocs.io/en/latest/"><strong>Read the Docs</strong></a>
+</p>
+
 An application for time series exploration.
 
 ## Overview
@@ -241,6 +262,18 @@ If the build fails, inspect the Read the Docs build logs and replicate locally u
 ```bash
 make -C docs html
 ```
+
+## User Guide
+
+A detailed user guide is available at [`docs/user_guide.md`](docs/user_guide.md). A video version of the user guide is also available on [YouTube](https://youtu.be/baoJrIpSTE8). The written guide covers:
+
+- Data requirements and input format
+- Step-by-step walkthrough of all three workflow phases
+- Interpreting SSA decomposition outputs (eigenvalue profile, component groupings, Durbin-Watson test)
+- Change point detection
+- AIC-based model order selection
+- Exporting reports and knowledge base entries
+- Setting up the Gemini chatbot integration
 
 ## Contributing & Feature Requests
 

@@ -134,7 +134,22 @@ def build_logging_layout() -> html.Div:
             ]),
         ], className="mb-4"),
         dbc.Textarea(id="observation-text", placeholder="Enter your expert observations here...", style={"height": "200px"}),
-        dbc.Button("Finalize & Save Report", color="success", className="mt-3"),
+        dbc.Button("Save to Knowledge Base", id="save-to-kb-btn", color="success", className="mt-3"),
+        html.Div(id="save-kb-feedback", className="mt-2"),
+        dbc.Modal([
+            dbc.ModalHeader(dbc.ModalTitle("Save Knowledge Base")),
+            dbc.ModalBody([
+                html.P("Select a directory and file name to save the knowledge base."),
+                dbc.Label("Directory", html_for="save-dir-input"),
+                dbc.Input(id="save-dir-input", type="text", placeholder="e.g. /home/user/knowledge_bases"),
+                dbc.Label("File Name", html_for="save-filename-input", className="mt-2"),
+                dbc.Input(id="save-filename-input", type="text", placeholder="e.g. analysis_kb.xml"),
+            ]),
+            dbc.ModalFooter([
+                dbc.Button("Save", id="save-kb-confirm-btn", color="primary", className="me-2"),
+                dbc.Button("Cancel", id="save-kb-cancel-btn", color="secondary"),
+            ]),
+        ], id="save-kb-modal", is_open=False),
     ])
 
 
@@ -144,6 +159,8 @@ def build_main_layout(assessment_layout: html.Div, decomposition_layout: html.Di
         dcc.Store(id="step-tracker", data=1),
         dcc.Store(id="analysis-complete-store", data=False),
         dcc.Store(id="uploaded-file-store", storage_type="memory", data=None),
+        dcc.Store(id="kb-save-dir-store", storage_type="memory", data=None),
+        dcc.Store(id="kb-save-filename-store", storage_type="memory", data=None),
         dcc.Store(id="apply-grouping-trigger", data=0),
         dcc.Store(id="loess-fraction-store", data=0.05),
         dcc.Store(id="noisy-series-store", data=False),

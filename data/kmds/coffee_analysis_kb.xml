@@ -266,26 +266,25 @@
   <rdfs:subClassOf rdf:resource="#KMObservation"/>
 </owl:Class>
 
-<owl:NamedIndividual rdf:about="#coffee_prices_35_year_analysis">
-  <rdf:type rdf:resource="#KnowledgeExtractionExperimentationWorkflow"/>
-  <has_exploratory_observations rdf:resource="#exploratoryobservation2"/>
-  <has_exploratory_observations rdf:resource="#exploratoryobservation1"/>
-</owl:NamedIndividual>
-
 <owl:NamedIndividual rdf:about="#exploratoryobservation1">
   <rdf:type rdf:resource="#ExploratoryObservation"/>
-  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">The monthly car sales data for Quebec was decomposed using Singular Spectral Analysis (SSA) with an optimal 24-month window, resulting in uncorrelated residuals. The analysis revealed strong seasonality, accounting for two-thirds of the variation, and a notable trend component, representing a quarter of the variation. This method is valuable for demand forecasting, allowing planners to distinguish between seasonal and trend-driven demand.</finding>
+  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Sampling properties: The series contains 426 observations spanning 1990-01-01 to 2025-06-01 (duration: 12935 days 00:00:00). The inferred sampling frequency is monthly.
+
+Descriptive statistics: mean = 144.9, median = 135.3, std dev = 65.46, min = 50.83, max = 409.5, skewness = 1.085, kurtosis = 1.642.
+
+SSA decomposition: The analysis used a window size of 12 with 12 components available in the decomposition. The smoothed signal explains 98.45% of the total variance. The noise signal accounts for 1.55% of the total variance; this percentage is the estimate of noise in the data.
+
+Durbin-Watson noise statistic: 1.7065. A value between 1.5 and 2.5 is generally considered acceptable to treat the noise as uncorrelated. This value falls within the acceptable range of 1.5 to 2.5, suggesting the noise residuals are approximately uncorrelated.
+
+Recommendation: Please correlate the findings above with your modeling, control, and monitoring objectives. The decomposition provides a basis for understanding the trend, periodic behaviour, and noise characteristics of the series, which should inform feature engineering, model selection, and appropriate monitoring thresholds.</finding>
   <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">1</finding_sequence>
   <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
   <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
 </owl:NamedIndividual>
 
-<owl:NamedIndividual rdf:about="#exploratoryobservation2">
-  <rdf:type rdf:resource="#ExploratoryObservation"/>
-  <finding rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Analysts should take note of the fact that the seasonal component dominates the trend component with this dataset..</finding>
-  <finding_sequence rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">2</finding_sequence>
-  <exploratory_observation_type rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Data Quality Observation</exploratory_observation_type>
-  <intent rdf:datatype="http://www.w3.org/2001/XMLSchema#string">DATA_UNDERSTANDING</intent>
+<owl:NamedIndividual rdf:about="#data/kmds/coffee_analysis_kb.xml">
+  <rdf:type rdf:resource="#KnowledgeExtractionExperimentationWorkflow"/>
+  <has_exploratory_observations rdf:resource="#exploratoryobservation1"/>
 </owl:NamedIndividual>
 
 

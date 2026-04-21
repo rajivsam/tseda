@@ -51,3 +51,9 @@ htmlcov/
 rajiv_github_key
 rajiv_github_key.pub
 *.pdf
+
+# Prompt-related files
+prompts/
+**/prompts/
+**/*prompt*.txt
+**/*prompt*.md

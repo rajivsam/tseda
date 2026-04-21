@@ -56,6 +56,22 @@ Observation Logging
 The final step produces a report-ready summary with rank-wise model diagnostics and
 editable narrative text.
 
+Knowledge base save validation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the Observation Logging phase, you can save observations to a KMDS knowledge base
+by providing a directory and file name.
+
+The UI validates the selected save location before writing:
+
+- The directory must exist.
+- The process must have write privileges for that directory.
+- If validation fails, the UI shows an error and prevents save to that location.
+
+The selected knowledge-base directory and file name are stored in application state
+for the active session and are reset when the upload is cleared in the Initial
+Assessment phase.
+
 AIC-based model selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -48,3 +48,7 @@ implement a seasonality check heuristic called seasonality_check_heuristic() tha
  can you do a uv build and publish this package to pypi
 
  can generate the documentation using sphynx, use best practices, upload the generated documentation to read the docs.
+ 
+ In the logging phase, when you save the generated observations, bring up a dialog with a save as button. When this save as button is clicked, pop up a file explorer with a prompt that says, select a directory and file name to save the knowledge base. When the user provides this information and clicks ok (save) in the file explorer, the application should create a kmds knowledge base and save the observations in the text area of the logging page that contains the generated observations.
+
+Add validation logic to the UI section related to providing the KB location to save the observations. If non-existent directory or a directory with incorrect privileges is provided, indicate the problem and ask the user to try again. The user should not be able to save the file to a problematic location - the validation should catch that.

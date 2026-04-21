@@ -3,6 +3,7 @@
 import base64
 import io
 import os
+import tempfile
 from typing import Any
 
 import numpy as np
@@ -33,6 +34,9 @@ from tseda.user_interface.callback_services import (
 )
 from tseda.decomposition.ssa_decomposition import SSADecomposition
 from tseda.decomposition.ssa_result_summary import SSAResultSummary
+from kmds.ontology.kmds_ontology import *
+from kmds.tagging.tag_types import ExploratoryTags
+from kmds.ontology.intent_types import IntentType
 
 # Use a non-interactive backend since figures are rendered to buffers in callbacks.
 matplotlib.use('Agg')
@@ -124,7 +128,7 @@ def store_uploaded_file(
     contents: str | None,
     filename: str | None,
     clear_clicks: int | None,
-) -> tuple[dict[str, str] | None, Any | None, bool]:
+) -> tuple[dict[str, str] | None, Any | None, bool, None, None]:
     """Persist uploaded file metadata and initialize decomposition prerequisites."""
     global series, window_size, ssa_obj
     ctx = dash.callback_context
@@ -136,13 +140,13 @@ def store_uploaded_file(
         series = None
         window_size = 0
         ssa_obj = None
-        return None, None, False
+        return None, None, False, None, None
 
     if contents is None or filename is None:
         series = None
         window_size = 0
         ssa_obj = None
-        return None, None, False
+        return None, None, False, None, None
     
     try:
         parse_upload(contents, filename)
@@ -156,12 +160,12 @@ def store_uploaded_file(
 
         window_size = int(freq_window)
         ssa_obj = None
-        return {'contents': contents, 'filename': filename}, None, False
+        return {'contents': contents, 'filename': filename}, None, False, dash.no_update, dash.no_update
     except ValueError as e:
         series = None
         window_size = 0
         ssa_obj = None
-        return None, dbc.Alert(str(e), color="danger", className="mt-2"), False
+        return None, dbc.Alert(str(e), color="danger", className="mt-2"), False, dash.no_update, dash.no_update
 
 
 def update_summary_table(
@@ -482,6 +486,127 @@ def populate_observation_text(
         return dash.no_update
 
 
+def toggle_save_kb_modal(
+    save_clicks: int | None,
+    cancel_clicks: int | None,
+    confirm_clicks: int | None,
+    is_open: bool,
+) -> bool:
+    """Open or close the Save Knowledge Base modal."""
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return is_open
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    if trigger in ("save-to-kb-btn", "save-kb-cancel-btn", "save-kb-confirm-btn"):
+        return not is_open
+    return is_open
+
+
+def sync_kb_location_state(
+    file_dir: str | None,
+    file_name: str | None,
+) -> tuple[str | None, str | None, Any, bool]:
+    """Persist KB save directory/filename and validate KB target location in real time."""
+    directory = (file_dir or "").strip() or None
+    filename = (file_name or "").strip() or None
+    if not directory:
+        return directory, filename, dbc.Alert("Please enter a directory path.", color="warning", dismissable=True), True
+
+    validation_error = validate_kb_directory(directory)
+    if validation_error is not None:
+        return directory, filename, dbc.Alert(f"{validation_error} Please try again.", color="danger", dismissable=True), True
+
+    return directory, filename, dbc.Alert("KB location is valid.", color="info", dismissable=True), False
+
+
+def validate_kb_directory(directory: str) -> str | None:
+    """Validate that KB directory exists and is writable by this process.
+
+    Returns:
+        ``None`` when valid; otherwise a user-facing error string.
+    """
+    from pathlib import Path
+
+    dir_path = Path(directory)
+    if not dir_path.is_dir():
+        return f"Directory does not exist: {directory}"
+
+    if not os.access(dir_path, os.W_OK | os.X_OK):
+        return f"Directory is not writable with current privileges: {directory}"
+
+    # Verify writable privileges with an actual create/delete operation.
+    try:
+        fd, temp_path = tempfile.mkstemp(prefix=".tseda_kb_write_test_", dir=str(dir_path))
+        os.close(fd)
+        os.unlink(temp_path)
+    except OSError:
+        return f"Directory is not writable with current privileges: {directory}"
+
+    return None
+
+
+def hydrate_kb_location_fields(
+    is_open: bool,
+    stored_dir: str | None,
+    stored_filename: str | None,
+) -> tuple[str | None | Any, str | None | Any]:
+    """Pre-fill KB location fields from app state when the save modal opens."""
+    if not is_open:
+        return dash.no_update, dash.no_update
+    return stored_dir, stored_filename
+
+
+def save_kmds_knowledge_base(
+    confirm_clicks: int | None,
+    observations: str | None,
+    file_dir: str | None,
+    file_name: str | None,
+) -> Any:
+    """Create a KMDS knowledge base file with the current observations."""
+    if not confirm_clicks:
+        return dash.no_update
+
+    observations = (observations or "").strip()
+    file_dir = (file_dir or "").strip()
+    file_name = (file_name or "").strip()
+
+    if not observations:
+        return dbc.Alert("No observations to save. Please enter observations first.", color="warning", dismissable=True)
+    if not file_dir:
+        return dbc.Alert("Please enter a directory path.", color="warning", dismissable=True)
+    if not file_name:
+        return dbc.Alert("Please enter a file name.", color="warning", dismissable=True)
+
+    import os
+    from pathlib import Path
+
+    if not Path(file_dir).is_dir():
+        return dbc.Alert(f"Directory does not exist: {file_dir}", color="danger", dismissable=True)
+
+    validation_error = validate_kb_directory(file_dir)
+    if validation_error is not None:
+        return dbc.Alert(f"{validation_error} Please try again.", color="danger", dismissable=True)
+
+    full_path = os.path.join(file_dir, file_name)
+
+    try:
+        exp_obs_list = []
+        e1 = ExploratoryObservation(namespace=onto)
+        e1.finding = observations
+        e1.finding_sequence = 1
+        e1.exploratory_observation_type = ExploratoryTags.DATA_QUALITY_OBSERVATION.value
+        e1.intent = IntentType.DATA_UNDERSTANDING.value
+        exp_obs_list.append(e1)
+
+        kaw = KnowledgeExtractionExperimentationWorkflow(full_path, namespace=onto)
+        kaw.has_exploratory_observations = exp_obs_list
+        onto.save(file=full_path, format="rdfxml")
+
+        return dbc.Alert(f"Knowledge base saved to: {full_path}", color="success", dismissable=True)
+    except Exception as err:
+        return dbc.Alert(f"Failed to save knowledge base: {str(err)}", color="danger", dismissable=True)
+
+
 def register_callbacks(dash_app: dash.Dash) -> None:
     """Register all app callbacks explicitly to separate wiring from logic."""
     dash_app.callback(
@@ -502,7 +627,9 @@ def register_callbacks(dash_app: dash.Dash) -> None:
     dash_app.callback(
         [Output('uploaded-file-store', 'data'),
          Output('upload-error-message', 'children'),
-         Output('analysis-complete-store', 'data', allow_duplicate=True)],
+         Output('analysis-complete-store', 'data', allow_duplicate=True),
+         Output('kb-save-dir-store', 'data'),
+         Output('kb-save-filename-store', 'data')],
         Input('upload-data', 'contents'),
         State('upload-data', 'filename'),
         Input('clear-upload-btn', 'n_clicks'),
@@ -600,6 +727,43 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          Input('uploaded-file-store', 'data')],
         prevent_initial_call=True,
     )(populate_observation_text)
+
+    dash_app.callback(
+        Output('save-kb-modal', 'is_open'),
+        [Input('save-to-kb-btn', 'n_clicks'),
+         Input('save-kb-cancel-btn', 'n_clicks'),
+         Input('save-kb-confirm-btn', 'n_clicks')],
+        State('save-kb-modal', 'is_open'),
+        prevent_initial_call=True,
+    )(toggle_save_kb_modal)
+
+    dash_app.callback(
+        [Output('kb-save-dir-store', 'data', allow_duplicate=True),
+         Output('kb-save-filename-store', 'data', allow_duplicate=True),
+         Output('save-kb-feedback', 'children', allow_duplicate=True),
+         Output('save-kb-confirm-btn', 'disabled')],
+        [Input('save-dir-input', 'value'),
+         Input('save-filename-input', 'value')],
+        prevent_initial_call=True,
+    )(sync_kb_location_state)
+
+    dash_app.callback(
+        [Output('save-dir-input', 'value'),
+         Output('save-filename-input', 'value')],
+        Input('save-kb-modal', 'is_open'),
+        [State('kb-save-dir-store', 'data'),
+         State('kb-save-filename-store', 'data')],
+        prevent_initial_call=True,
+    )(hydrate_kb_location_fields)
+
+    dash_app.callback(
+        Output('save-kb-feedback', 'children'),
+        Input('save-kb-confirm-btn', 'n_clicks'),
+        [State('observation-text', 'value'),
+         State('save-dir-input', 'value'),
+         State('save-filename-input', 'value')],
+        prevent_initial_call=True,
+    )(save_kmds_knowledge_base)
 
 
 def create_app() -> dash.Dash:

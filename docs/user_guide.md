@@ -221,6 +221,21 @@ The narrative is editable in the app. Add your own observations, domain context,
 
 The finalised report can be exported as a plain text file for documentation or sharing.
 
+#### Saving Observations to a Knowledge Base
+
+Use **Save to Knowledge Base** in the Observation Logging step to persist observations
+to a KMDS OWL/RDF file.
+
+When entering the save location:
+
+- The app validates that the directory exists.
+- The app validates that the current user has sufficient write privileges.
+- If validation fails, a clear error is shown and the Save button is disabled.
+- The app blocks save attempts to invalid or non-writable locations.
+
+The selected directory and file name are stored in app state during the session and
+are reset when you click **Clear Uploaded File** in Step 1.
+
 ---
 
 ## Gemini Chatbot
@@ -248,6 +263,8 @@ The chatbot can be used to ask questions about your findings, look up domain kno
 - Observations are appended to a `.xml` OWL file.
 - Existing observations can be deleted from the UI.
 - The knowledge base can accumulate findings across multiple analysis sessions.
+- Save-location validation prevents writing to non-existent or privilege-restricted
+   directories and prompts you to choose a valid location.
 
 ---
 
