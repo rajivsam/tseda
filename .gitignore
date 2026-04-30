@@ -57,3 +57,4 @@ prompts/
 **/prompts/
 **/*prompt*.txt
 **/*prompt*.md
+**/*prompt*.csv

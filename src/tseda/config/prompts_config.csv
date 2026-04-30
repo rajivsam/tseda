@@ -1,5 +1,0 @@
-previous_state,prompt
-START,You should upload a regularly sampled csv file for analysis
-FILE_PROCESSED,"You should estimate the densite for the series and inspect its plot to see if there are multiple modes. If you see this, it means there were different regimes in your time series and you should analyze and explore these regimes independently. You can get an approximate estimate of the inflection points in the density estimate, so that you can sense if there are multiple regimes. You can then apply a change point detection algorithm to estimate the location of these changes. Shall I proceed with the inflection point estimation in the density curve?"
-INFLECTION_POINTS_EST,You should run a change point detection algorithm to locate the estimated time of change of your time series behavior. Shall I do that?
-CHANGE_POINTS_IDENTIFIED,You should plot the change points on the time series with the different segment color coded. Shall I do that?
