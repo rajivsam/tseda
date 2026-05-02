@@ -42,13 +42,20 @@ In this step you inspect:
 - Eigenvalue and explained-variance profiles.
 - Eigenvector patterns.
 - Weighted correlation between components.
+- A suggested grouping table built from the SSA eigen spectrum.
 - Reconstruction quality for user-defined groups (for example trend,
   seasonality, and noise).
 - Residual diagnostics, including Durbin-Watson on the noise component.
 
-Component grouping is intentionally analyst-driven. You can regroup components based
-on domain context and the diagnostic plots until the decomposition matches the
-intended downstream objective.
+Component grouping starts with an automatic heuristic: components explaining at least
+10 percent of total variance are scanned in rank order, adjacent pairs within a 5
+percent eigenvalue difference are suggested as seasonality, remaining eligible
+components are suggested as trend, and everything else is assigned to noise.
+
+The suggested grouping is rendered directly in the UI and prepopulates the editable
+Trend, Seasonality, and Noise inputs. You can still regroup components based on
+domain context and the diagnostic plots until the decomposition matches the intended
+downstream objective.
 
 API quick links
 ~~~~~~~~~~~~~~~

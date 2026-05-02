@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import dash_bootstrap_components as dbc
 from dash import html
 from scipy import stats
 
@@ -256,6 +257,76 @@ def build_reconstruction_metadata(ssa_obj: Any, recon_dict: dict[str, list[int]]
             className="text-muted",
         ),
     ])
+
+
+def format_component_indices(indices: list[int]) -> str:
+    """Format component indices for display in the UI."""
+    return ", ".join(str(index) for index in indices)
+
+
+def build_suggested_grouping_table(
+    ssa_obj: Any,
+    recon_dict: dict[str, list[int]],
+    dw_satisfied: bool = True,
+) -> html.Div:
+    """Build a centered table describing the automatic grouping suggestion.
+
+    When ``dw_satisfied`` is False, a warning is appended advising the user to
+    try a different SSA window size.
+    """
+    exp_var = getattr(ssa_obj, "_exp_var", {})
+    rows = []
+    for group_name in ("Trend", "Seasonality", "Noise"):
+        indices = recon_dict.get(group_name, [])
+        variance_pct = sum(float(exp_var.get(f"var_comp-{index}", 0.0)) for index in indices) * 100
+        rows.append(
+            html.Tr([
+                html.Td(group_name),
+                html.Td(format_component_indices(indices) if indices else "None"),
+                html.Td(f"{variance_pct:.2f}"),
+            ])
+        )
+
+    body_children: list = [
+        html.H6("Suggested Grouping", className="text-center mb-3"),
+        html.Div(
+            html.Small(
+                "These values are prepopulated below. You can change them if you want to.",
+                className="text-muted",
+            ),
+            className="text-center mb-3",
+        ),
+        html.Div(
+            dbc.Table(
+                [
+                    html.Thead(html.Tr([
+                        html.Th("Group"),
+                        html.Th("Components"),
+                        html.Th("Explained Variance (%)"),
+                    ])),
+                    html.Tbody(rows),
+                ],
+                bordered=True,
+                hover=True,
+                responsive=True,
+                style={"width": "auto", "margin": "0 auto"},
+            ),
+            className="d-flex justify-content-center",
+        ),
+    ]
+
+    if not dw_satisfied:
+        body_children.append(
+            dbc.Alert(
+                "The noise residual for this grouping does not pass the Durbin-Watson "
+                "test (target range 1.5\u20132.5). Consider trying a different SSA "
+                "window size.",
+                color="warning",
+                className="mt-3",
+            )
+        )
+
+    return html.Div(html.Div(body_children), className="mb-4")
 
 
 def build_noise_kde_figure(ssa_obj: Any, fallback_fig: go.Figure) -> go.Figure:

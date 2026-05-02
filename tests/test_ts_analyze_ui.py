@@ -1,5 +1,6 @@
 import base64
 
+import dash
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -101,6 +102,152 @@ def test_validate_components_reuses_existing_ssa_and_renders_outputs(monkeypatch
     assert result[4].__class__.__name__ == "Div"
     assert isinstance(result[5], go.Figure)
     assert result[6] is True
+
+
+def test_update_ssa_plots_populates_suggested_grouping(monkeypatch):
+    ui.series = pd.Series(
+        [1.0, 2.0, 3.0, 4.0],
+        index=pd.date_range("2021-01-01", periods=4, freq="D"),
+    )
+    ui.window_size = 4
+
+    class FakeSSA:
+        def __init__(self, series, window):
+            self._window = window
+            self._eigenvalues = np.array([5.0, 4.0, 3.0, 2.0], dtype=float)
+            self._exp_var = {
+                "var_comp-0": 0.35,
+                "var_comp-1": 0.30,
+                "var_comp-2": 0.20,
+                "var_comp-3": 0.15,
+            }
+
+        def eigenplot(self):
+            return go.Figure()
+
+        def eigen_vector_plot(self):
+            return plt.figure()
+
+        def suggest_reconstruction_groups(self):
+            return (
+                {
+                    "Trend": [0],
+                    "Seasonality": [1, 2],
+                    "Noise": [3],
+                },
+                True,
+            )
+
+    class CallbackContext:
+        triggered = [{"prop_id": "uploaded-file-store.data"}]
+
+    monkeypatch.setattr(ui, "SSADecomposition", FakeSSA)
+    monkeypatch.setattr(ui.dash, "callback_context", CallbackContext())
+
+    result = ui.update_ssa_plots(
+        current_step=2,
+        analysis_complete=False,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        slider_window_size=4,
+    )
+
+    assert isinstance(result[0], go.Figure)
+    assert result[5].__class__.__name__ == "Div"
+    assert result[6:12] == ("Trend", "0", "Seasonality", "1, 2", "Noise", "*")
+
+
+def test_update_ssa_plots_reruns_heuristic_when_slider_changes(monkeypatch):
+    ui.series = pd.Series(
+        [1.0, 2.0, 3.0, 4.0],
+        index=pd.date_range("2021-01-01", periods=4, freq="D"),
+    )
+    ui.window_size = 4
+
+    heuristic_calls = []
+
+    class FakeSSA:
+        def __init__(self, series, window):
+            self._window = window
+            self._eigenvalues = np.array([5.0, 4.0, 3.0, 2.0], dtype=float)
+            self._exp_var = {
+                "var_comp-0": 0.35,
+                "var_comp-1": 0.30,
+                "var_comp-2": 0.20,
+                "var_comp-3": 0.15,
+            }
+
+        def eigenplot(self):
+            return go.Figure()
+
+        def eigen_vector_plot(self):
+            return plt.figure()
+
+        def suggest_reconstruction_groups(self):
+            heuristic_calls.append(self._window)
+            return (
+                {"Trend": [0], "Seasonality": [1, 2], "Noise": [3]},
+                True,
+            )
+
+    class SliderCallbackContext:
+        triggered = [{"prop_id": "ssa-window-slider.value"}]
+
+    monkeypatch.setattr(ui, "SSADecomposition", FakeSSA)
+    monkeypatch.setattr(ui.dash, "callback_context", SliderCallbackContext())
+
+    result = ui.update_ssa_plots(
+        current_step=2,
+        analysis_complete=False,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        slider_window_size=8,
+    )
+
+    # Heuristic must have been called once with the new window size.
+    assert heuristic_calls == [8]
+    # Global window_size must be updated so validate_components does not rebuild.
+    assert ui.window_size == 8
+    # Suggestion table and input fields must be populated.
+    assert result[5].__class__.__name__ == "Div"
+    assert result[6:12] == ("Trend", "0", "Seasonality", "1, 2", "Noise", "*")
+
+
+def test_update_ssa_plots_preserves_suggestions_after_apply_grouping(monkeypatch):
+    ui.series = pd.Series(
+        [1.0, 2.0, 3.0, 4.0],
+        index=pd.date_range("2021-01-01", periods=4, freq="D"),
+    )
+    ui.window_size = 4
+
+    class FakeSSA:
+        def __init__(self, series, window):
+            self._window = window
+            self._eigenvalues = np.array([5.0, 4.0, 3.0, 2.0], dtype=float)
+            self._exp_var = {}
+
+        def eigenplot(self):
+            return go.Figure()
+
+        def eigen_vector_plot(self):
+            return plt.figure()
+
+        def suggest_reconstruction_groups(self):
+            raise AssertionError("heuristic must not run when analysis-complete-store fires")
+
+    class AnalysisCompleteCallbackContext:
+        triggered = [{"prop_id": "analysis-complete-store.data"}]
+
+    ui.ssa_obj = FakeSSA(None, 4)
+    monkeypatch.setattr(ui.dash, "callback_context", AnalysisCompleteCallbackContext())
+
+    result = ui.update_ssa_plots(
+        current_step=2,
+        analysis_complete=True,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        slider_window_size=4,
+    )
+
+    # All six suggestion outputs must be no_update.
+    assert all(v is dash.no_update for v in result[6:12])
 
 
 def test_logging_rank_diagnostics_uses_fresh_ssa_instance(monkeypatch):

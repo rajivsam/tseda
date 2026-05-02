@@ -45,6 +45,26 @@ On the basis of the sampling frequency, a window for SSA is determined. This is 
 
 This can be changed in the UI. Based on the eigen value distribution, observations from the ACF plot and the eigen vector plot, the seasonal components can be determined if present. Based on these initial plots, the user needs to input a set of groupings and reconstruct the series with these groupings. The reconstruction plots are shown. If there is structure in the series, then change point analysis can be done using the fact that the components are smooth. A change point plot is shown. The explained variance from signal and noise components and the assessment of the noise structure (independent or correlated) is provided.
 
+The decomposition step now also includes an automatic grouping heuristic. Components explaining at least 10% of the total SSA variance are scanned in rank order. Near-equal adjacent pairs within a 5% difference are suggested as seasonality, other components above the threshold are suggested as trend, and all remaining components are left to noise. The Durbin-Watson (DW) statistic is then computed on the noise residual; if DW falls outside [1.5, 2.5] the algorithm expands the assignment one component at a time, tracking the assignment closest to DW = 2.0, until the criterion is met or all components are consumed. If the criterion is never met the user is prompted to try a different window size. The UI renders the result as a suggested grouping table, prepopulates the Trend, Seasonality, and Noise inputs, and still lets you override before applying reconstruction. Changing the window size slider re-runs the heuristic automatically.
+
+```mermaid
+flowchart LR
+    A([SSA with window W]) --> B{Variance ≥ 10%?}
+    B -- No --> C[Noise]
+    B -- Yes --> D{Adjacent pair\n≤ 5% diff?}
+    D -- Yes --> E[Seasonality pair]
+    D -- No --> F[Trend]
+    E & F & C --> G[Compute DW on Noise]
+    G --> H{DW ∈ 1.5–2.5?}
+    H -- Yes --> I([✅ Assignment accepted])
+    H -- No --> J{Unassigned\nremain?}
+    J -- No --> K([⚠ Best assignment\n+ warn user])
+    J -- Yes --> L{Next is\na pair?}
+    L -- Yes --> M[Expand Seasonality]
+    L -- No --> N[Expand Trend]
+    M & N --> G
+```
+
 ### (c) Observation Logging
 
 The SSA is based on the eigen decomposition of the trajectory matrix. Though the raw signal is correlated, the eigenvectors are uncorrelated. If we assume that the signal is Gaussian, this also implies independence. We can use the Akaike Information Criterion for model selection and determine the AIC as a function of the rank of the model. This is shown in the observation page. An automatic summary of all the observations is provided.
@@ -154,7 +174,7 @@ TSEDA_HOST=0.0.0.0 TSEDA_PORT=8050 TSEDA_DEBUG=false tseda
 | Step | Panel | What to do |
 |------|-------|------------|
 | 1 | **Initial Assessment of Time Series** | Review distribution plots (KDE, box plot) and the ACF / PACF for autocorrelation patterns. |
-| 2 | **Time Series Decomposition** | Review the eigenvalue plot, then enter component groupings (e.g., Trend, Seasonal, Noise) and click **Apply Grouping**. |
+| 2 | **Time Series Decomposition** | Review the suggested grouping table, adjust the prepopulated Trend, Seasonality, and Noise inputs if needed, then click **Apply Grouping**. |
 | 3 | **Observation Logging** | Review the AIC rank diagnostics, read the auto-generated summary, and add your own observations before saving the report. |
 
 ## Development Install (From Source)

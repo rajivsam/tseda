@@ -43,6 +43,7 @@ def analysis_layout() -> html.Div:
                                 color="info",
                                 className="mb-3"
                             ),
+                            html.Div(id='suggested-grouping-table'),
                             dbc.Table([
                                 html.Thead(html.Tr([
                                     html.Th("Component Name"),

@@ -12,6 +12,8 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
+from tseda.decomposition.automatic_grouping_heuristic import AutomaticGroupingHeuristic
+
 
 class SSADecomposition:
     """
@@ -45,19 +47,66 @@ class SSADecomposition:
         If any pair among the configured leading eigenvalues has a smaller/larger ratio of
         at least 0.95, mark the internal seasonality flag as True.
         """
-        eigenvalues = np.asarray(self._eigenvalues, dtype=float)
-        leading = eigenvalues[: min(self.SEASONALITY_HEURISTIC_LEADING_EIGENVALUES, eigenvalues.size)]
-        self._seasonality_check_heuristic = False
+        heuristic = self.get_automatic_grouping_heuristic()
+        max_components = min(self.SEASONALITY_HEURISTIC_LEADING_EIGENVALUES, len(heuristic.eigenvalues))
+        self._seasonality_check_heuristic = heuristic.has_seasonal_pair(max_components=max_components)
+        return self._seasonality_check_heuristic
 
-        for i in range(len(leading)):
-            for j in range(i + 1, len(leading)):
-                larger = max(leading[i], leading[j])
-                smaller = min(leading[i], leading[j])
-                if larger > 0 and (smaller / larger) >= 0.95:
-                    self._seasonality_check_heuristic = True
-                    return True
+    def get_automatic_grouping_heuristic(self) -> AutomaticGroupingHeuristic:
+        """Return the automatic grouping heuristic for the current eigen spectrum."""
+        return AutomaticGroupingHeuristic(eigenvalues=np.asarray(self._eigenvalues, dtype=float))
 
-        return False
+    def suggest_reconstruction_groups(self) -> tuple[dict[str, list[int]], bool]:
+        """Return the best auto-inferred grouping and a Durbin-Watson satisfied flag.
+
+        Starting from the threshold-based initial assignment, the method expands the
+        assignment one component (or one seasonal pair) at a time until the
+        Durbin-Watson statistic of the noise residual falls in [1.5, 2.5] or the
+        candidate pool is exhausted.  The assignment with the DW value closest to
+        2.0 is returned.  When no assignment achieves a DW in range the flag is
+        False, signalling the caller to prompt the user to try a different window.
+
+        Side effect: leaves SSA reconstruction state set to the returned assignment.
+        """
+        heuristic = self.get_automatic_grouping_heuristic()
+        assignment = heuristic.suggest_reconstruction()
+
+        dw = self._compute_dw_for_assignment(assignment)
+        if dw is not None and 1.5 <= dw <= 2.5:
+            return assignment, True
+
+        best_assignment = assignment
+        best_dw_distance = abs(dw - 2.0) if dw is not None else float("inf")
+
+        while True:
+            expanded, did_expand = heuristic.suggest_next_expansion(assignment)
+            if not did_expand:
+                break
+            assignment = expanded
+            dw = self._compute_dw_for_assignment(assignment)
+            if dw is not None:
+                dist = abs(dw - 2.0)
+                if dist < best_dw_distance:
+                    best_assignment = expanded
+                    best_dw_distance = dist
+                if 1.5 <= dw <= 2.5:
+                    return best_assignment, True
+
+        if best_assignment is not assignment:
+            self._compute_dw_for_assignment(best_assignment)
+        return best_assignment, False
+
+    def _compute_dw_for_assignment(self, assignment: dict[str, list[int]]) -> float | None:
+        """Set reconstruction to the given assignment and return the Durbin-Watson statistic.
+
+        Returns None when the noise group is absent or empty (DW cannot be computed).
+        """
+        if not assignment.get("Noise"):
+            return None
+        filtered = {k: v for k, v in assignment.items() if v}
+        self.set_reconstruction(filtered)
+        self._ensure_reconstruction_cache()
+        return self._durbin_watson
 
     def _reset_reconstruction_cache(self) -> None:
         """Clear cached reconstruction products so they are rebuilt from the latest grouping."""

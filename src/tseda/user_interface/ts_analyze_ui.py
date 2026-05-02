@@ -27,7 +27,9 @@ from tseda.user_interface.analysis import (
 from tseda.user_interface.callback_services import (
     build_noise_kde_figure,
     build_reconstruction_metadata,
+    build_suggested_grouping_table,
     compute_window_slider_config,
+    format_component_indices,
     matplotlib_figure_to_data_url,
     parse_reconstruction_groups,
     parse_uploaded_series,
@@ -244,18 +246,29 @@ def update_ssa_plots(
     analysis_complete: bool,
     uploaded_file: dict[str, str] | None,
     slider_window_size: int | None,
-) -> tuple[go.Figure, str, bool, Any, bool]:
+) -> tuple[go.Figure, str, bool, Any, bool, Any, str | Any, str | Any, str | Any, str | Any, str | Any, str | Any]:
     """Generate SSA plots and series-suitability state for grouping actions."""
     global series, window_size, ssa_obj
+
+    ctx = dash.callback_context
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+
+    empty_suggestions = ("", "", "", "", "", "")
+    preserve_suggestions = (dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update)
     
     if current_step != 2 or series is None or window_size <= 0:
         empty_fig = empty_figure("No data available")
-        return empty_fig, "", False, None, False
+        return empty_fig, "", False, None, False, "", *empty_suggestions
     
     try:
-        if ssa_obj is None:
-            ssa_obj = SSADecomposition(series, window_size)
-        
+        selected_window_size = int(slider_window_size) if slider_window_size is not None and int(slider_window_size) > 0 else window_size
+
+        if ssa_obj is None or getattr(ssa_obj, "_window", None) != selected_window_size:
+            ssa_obj = SSADecomposition(series, selected_window_size)
+            # Keep the global in sync so validate_components does not rebuild SSA
+            # unnecessarily when the user clicks Apply Grouping after moving the slider.
+            window_size = selected_window_size
+
         eigen_fig = ssa_obj.eigenplot()
         
         mpl_fig = ssa_obj.eigen_vector_plot()
@@ -277,12 +290,37 @@ def update_ssa_plots(
                 color="warning",
                 className="mb-0",
             )
-        
-        return eigen_fig, img_src, noisy_series, noisy_message, noisy_series
+
+        # Re-run the heuristic on any trigger except the Apply Grouping confirmation
+        # (analysis-complete-store) so that the user's manual edits are not
+        # overwritten after reconstruction. The slider change fires this callback
+        # with trigger_id == 'ssa-window-slider', which correctly lands in the
+        # heuristic branch and updates the prepopulated fields.
+        run_heuristic = trigger_id != 'analysis-complete-store'
+        if run_heuristic:
+            suggested_groups, dw_satisfied = ssa_obj.suggest_reconstruction_groups()
+            suggestion_children = build_suggested_grouping_table(
+                ssa_obj=ssa_obj,
+                recon_dict=suggested_groups,
+                dw_satisfied=dw_satisfied,
+            )
+            suggestion_values = (
+                "Trend",
+                format_component_indices(suggested_groups.get("Trend", [])),
+                "Seasonality",
+                format_component_indices(suggested_groups.get("Seasonality", [])),
+                "Noise",
+                "*",
+            )
+        else:
+            suggestion_children = dash.no_update
+            suggestion_values = preserve_suggestions
+
+        return eigen_fig, img_src, noisy_series, noisy_message, noisy_series, suggestion_children, *suggestion_values
         
     except Exception as err:
         empty_fig = empty_figure(f"Error: {str(err)[:80]}")
-        return empty_fig, "", False, None, False
+        return empty_fig, "", False, None, False, "", *empty_suggestions
 
 
 def validate_components(
@@ -677,11 +715,18 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          Output('eigenvector-plot', 'src'),
          Output('noisy-series-store', 'data'),
          Output('noisy-series-message', 'children'),
-         Output('apply-components-btn', 'disabled')],
+         Output('apply-components-btn', 'disabled'),
+         Output('suggested-grouping-table', 'children'),
+         Output('component-name-1', 'value'),
+         Output('component-list-1', 'value'),
+         Output('component-name-2', 'value'),
+         Output('component-list-2', 'value'),
+         Output('component-name-3', 'value'),
+         Output('component-list-3', 'value')],
         [Input('step-tracker', 'data'),
          Input('analysis-complete-store', 'data'),
-         Input('uploaded-file-store', 'data')],
-        State('ssa-window-slider', 'value'),
+         Input('uploaded-file-store', 'data'),
+         Input('ssa-window-slider', 'value')],
         prevent_initial_call=True,
     )(update_ssa_plots)
 

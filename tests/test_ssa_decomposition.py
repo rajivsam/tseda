@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from tseda.decomposition.automatic_grouping_heuristic import AutomaticGroupingHeuristic
 from tseda.decomposition.ssa_decomposition import SSADecomposition
 
 
@@ -88,3 +89,67 @@ def test_signal_reconstruction_plot_updates_seasonality_heuristic_flag():
     ssa.signal_reconstruction_plot()
 
     assert ssa._seasonality_check_heuristic is True
+
+
+def test_automatic_grouping_heuristic_suggests_trend_seasonality_and_noise():
+    heuristic = AutomaticGroupingHeuristic(
+        eigenvalues=np.array([40.0, 21.0, 20.2, 8.0, 5.0, 2.0]),
+    )
+
+    assert heuristic.suggest_reconstruction() == {
+        "Trend": [0],
+        "Seasonality": [1, 2],
+        "Noise": [3, 4, 5],
+    }
+
+
+def test_suggest_next_expansion_adds_trend_component():
+    # eigenvalue[3]=8.0, eigenvalue[4]=5.0 → not near-equal → trend
+    heuristic = AutomaticGroupingHeuristic(
+        eigenvalues=np.array([40.0, 21.0, 20.2, 8.0, 5.0, 2.0]),
+    )
+    current = {"Trend": [0], "Seasonality": [1, 2], "Noise": [3, 4, 5]}
+
+    expanded, did_expand = heuristic.suggest_next_expansion(current)
+
+    assert did_expand is True
+    assert expanded["Trend"] == [0, 3]
+    assert expanded["Seasonality"] == [1, 2]
+    assert expanded["Noise"] == [4, 5]
+
+
+def test_suggest_next_expansion_adds_seasonal_pair():
+    # eigenvalue[3]=10.0, eigenvalue[4]=9.7 → near-equal adjacent pair → seasonality
+    heuristic = AutomaticGroupingHeuristic(
+        eigenvalues=np.array([40.0, 21.0, 20.2, 10.0, 9.7, 2.0]),
+    )
+    current = {"Trend": [0], "Seasonality": [1, 2], "Noise": [3, 4, 5]}
+
+    expanded, did_expand = heuristic.suggest_next_expansion(current)
+
+    assert did_expand is True
+    assert expanded["Seasonality"] == [1, 2, 3, 4]
+    assert expanded["Noise"] == [5]
+
+
+def test_suggest_next_expansion_returns_false_when_pool_empty():
+    heuristic = AutomaticGroupingHeuristic(
+        eigenvalues=np.array([40.0, 21.0, 20.2]),
+    )
+    current = {"Trend": [0], "Seasonality": [1, 2], "Noise": []}
+
+    _, did_expand = heuristic.suggest_next_expansion(current)
+
+    assert did_expand is False
+
+
+def test_ssa_decomposition_suggest_reconstruction_groups_returns_tuple():
+    series = build_series()
+    ssa = SSADecomposition(series, window=12)
+
+    groups, dw_satisfied = ssa.suggest_reconstruction_groups()
+
+    assert isinstance(groups, dict)
+    assert "Trend" in groups
+    assert "Noise" in groups
+    assert isinstance(dw_satisfied, bool)

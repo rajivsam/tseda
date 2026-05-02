@@ -164,13 +164,64 @@ Plots of the leading eigenvectors. **Paired eigenvectors** (similar shape, simil
 
 #### Seasonality Heuristic
 
-The app automatically checks whether any pair among the top 6 eigenvalues has a ratio ≥ 0.95. If so, it flags the presence of a likely sinusoidal seasonal component.
+The automatic grouping heuristic runs in two phases.
+
+**Phase 1 — initial assignment**
+
+- Only components explaining at least 10% of total variance are considered signal-bearing (eligible).
+- Eligible components are scanned in rank order (lowest index first).
+- If two adjacent eligible components differ by at most 5%, they are suggested as a **seasonal pair**.
+- Any other eligible component is suggested as **trend**.
+- All remaining components are assigned to **noise**.
+
+**Phase 2 — Durbin-Watson refinement**
+
+After the initial assignment the Durbin-Watson (DW) statistic is computed on the noise residual. A value in the range **1.5 – 2.5** indicates that the noise is approximately uncorrelated and the assignment is accepted. If DW is outside this range the algorithm expands the assignment one step at a time:
+
+- The next unassigned component (highest remaining variance) is examined.
+- If it forms a near-equal pair with its neighbour, both are added to seasonality; otherwise the single component is added to trend.
+- DW is recomputed and compared against the target range.
+- The assignment closest to DW = 2.0 is tracked as the current best.
+- The loop continues until DW is satisfied **or** all components are assigned.
+
+If no assignment satisfies the DW criterion, the best-found assignment is returned and a warning is shown asking you to try a different window size.
+
+**Assignment flowchart**
+
+```mermaid
+flowchart TD
+    A([SSA decomposed\nwith window W]) --> B["Rank components by\nexplained variance"]
+    B --> C{"Variance ≥ 10%?"}
+    C -- No --> D[Assign to Noise]
+    C -- Yes --> E{"Adjacent component also eligible\nand difference ≤ 5%?"}
+    E -- Yes --> F["Add pair → Seasonality"]
+    E -- No --> G["Add component → Trend"]
+    F --> H{More components?}
+    G --> H
+    D --> H
+    H -- Yes --> C
+    H -- No --> I["Compute Durbin-Watson\non Noise residual"]
+    I --> J{"DW ∈ \[1.5, 2.5\]?"}
+    J -- Yes --> K(["Return assignment\n✅ dw_satisfied = True"])
+    J -- No --> L["Track best assignment\n(closest DW to 2.0)"]
+    L --> M{Unassigned\ncomponents remain?}
+    M -- No --> N(["Return best assignment\n⚠ dw_satisfied = False"])
+    N --> O([Warn: try a different\nwindow size])
+    M -- Yes --> P{"Next unassigned is\na near-equal pair?"}
+    P -- Yes --> Q[Add pair → Seasonality]
+    P -- No --> R[Add component → Trend]
+    Q --> S[Recompute Durbin-Watson]
+    R --> S
+    S --> J
+```
 
 #### Weighted Correlation Matrix
 
 A heatmap of correlations between SSA components. Strongly correlated component pairs should be grouped together in the reconstruction step.
 
 #### Component Grouping
+
+The app first renders a **Suggested Grouping** table in the center of the decomposition panel and prepopulates the input rows for **Trend**, **Seasonality**, and **Noise** using the heuristic above. You can edit those values before reconstruction if the diagnostic plots or domain context suggest a different interpretation.
 
 Assign SSA components to interpretable groups by entering index ranges (0-based). Typical groupings:
 
@@ -181,6 +232,8 @@ Assign SSA components to interpretable groups by entering index ranges (0-based)
 | Noise | `[4:]` | Residual / noise |
 
 The app reconstructs the signal for each group and displays the result overlaid on the original series.
+
+If you click **Clear Uploaded File** in Step 1, the suggested grouping table and the prepopulated grouping fields are reset with the rest of the session analysis state.
 
 #### Durbin-Watson Test
 
