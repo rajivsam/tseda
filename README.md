@@ -35,6 +35,8 @@ Explore the distribution and spread of values using a kernel density estimate an
 
 ### (b) Decomposition Using Singular Spectral Analysis
 
+**Window selection and component grouping are the two hardest decisions when applying SSA.** Choosing the wrong window distorts the eigen spectrum and makes meaningful grouping impossible; grouping the wrong components together conflates trend with seasonality or buries signal in noise. `tseda` automates both steps: it selects a window from the sampling frequency and derives a grouping from the eigen spectrum using a variance-and-correlation heuristic. Expert users can override both — the window via a slider and the grouping via direct input — but the defaults are designed to produce a defensible starting point without manual tuning.
+
 On the basis of the sampling frequency, a window for SSA is determined. This is a heuristic assignment. For example:
 
 | Sampling Frequency | Window Size |
