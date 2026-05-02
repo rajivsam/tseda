@@ -1,6 +1,6 @@
 [project]
 name = "tseda"
-version = "0.1.7"
+version = "0.1.8"
 description = "A package for exploration of regularly sampled time series."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -56,6 +56,7 @@ dependencies = [
 
   [project.scripts]
   tseda = "tseda.user_interface.ts_analyze_ui:main"
+  bump-version = "tseda.bump_version:main"
 
   [build-system]
   requires = ["setuptools>=68", "wheel"]
