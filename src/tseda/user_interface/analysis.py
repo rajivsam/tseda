@@ -164,6 +164,7 @@ def build_main_layout(assessment_layout: html.Div, decomposition_layout: html.Di
         dcc.Store(id="apply-grouping-trigger", data=0),
         dcc.Store(id="loess-fraction-store", data=0.05),
         dcc.Store(id="noisy-series-store", data=False),
+        dcc.Store(id="refined-window-store", data=0),
         html.H1("Time Series Explorer", className="text-center my-4"),
         dbc.Progress([
             dbc.Progress(value=33, label="1. Assessment", id="p1", color="primary", bar=True),

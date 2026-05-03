@@ -37,6 +37,57 @@ The app applies Singular Spectrum Analysis (SSA) with a heuristic default window
 derived from the inferred sampling frequency. You can change this window and compare
 decomposition quality directly in the UI.
 
+Initial window assignment and refinement
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The initial SSA window is selected from inferred cadence, then refined using a
+tail-spread check on the SSA eigen spectrum. The objective is to avoid starting
+from a window where the smallest eigenvalue still explains too much variance.
+
+Cadence-to-window mapping:
+
++----------+----------------+
+| Cadence  | Initial Window |
++==========+================+
+| Hourly   | 24             |
++----------+----------------+
+| Daily    | 5              |
++----------+----------------+
+| Weekly   | 4              |
++----------+----------------+
+| Monthly  | 12             |
++----------+----------------+
+
+The pseudocode below describes the full setup procedure:
+
+.. code-block:: text
+
+    Algorithm: Initial SSA Window Setup
+
+    Input:  regular time series x, inferred cadence c
+    Params: min_tail_spread = 0.10
+
+    --- Cadence-based initialization ---
+    1.  If c = hourly  -> w ← 24
+    2.  If c = daily   -> w ← 5
+    3.  If c = weekly  -> w ← 4
+    4.  If c = monthly -> w ← 12
+    5.  If cadence is unknown -> fail with "invalid window"
+
+    --- Spectrum-spread refinement ---
+    6.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
+    7.  tail_ratio ← λ_w / Σᵢ λᵢ
+    8.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
+          w ← 2w
+          Rebuild SSA(x, w)
+          tail_ratio ← λ_w / Σᵢ λᵢ
+
+    --- Output ---
+    9.  Return final w as the decomposition default and slider value
+
+In the UI, this final value is surfaced as the Step-2 default and remains
+user-overridable via the window slider.
+
 In this step you inspect:
 
 - Eigenvalue and explained-variance profiles.

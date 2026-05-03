@@ -26,7 +26,7 @@ def test_store_uploaded_file_clear_resets_kb_location_state(monkeypatch):
         clear_clicks=1,
     )
 
-    assert result == (None, None, False, None, None)
+    assert result == (None, None, False, None, None, 0)
 
 
 def test_validate_components_reuses_existing_ssa_and_renders_outputs(monkeypatch):
@@ -84,6 +84,7 @@ def test_validate_components_reuses_existing_ssa_and_renders_outputs(monkeypatch
         name3="",
         list3="",
         slider_window_size=4,
+        refined_window=4,
         loess_fraction=0.2,
         uploaded_file=None,
     )

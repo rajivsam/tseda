@@ -130,7 +130,7 @@ def store_uploaded_file(
     contents: str | None,
     filename: str | None,
     clear_clicks: int | None,
-) -> tuple[dict[str, str] | None, Any | None, bool, None, None]:
+) -> tuple[dict[str, str] | None, Any | None, bool, None, None, int]:
     """Persist uploaded file metadata and initialize decomposition prerequisites."""
     global series, window_size, ssa_obj
     ctx = dash.callback_context
@@ -142,13 +142,13 @@ def store_uploaded_file(
         series = None
         window_size = 0
         ssa_obj = None
-        return None, None, False, None, None
+        return None, None, False, None, None, 0
 
     if contents is None or filename is None:
         series = None
         window_size = 0
         ssa_obj = None
-        return None, None, False, None, None
+        return None, None, False, None, None, 0
     
     try:
         parse_upload(contents, filename)
@@ -162,12 +162,12 @@ def store_uploaded_file(
 
         window_size = int(freq_window)
         ssa_obj = None
-        return {'contents': contents, 'filename': filename}, None, False, dash.no_update, dash.no_update
+        return {'contents': contents, 'filename': filename}, None, False, dash.no_update, dash.no_update, 0
     except ValueError as e:
         series = None
         window_size = 0
         ssa_obj = None
-        return None, dbc.Alert(str(e), color="danger", className="mt-2"), False, dash.no_update, dash.no_update
+        return None, dbc.Alert(str(e), color="danger", className="mt-2"), False, dash.no_update, dash.no_update, 0
 
 
 def update_summary_table(
@@ -219,15 +219,23 @@ def update_summary_table(
 def configure_redo_slider(
     current_step: int,
     uploaded_file: dict[str, str] | None,
+    refined_window: int | None,
 ) -> tuple[dict[int, str], int, int, int, None]:
-    """Configure valid redo SSA window values as integer multiples of the default window."""
+    """Configure valid redo SSA window values as integer multiples of the default window.
+
+    When the refinement loop in ``update_ssa_plots`` has doubled the initial
+    heuristic window to satisfy the <10 % smallest-eigenvalue invariant, it
+    writes the final value to ``refined-window-store``.  This callback re-fires
+    on that change and uses the refined value so the slider stays in sync.
+    """
     global series, window_size
 
+    effective_window = int(refined_window) if refined_window and int(refined_window) > 0 else window_size
     series_length = len(series) if series is not None else 0
     return compute_window_slider_config(
         current_step=current_step,
         series_length=series_length,
-        default_window_size=window_size,
+        default_window_size=effective_window,
     )
 
 
@@ -246,7 +254,7 @@ def update_ssa_plots(
     analysis_complete: bool,
     uploaded_file: dict[str, str] | None,
     slider_window_size: int | None,
-) -> tuple[go.Figure, str, bool, Any, bool, Any, str | Any, str | Any, str | Any, str | Any, str | Any, str | Any]:
+) -> tuple[go.Figure, str, bool, Any, bool, Any, str | Any, str | Any, str | Any, str | Any, str | Any, str | Any, int | Any]:
     """Generate SSA plots and series-suitability state for grouping actions."""
     global series, window_size, ssa_obj
 
@@ -258,7 +266,7 @@ def update_ssa_plots(
     
     if current_step != 2 or series is None or window_size <= 0:
         empty_fig = empty_figure("No data available")
-        return empty_fig, "", False, None, False, "", *empty_suggestions
+        return empty_fig, "", False, None, False, "", *empty_suggestions, dash.no_update
     
     try:
         selected_window_size = int(slider_window_size) if slider_window_size is not None and int(slider_window_size) > 0 else window_size
@@ -268,6 +276,25 @@ def update_ssa_plots(
             # Keep the global in sync so validate_components does not rebuild SSA
             # unnecessarily when the user clicks Apply Grouping after moving the slider.
             window_size = selected_window_size
+
+        # Refinement: if this is an initial (non-slider) window assignment and the
+        # smallest eigenvalue still accounts for >= 10 % of total variance, the
+        # spectrum is too flat — double the window and recompute until the invariant
+        # holds or the window would exceed half the series length.
+        if trigger_id != 'ssa-window-slider':
+            _eigs = np.asarray(getattr(ssa_obj, "_eigenvalues", []), dtype=float)
+            _total = float(np.sum(_eigs))
+            while (
+                _eigs.size > 0
+                and _total > 0.0
+                and float(_eigs[-1]) / _total >= 0.10
+                and selected_window_size * 2 <= len(series) // 2
+            ):
+                selected_window_size *= 2
+                ssa_obj = SSADecomposition(series, selected_window_size)
+                window_size = selected_window_size
+                _eigs = np.asarray(getattr(ssa_obj, "_eigenvalues", []), dtype=float)
+                _total = float(np.sum(_eigs))
 
         eigen_fig = ssa_obj.eigenplot()
         
@@ -316,11 +343,11 @@ def update_ssa_plots(
             suggestion_children = dash.no_update
             suggestion_values = preserve_suggestions
 
-        return eigen_fig, img_src, noisy_series, noisy_message, noisy_series, suggestion_children, *suggestion_values
+        return eigen_fig, img_src, noisy_series, noisy_message, noisy_series, suggestion_children, *suggestion_values, window_size
         
     except Exception as err:
         empty_fig = empty_figure(f"Error: {str(err)[:80]}")
-        return empty_fig, "", False, None, False, "", *empty_suggestions
+        return empty_fig, "", False, None, False, "", *empty_suggestions, dash.no_update
 
 
 def validate_components(
@@ -333,6 +360,7 @@ def validate_components(
     name3: str | None,
     list3: str | None,
     slider_window_size: int | None,
+    refined_window: int | None,
     loess_fraction: float | None,
 ) -> tuple[Any, go.Figure, go.Figure, str, Any, go.Figure, bool]:
     """Validate component inputs."""
@@ -368,6 +396,12 @@ def validate_components(
                 return dbc.Alert("No data loaded. Please upload a file first.", color="warning"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
 
     selected_window_size = int(slider_window_size) if slider_window_size is not None and int(slider_window_size) > 0 else window_size
+    refined_default = int(refined_window) if refined_window is not None and int(refined_window) > 0 else 0
+    # Guard against callback ordering races: if startup refinement increased the
+    # default window but the slider state is still stale, prefer the refined
+    # default so all downstream plots use the latest valid SSA window.
+    if refined_default > 0 and selected_window_size < refined_default:
+        selected_window_size = refined_default
     window_changed = selected_window_size != window_size
     if window_changed:
         window_size = selected_window_size
@@ -667,7 +701,8 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          Output('upload-error-message', 'children'),
          Output('analysis-complete-store', 'data', allow_duplicate=True),
          Output('kb-save-dir-store', 'data'),
-         Output('kb-save-filename-store', 'data')],
+         Output('kb-save-filename-store', 'data'),
+         Output('refined-window-store', 'data', allow_duplicate=True)],
         Input('upload-data', 'contents'),
         State('upload-data', 'filename'),
         Input('clear-upload-btn', 'n_clicks'),
@@ -695,7 +730,8 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          Output('ssa-window-slider', 'max'),
          Output('ssa-window-slider', 'step')],
         [Input('step-tracker', 'data'),
-         Input('uploaded-file-store', 'data')],
+         Input('uploaded-file-store', 'data'),
+         Input('refined-window-store', 'data')],
     )(configure_redo_slider)
 
     dash_app.callback(
@@ -722,7 +758,8 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          Output('component-name-2', 'value'),
          Output('component-list-2', 'value'),
          Output('component-name-3', 'value'),
-         Output('component-list-3', 'value')],
+         Output('component-list-3', 'value'),
+         Output('refined-window-store', 'data')],
         [Input('step-tracker', 'data'),
          Input('analysis-complete-store', 'data'),
          Input('uploaded-file-store', 'data'),
@@ -744,6 +781,7 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          State('component-name-2', 'value'), State('component-list-2', 'value'),
          State('component-name-3', 'value'), State('component-list-3', 'value'),
          State('ssa-window-slider', 'value'),
+         State('refined-window-store', 'data'),
          State('loess-fraction-store', 'data')],
         prevent_initial_call=True,
     )(validate_components)

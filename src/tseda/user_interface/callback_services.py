@@ -347,8 +347,37 @@ def build_noise_kde_figure(ssa_obj: Any, fallback_fig: go.Figure) -> go.Figure:
     if noise_data.size < 2:
         return fallback_fig
 
-    kde_estimator = stats.gaussian_kde(noise_data)
-    xs = np.linspace(noise_data.min(), noise_data.max(), 300)
+    try:
+        kde_estimator = stats.gaussian_kde(noise_data)
+    except Exception as err:
+        # Some datasets produce near-singular covariance (lower-dimensional support).
+        # Retry once with a tiny, deterministic jitter to stabilize KDE estimation.
+        err_text = str(err).lower()
+        is_singular_covariance = (
+            isinstance(err, np.linalg.LinAlgError)
+            or "singular" in err_text
+            or "lower-dimensional subspace" in err_text
+        )
+        if not is_singular_covariance:
+            raise
+
+        scale = float(np.std(noise_data))
+        if not np.isfinite(scale) or scale <= 0.0:
+            scale = max(float(np.max(np.abs(noise_data))), 1.0)
+        jitter_sigma = max(scale * 1e-8, 1e-12)
+        rng = np.random.default_rng(42)
+        jittered = noise_data + rng.normal(0.0, jitter_sigma, size=noise_data.shape)
+        kde_estimator = stats.gaussian_kde(jittered)
+        noise_data = jittered
+
+    data_min = float(np.min(noise_data))
+    data_max = float(np.max(noise_data))
+    if data_min == data_max:
+        eps = max(abs(data_min) * 1e-6, 1e-6)
+        data_min -= eps
+        data_max += eps
+
+    xs = np.linspace(data_min, data_max, 300)
     ys = kde_estimator(xs)
 
     noise_kde_fig = go.Figure()

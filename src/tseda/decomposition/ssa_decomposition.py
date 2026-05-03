@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ssalib import SingularSpectrumAnalysis
 from matplotlib import pyplot as plt
-from scipy.signal import find_peaks
+import ruptures as rpt
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import pandas as pd
@@ -337,41 +337,140 @@ class SSADecomposition:
         return fig
 
     def change_point_plot(self) -> go.Figure:
-        """Return a change-point analysis plot using the smoothed signal."""
+        """Return a change-point analysis plot using the smoothed signal.
 
+        Two independent PELT detectors are run:
+
+        * **Trend shifts** — PELT on the z-score-normalised Trend component
+          (``l2`` cost, penalty ``log(n)``).  Rendered as vertical *dashed* lines.
+        * **Seasonal amplitude shifts** — PELT on the z-score-normalised
+          rolling-RMS envelope of the Seasonality component, with a rolling
+          window equal to the SSA window size (``l2`` cost, penalty ``log(n)``).
+          Rendered as vertical *dotted* lines.
+
+        The smoothed signal (trend + all non-noise components) is plotted as a
+        single continuous trace.  A plain-language summary of detected changes
+        is appended below the plot.
+        """
         if not hasattr(self, "_recon"):
             raise ValueError("Reconstruction map is not set. Call set_reconstruction() first.")
 
         self._ensure_reconstruction_cache()
         smoothed_signal = self.get_reconstructed_series("smoothed_signal")
+        dates = self._series.index
+        n = len(smoothed_signal)
+        penalty = float(np.log(max(n, 2)))
 
-        max_peaks, _ = find_peaks(smoothed_signal.values)
-        min_peaks, _ = find_peaks((-smoothed_signal).values)
-        change_points = np.unique(np.concatenate([max_peaks, min_peaks]))
-        self._change_points = change_points
+        def _pelt_on(signal_1d: np.ndarray) -> np.ndarray:
+            """Z-normalise then run PELT; return interior breakpoint indices."""
+            std = float(np.std(signal_1d))
+            normed = ((signal_1d - np.mean(signal_1d)) / std
+                      if std > 0.0 else signal_1d.copy())
+            bkps = rpt.Pelt(model="l2").fit(normed.reshape(-1, 1)).predict(pen=penalty)
+            return np.array([b for b in bkps if b < n], dtype=int)
 
+        # --- Trend shift detection --------------------------------------------
+        trend_signal = self._group_signals.get("trend", smoothed_signal)
+        trend_change_points = _pelt_on(trend_signal.values.astype(float))
+        self._change_points = trend_change_points  # backward-compatible attribute
+
+        # --- Seasonal amplitude shift detection -------------------------------
+        seas_signal = self._group_signals.get("seasonality")
+        seasonal_change_points: np.ndarray = np.array([], dtype=int)
+        if seas_signal is not None:
+            rms_envelope = (
+                pd.Series(seas_signal.values.astype(float))
+                .pow(2)
+                .rolling(self._window, center=True, min_periods=1)
+                .mean()
+                .pow(0.5)
+                .values
+            )
+            seasonal_change_points = _pelt_on(rms_envelope)
+
+        # --- Segment labels (stored for downstream consumers) -----------------
+        segment_ids = np.ones(n, dtype=int)
+        for seg_idx, bp in enumerate(trend_change_points):
+            segment_ids[bp:] = seg_idx + 2
         segment_frame = pd.DataFrame(
             {
-                "date": self._series.index,
+                "date": dates,
                 "Smoothed Signal": smoothed_signal.values,
+                "segment": [f"segment-{s}" for s in segment_ids],
             }
         )
-
-        segment_ids = np.ones(len(segment_frame), dtype=int)
-        if change_points.size > 0:
-            for idx, cp in enumerate(change_points, start=1):
-                segment_ids[cp:] = idx + 1
-
-        segment_frame["segment"] = [f"segment-{segment_id}" for segment_id in segment_ids]
         self._segment_frame = segment_frame
 
-        fig = px.line(
-            segment_frame,
-            x="date",
-            y="Smoothed Signal",
-            color="segment",
-            title="Change Point Analysis by Segment",
-            labels={"date": "Date", "Smoothed Signal": "Signal", "segment": "Segment"},
+        # --- Figure -----------------------------------------------------------
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=dates,
+                y=smoothed_signal.values,
+                mode="lines",
+                name="Smoothed Signal",
+                line=dict(color="steelblue", width=2),
+            )
+        )
+
+        def _ts_to_ms(idx: int) -> float:
+            return float(pd.Timestamp(dates[idx]).timestamp() * 1000)
+
+        # Trend change points — dashed lines, blue palette
+        trend_colors = px.colors.qualitative.Plotly
+        for i, cp_idx in enumerate(trend_change_points):
+            fig.add_vline(
+                x=_ts_to_ms(cp_idx),
+                line_dash="dash",
+                line_color=trend_colors[i % len(trend_colors)],
+                annotation_text=f"T{i + 1}",
+                annotation_position="top left" if i % 2 == 0 else "top right",
+            )
+
+        # Seasonal amplitude change points — dotted lines, warm palette
+        seasonal_colors = px.colors.qualitative.Pastel
+        for i, cp_idx in enumerate(seasonal_change_points):
+            fig.add_vline(
+                x=_ts_to_ms(cp_idx),
+                line_dash="dot",
+                line_color=seasonal_colors[i % len(seasonal_colors)],
+                annotation_text=f"S{i + 1}",
+                annotation_position="bottom left" if i % 2 == 0 else "bottom right",
+            )
+
+        # --- Plain-language summary annotations below the plot ----------------
+        def _fmt_dates(indices: np.ndarray) -> str:
+            if indices.size == 0:
+                return "none detected"
+            return ", ".join(
+                str(dates[idx].date()) if hasattr(dates[idx], "date") else str(dates[idx])
+                for idx in indices
+            )
+
+        trend_summary = (
+            f"Trend shifts (- -): {_fmt_dates(trend_change_points)}"
+        )
+        seasonal_summary = (
+            f"Seasonal amplitude shifts (···): {_fmt_dates(seasonal_change_points)}"
+        )
+
+        for row_idx, text in enumerate([trend_summary, seasonal_summary]):
+            fig.add_annotation(
+                text=text,
+                xref="paper", yref="paper",
+                x=0.0,
+                y=-0.22 - row_idx * 0.09,
+                showarrow=False,
+                font=dict(size=11),
+                align="left",
+                xanchor="left",
+            )
+
+        fig.update_layout(
+            title="Change Point Analysis",
+            xaxis_title="Date",
+            yaxis_title="Signal",
+            margin=dict(b=160),
         )
 
         return fig

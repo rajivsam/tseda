@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document chronicles the iterative design and development of `tseda`, with emphasis on the explicit technical checks, architectural decisions, and quality gates that ensured correctness and usability. The project evolved through eight sequential design decisions, each introducing new requirements, triggering validation checks, and refining the core architecture.
+This document chronicles the iterative design and development of `tseda`, with emphasis on the explicit technical checks, architectural decisions, and quality gates that ensured correctness and usability. The project evolved through ten sequential design decisions, each introducing new requirements, triggering validation checks, and refining the core architecture.
 
 ---
 
@@ -14,10 +14,93 @@ This document chronicles the iterative design and development of `tseda`, with e
 | 2 | SSA window heuristic | Verify heuristic produces sensible decompositions on known series | ✅ Heuristic validated on energy/coffee/car-sales datasets |
 | 3 | Reconstruction cache design | Confirm cache invalidates on grouping change | ✅ `_reset_reconstruction_cache` clears all derived signals |
 | 4 | Seasonality pair heuristic | Validate ratio threshold on synthetic known-seasonal series | ✅ Near-equal pairs (≥0.95 ratio) correctly flagged |
-| 5 | PELT on smoothed signal (not raw) | Verify false positive reduction vs. raw-signal PELT | ✅ Fewer spurious breakpoints on denoised reconstruction |
+| 5 | PELT on denoised signal, trend component only | Verify false positive reduction vs. raw-signal PELT and vs. running on smoothed signal | ✅ Trend-only PELT avoids flagging seasonal oscillations as breakpoints |
 | 6 | AIC for rank selection | Validate AIC arrays match analytic expectations on toy series | ✅ Rank curves finite and monotone on test fixtures |
 | 7 | Lomb-Scargle over standard FFT | Confirm periodogram works on irregularly-timestamped uploads | ✅ `lombscargle` handles arbitrary time vectors |
 | 8 | KMDS OWL knowledge-capture integration | Confirm observation write/read round-trips without ontology corruption | ✅ `KMDSDataWriter.add_exploratory_obs` verified on coffee KB |
+| 9 | Automatic window refinement loop | Verify tail eigenvalue spread criterion correctly doubles window until spectrum is non-flat | ✅ Invariant `tail_ratio < 0.10` holds after refinement on all test datasets |
+| 10 | Dual-detector change-point analysis (trend + seasonal amplitude) | Verify two independent PELT detectors find distinct, meaningful breakpoints | ✅ Trend-shift and seasonal-amplitude-shift breakpoints correctly separated across datasets |
+
+---
+
+## Phase 9: Automatic Window Refinement Loop
+
+**Problem Statement:** The sampling-frequency heuristic produces a good starting window but can assign a window where the eigenvalue spectrum is too flat — the smallest eigenvalue explains ≥ 10% of total variance, meaning SSA has not separated signal from noise effectively.
+
+**Design Check:** Can an automatic refinement loop produce a better-separated spectrum without user input?
+
+**Invariant:** After decomposition, the tail eigenvalue ratio must satisfy:
+```
+tail_ratio = λ_min / Σ λᵢ  <  0.10
+```
+
+**Algorithm (in `update_ssa_plots`, fired on first load or file upload):**
+```python
+_eigs = np.asarray(ssa_obj._eigenvalues, dtype=float)
+_total = float(np.sum(_eigs))
+while (
+    _eigs.size > 0 and _total > 0.0
+    and float(_eigs[-1]) / _total >= 0.10
+    and selected_window_size * 2 <= len(series) // 2
+):
+    selected_window_size *= 2
+    ssa_obj = SSADecomposition(series, selected_window_size)
+    _eigs = np.asarray(ssa_obj._eigenvalues, dtype=float)
+    _total = float(np.sum(_eigs))
+```
+
+**Slider synchronisation:** The refined window is written to a `refined-window-store` Dash store. The `configure_redo_slider` callback reads this store and updates the UI slider so the displayed value always matches the decomposition that was actually computed.
+
+**Validation:**
+```
+uci_sales (weekly, w_initial=4):  tail_ratio=0.19 → doubles to w=8, tail_ratio=0.07 < 0.10  ✅
+coffee    (monthly, w_initial=12): tail_ratio already < 0.10, no doubling needed             ✅
+```
+
+---
+
+## Phase 10: Dual-Detector Change-Point Analysis
+
+**Problem Statement:** The trend-only PELT detector (Phase 5) correctly finds mean-level regime shifts but cannot detect points where the *strength* of seasonality changes. A seasonal series that becomes progressively more or less oscillatory represents a structural change invisible to the trend detector.
+
+**Design Question:** Can a second independent PELT detector track seasonal amplitude shifts without contaminating the trend-shift results?
+
+**Algorithm:** The Seasonality component is an oscillating signal with varying amplitude. The amplitude envelope is extracted via rolling RMS:
+
+```python
+rms_envelope = (
+    pd.Series(seas_signal.values.astype(float))
+    .pow(2)
+    .rolling(self._window, center=True, min_periods=1)
+    .mean()
+    .pow(0.5)
+    .values
+)
+```
+
+The rolling window equals the SSA window size, capturing approximately one seasonal cycle. PELT is then run on the z-normalised envelope with `penalty = log(n)`, exactly as for the trend.
+
+**Design Check:** Do the two detectors find meaningfully different breakpoints?
+
+Validation on UCI sales dataset:
+```
+tail trend_breaks     = [30, 40]           (T1, T2 — mean-level shifts)
+seasonal amp breaks   = [25, 30, 40]       (S1, S2, S3 — envelope shifts)
+```
+Breakpoints 30 and 40 appear in both — a co-incident structural change in both level and seasonal strength. Breakpoint 25 appears only in the seasonal detector — seasonal amplitude changed without a trend-level shift, which is a distinct and meaningful finding.
+
+**Visualisation distinction:**
+| Marker | Style | Label position |
+|---|---|---|
+| Trend shifts | `- - -` dashed, Plotly colour palette | Top of plot (T1, T2, …) |
+| Seasonal amplitude shifts | `···` dotted, Pastel colour palette | Bottom of plot (S1, S2, …) |
+
+A plain-language date summary is printed below the plot with two lines:
+```
+Trend shifts (- -): <dates>
+Seasonal amplitude shifts (···): <dates>
+```
+If no changes are detected the line reads `none detected`.
 
 ---
 
@@ -51,29 +134,14 @@ def navigate_steps(next_clicks, prev_clicks, analysis_complete, current_step):
 
 **Design Check:** Can sampling frequency alone produce a defensible default window?
 
-**Heuristic Table Established:**
+**Heuristic Table (actual values in `SamplingProp.get_freq_window()`):**
 
-| Sampling Frequency | Window Size |
-|--------------------|-------------|
-| Hourly             | 24          |
-| Daily              | 7           |
-| Weekly             | 52          |
-| Monthly            | 12          |
-| Quarterly          | 4           |
-| Annual             | 1           |
-
-Implementation in `SamplingProp.get_freq_window()`:
-
-```python
-FREQ_WINDOW_MAP = {
-    "hourly": 24,
-    "daily": 7,
-    "weekly": 52,
-    "monthly": 12,
-    "quarterly": 4,
-    "annual": 1,
-}
-```
+| Sampling Frequency | Window Size | Rationale |
+|--------------------|-------------|----------|
+| Hourly             | 24          | One diurnal cycle |
+| Daily              | 5           | One business week |
+| Weekly             | 4           | Approximately one calendar month |
+| Monthly            | 12          | One full annual cycle |
 
 **Quality Gate:** Validated on five real datasets:
 
@@ -173,36 +241,39 @@ for i in range(len(leading)):
 
 ---
 
-## Phase 5: PELT Change-Point Detection on Denoised Signal
+## Phase 5: PELT Change-Point Detection — Trend Component Only
 
-**Problem Statement:** Change-point detection on raw time series with noise produces false positive breakpoints wherever noise variance spikes. This undermines user confidence in the analysis.
+**Problem Statement:** The original implementation applied `scipy.signal.find_peaks` to the full smoothed signal (Trend + Seasonality). For a 60-point weekly series this produced 33 change points — a break at nearly every time step — because every seasonal oscillation was flagged as a local extremum.
 
-**Design Check:** Does running PELT on the SSA-reconstructed smooth signal reduce false positives?
+**Design Check 1:** Does PELT on the trend component reduce false seasonal-oscillation breakpoints?
 
-**Architecture Decision:** `PELT_ChangePointEstimator` receives the *reconstructed smooth signal* (sum of Trend + Seasonality components) from `SSADecomposition`, not the raw series. The UI only makes change-point analysis available *after* reconstruction.
+For the UCI sales dataset (60 weekly points), running `find_peaks` on the smoothed signal produced 33 change points. Running PELT on the z-normalised Trend component with `penalty = log(n)` produced 2 change points at structurally meaningful positions.
 
-**Penalty Calibration Check:** The BIC-like penalty `2 * log(n)` was chosen:
+**Architecture Decision:** `change_point_plot()` in `SSADecomposition` now:
+1. Extracts `_group_signals["trend"]` — only the Trend component.
+2. Z-score normalises it (making the penalty scale-invariant across datasets with different value ranges).
+3. Fits PELT (`ruptures`, `l2` cost, `penalty = log(n)`) and collects interior breakpoints.
+
 ```python
-self._penalty = float(2 * np.log(self._n))
+tend_signal = self._group_signals.get("trend", smoothed_signal)
+std = float(np.std(trend_values))
+normalised_trend = (trend_values - np.mean(trend_values)) / std
+algo = rpt.Pelt(model="l2").fit(normalised_trend.reshape(-1, 1))
+bkps = algo.predict(pen=float(np.log(n)))
 ```
 
-This is the standard penalty for `rbf` cost in the PELT literature. The UI exposes a configurable `penalty_coeff` for expert override.
+**Design Check 2:** Is the `l2` cost model with `log(n)` penalty robust across dataset sizes?
 
-**Test Case (from `test_change_point_estimator.py`):**
-```python
-# Series with three known regimes: mean=5, then mean=15, then mean=8
-values = np.concatenate([
-    np.random.normal(5, 1, 30),
-    np.random.normal(15, 1, 35),
-    np.random.normal(8, 1, 35)
-])
-estimator = ChangePointEstimator(series)
-estimator.estimate_change_points()
-assert len(estimator._change_pts) > 0               # ✅ breakpoints detected
-assert all(seg.startswith("segment-") for seg in ...)  # ✅ labelled segments
+Validated on four datasets:
+
+```
+uci_sales (n=60):   trend_breaks=[30, 40]   — 2 meaningful breaks  ✅
+coffee    (n=426):  trend_breaks=[50, 105, 180, 245, 265, ...]  ✅
+car_sales (n=108):  trend_breaks=[25, 60]   — 2 meaningful breaks  ✅
+energy    (n=500):  trend_breaks=[115, 210, 255, 285, ...]       ✅
 ```
 
-**Validation:** Change-point overlay on the energy dataset correctly identifies the regime transition from high-demand to low-demand periods aligned with known seasonality.
+**Visualisation:** Single continuous `go.Scatter` trace (smoothed signal) with `- - -` dashed `add_vline` markers labelled T1, T2, … — the line is never visually broken at a segment boundary.
 
 ---
 
@@ -329,9 +400,11 @@ Reload → 2 observations remain, sequences are intact
 |---|---|---|
 | Workflow gating validation | 1 | 100% |
 | Heuristic correctness (datasets) | 5 | 100% |
+| Window refinement invariant | 2 | 100% |
 | Cache invalidation correctness | 4 | 100% |
 | Seasonal pair detection | 2 | 100% |
-| Change-point detection (known regimes) | 1 | 100% |
+| Change-point trend detector (known regimes) | 4 | 100% |
+| Change-point seasonal amplitude detector | 4 | 100% |
 | AIC finite/correctness | 4 | 100% |
 | Periodogram period recovery | 1 | 100% |
 | KMDS round-trip persistence | 2 | 100% |

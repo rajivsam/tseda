@@ -108,13 +108,44 @@ class SamplingProp:
     def get_freq_window(self, index: pd.Index) -> int | None:
         """Map pandas inferred frequency to a default SSA window size.
 
-        Hourly -> 24, Daily -> 5, Weekly -> 4, Monthly -> 12.
+        **Heuristic rationale**
+
+        The window in Singular Spectrum Analysis (SSA) controls the width of the
+        trajectory matrix.  A sensible starting point is one full dominant seasonal
+        cycle so that the periodic structure appears as a pair of near-equal
+        eigenvalues in the eigen spectrum.  The table below lists the cadence-to-
+        window mapping used as the *initial* assignment:
+
+        +-----------+--------+----------------------------------------------+
+        | Cadence   | Window | Rationale                                    |
+        +===========+========+==============================================+
+        | Hourly    | 24     | One diurnal (24-hour) cycle                  |
+        +-----------+--------+----------------------------------------------+
+        | Daily     | 5      | One business week (5 trading/working days)   |
+        +-----------+--------+----------------------------------------------+
+        | Weekly    | 4      | Approximately one calendar month (4 weeks)   |
+        +-----------+--------+----------------------------------------------+
+        | Monthly   | 12     | One full annual cycle (12 months)            |
+        +-----------+--------+----------------------------------------------+
+
+        **Required invariant after refinement**
+
+        The initial value returned here is a *candidate*, not a final answer.  At
+        SSA construction time the caller must verify that the smallest eigenvalue
+        explains strictly less than 10 % of total variance.  If it does not, the
+        window is doubled and SSA is recomputed; this doubling is repeated until
+        the invariant holds or the window would exceed half the series length.  The
+        invariant ensures that the eigen spectrum has meaningful spread — i.e. the
+        decomposition is not degenerate — and prevents the smallest component from
+        carrying too much signal that should have been separated into distinct
+        eigenmodes.
 
         Args:
             index: Datetime index from the source series.
 
         Returns:
-            Default SSA window size for the inferred frequency.
+            Initial candidate SSA window size for the inferred frequency, or
+            ``None`` when the frequency cannot be determined.
         """
         # 1. Infer the frequency alias (e.g., 'h', 'D', 'W-SUN', 'ME')
         freq_str = pd.infer_freq(index)

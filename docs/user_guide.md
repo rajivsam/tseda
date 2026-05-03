@@ -119,11 +119,12 @@ A summary table showing:
 - **Inferred frequency**: e.g., "Monthly", "Daily"
 - **Heuristic SSA window**: a suggested window size for decomposition based on the detected cadence
 
-| Cadence | Default Window |
-|---------|---------------|
-| Hourly  | 24            |
-| Monthly | 12            |
-| Quarterly | 4           |
+| Cadence | Initial Window |
+|---------|----------------|
+| Hourly  | 24             |
+| Daily   | 5              |
+| Weekly  | 4              |
+| Monthly | 12             |
 
 #### Distribution Plot (KDE + Box Plot)
 
@@ -153,6 +154,41 @@ SSA decomposes the series into a set of components ranked by their contribution 
 The app pre-selects a window size based on the detected cadence. You can adjust it manually. A good rule of thumb:
 - The window should be at least as long as the expected seasonal period.
 - Larger windows capture longer-range structure but increase computation.
+
+#### Initial Window Setup Heuristic
+
+Before grouping, the app computes a cadence-based initial window and then applies an
+eigen-spectrum spread check. The goal is to avoid starting with a window where the
+smallest eigenvalue still explains too much variance.
+
+```
+Algorithm: Initial SSA Window Setup
+
+Input:  regular time series x, inferred cadence c
+Params: min_tail_spread = 0.10
+
+--- Cadence-based initialization ---
+1.  If c = hourly  -> w ← 24
+2.  If c = daily   -> w ← 5
+3.  If c = weekly  -> w ← 4
+4.  If c = monthly -> w ← 12
+5.  If cadence is unknown -> fail with "invalid window"
+
+--- Spectrum-spread refinement ---
+6.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
+7.  tail_ratio ← λ_w / Σᵢ λᵢ
+8.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
+   w ← 2w
+   Rebuild SSA(x, w)
+   tail_ratio ← λ_w / Σᵢ λᵢ
+
+--- Output ---
+9.  Return final w as the decomposition default and slider value
+```
+
+Operationally, this means the startup window can be larger than the raw cadence mapping
+if the first decomposition is too flat in the tail. The UI slider is synchronized to
+this final value.
 
 #### Eigenvalue / Variance Profile
 
@@ -248,9 +284,92 @@ Applied to the noise component to assess residual independence:
 - **Value < 1.5**: positive autocorrelation remains (consider adding more components to the structured groups).
 - **Value > 2.5**: negative autocorrelation.
 
-#### Change Point Detection
+---
 
-The PELT algorithm (`ruptures` library) is applied to smoothed reconstructed components. Detected change points are marked on the signal plot, indicating structural breaks or regime shifts.
+## Change Point Detection
+
+After applying the reconstruction grouping, the app runs a change-point analysis that independently examines **trend shifts** and **seasonal amplitude shifts**. Noise is excluded from this analysis: by definition, noise has no persistent structure and is not a source of meaningful change points.
+
+### What is analysed and what is not
+
+| Component | Analysed? | Rationale |
+|-----------|-----------|----------|
+| Trend | ✅ Yes | Persistent mean-level shifts are the primary structural break of interest. |
+| Seasonality | ✅ Yes (amplitude envelope) | Changes in how strong the seasonal pattern is (e.g. seasonality growing or shrinking) are detected. Phase/frequency shifts are not — see note below. |
+| Noise | ❌ No | Noise is by construction structureless; running a change-point detector on it would produce spurious breaks. |
+
+> **Phase and frequency shifts** are not detected by the current algorithm. Detecting period changes robustly requires either a sliding-window FFT or a Hilbert-transform instantaneous frequency approach; both are noisy on short series (< 200 points) and are not implemented here.
+
+---
+
+### Detector 1 — Trend shifts
+
+Detects points where the long-run mean level of the series changes permanently.
+
+```
+Input:  Trend component from the SSA reconstruction
+
+1. Z-score normalise the trend:
+       z[t] = (trend[t] − mean(trend)) / std(trend)
+   Normalisation makes the penalty scale-invariant across datasets
+   with very different value ranges.
+
+2. Fit PELT (ruptures, l2 cost model) with a BIC-style penalty:
+       penalty = log(n)
+   where n is the series length.
+
+3. Collect interior breakpoints (PELT appends n as a sentinel;
+   discard it). These are the trend-shift indices.
+```
+
+**Visualisation:** vertical `- - -` dashed lines, labelled **T1, T2, …** at the top of the plot.
+
+---
+
+### Detector 2 — Seasonal amplitude shifts
+
+Detects points where the *strength* of the seasonal pattern changes (the seasonal oscillations become noticeably larger or smaller).
+
+```
+Input:  Seasonality component from the SSA reconstruction
+
+1. Compute the rolling RMS envelope over a window w equal to the
+   SSA window size (captures one nominal seasonal cycle):
+       envelope[t] = sqrt( mean( seasonality[t-w/2 : t+w/2]² ) )
+   This converts the oscillating seasonality signal into a smooth
+   amplitude envelope.
+
+2. Z-score normalise the envelope (same reason as for the trend).
+
+3. Fit PELT (ruptures, l2 cost model) with penalty = log(n).
+
+4. Collect interior breakpoints. These are the seasonal-amplitude-
+   shift indices.
+```
+
+**Visualisation:** vertical `···` dotted lines, labelled **S1, S2, …** at the bottom of the plot.
+
+---
+
+### Reading the plot
+
+The smoothed signal (trend + all non-noise components) is drawn as a single continuous line — it is never broken at a segment boundary. The two sets of markers are visually distinct:
+
+| Marker style | Label | Meaning |
+|---|---|---|
+| Vertical `- - -` dashed line | T1, T2, … | The trend mean shifted here |
+| Vertical `···` dotted line | S1, S2, … | The seasonal amplitude changed here |
+
+A plain-language summary is printed below the plot, for example:
+
+```
+Trend shifts (- -): 2026-11-29, 2027-02-07
+Seasonal amplitude shifts (···): 2026-10-25, 2026-11-29, 2027-02-07
+```
+
+If no changes are detected for a component the line reads `none detected`.
+
+When a trend-shift date and a seasonal-amplitude-shift date coincide, both a dashed and a dotted line will appear at the same x position, indicating a simultaneous structural regime change in both the level and the seasonal strength.
 
 ---
 

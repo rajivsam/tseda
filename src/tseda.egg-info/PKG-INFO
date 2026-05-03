@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: tseda
-Version: 1.0.0
+Version: 2.0.0
 Summary: A package for exploration of regularly sampled time series.
 License-Expression: LicenseRef-Proprietary
 Keywords: time-series,ssa,dash,analytics,decomposition
@@ -85,15 +85,51 @@ Explore the distribution and spread of values using a kernel density estimate an
 
 **Window selection and component grouping are the two hardest decisions when applying SSA.** Choosing the wrong window distorts the eigen spectrum and makes meaningful grouping impossible; grouping the wrong components together conflates trend with seasonality or buries signal in noise. `tseda` automates both steps: it selects a window from the sampling frequency and derives a grouping from the eigen spectrum using a variance-and-correlation heuristic. Expert users can override both — the window via a slider and the grouping via direct input — but the defaults are designed to produce a defensible starting point without manual tuning.
 
-On the basis of the sampling frequency, a window for SSA is determined. This is a heuristic assignment. For example:
+The app first computes an initial SSA window from the detected cadence, then validates whether the eigen spectrum has enough spread. If the smallest eigenvalue still explains too much variance, the window is doubled and SSA is recomputed until the criterion is satisfied (or the SSA half-length bound is reached).
 
-| Sampling Frequency | Window Size |
-|--------------------|-------------|
-| Hourly             | 24          |
-| Monthly            | 12          |
-| Quarterly          | 4           |
+| Cadence | Initial Window |
+|---------|----------------|
+| Hourly  | 24             |
+| Daily   | 5              |
+| Weekly  | 4              |
+| Monthly | 12             |
 
-This can be changed in the UI. Based on the eigen value distribution, observations from the ACF plot and the eigen vector plot, the seasonal components can be determined if present. Based on these initial plots, the user needs to input a set of groupings and reconstruct the series with these groupings. The reconstruction plots are shown. If there is structure in the series, then change point analysis can be done using the fact that the components are smooth. A change point plot is shown. The explained variance from signal and noise components and the assessment of the noise structure (independent or correlated) is provided.
+**Algorithm: Initial SSA Window Setup**
+
+```
+Input:  regular time series x, inferred cadence c
+Params: min_tail_spread = 0.10
+
+--- Cadence-based initialization ---
+1.  If c = hourly  -> w ← 24
+2.  If c = daily   -> w ← 5
+3.  If c = weekly  -> w ← 4
+4.  If c = monthly -> w ← 12
+5.  If cadence is unknown -> fail with "invalid window"
+
+--- Spectrum-spread refinement ---
+6.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
+7.  tail_ratio ← λ_w / Σᵢ λᵢ
+8.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
+    w ← 2w
+    Rebuild SSA(x, w)
+    tail_ratio ← λ_w / Σᵢ λᵢ
+
+--- Output ---
+9.  Return final w as the decomposition default and slider value
+```
+
+This can be changed in the UI. Based on the eigen value distribution, observations from the ACF plot and the eigen vector plot, the seasonal components can be determined if present. Based on these initial plots, the user needs to input a set of groupings and reconstruct the series with these groupings. The reconstruction plots are shown.
+
+**Change point detection** is run automatically after grouping, covering two independent analyses:
+
+- **Trend shifts** — detects permanent changes in the long-run mean level (PELT on the normalised Trend component).
+- **Seasonal amplitude shifts** — detects points where the seasonal pattern becomes noticeably stronger or weaker (PELT on the rolling-RMS envelope of the Seasonality component).
+- **Noise** — excluded from change-point analysis by design; noise has no persistent structure.
+
+The plot overlays both sets of markers on a single continuous signal line, with a plain-language date summary below. See the [User Guide — Change Point Detection](docs/user_guide.md#change-point-detection) section for the full algorithm and visualisation reference.
+
+The explained variance from signal and noise components and the assessment of the noise structure (independent or correlated) is provided.
 
 The decomposition step now also includes an automatic grouping heuristic. Components explaining at least 10% of the total SSA variance are scanned in rank order. Near-equal adjacent pairs within a 5% difference are suggested as seasonality, other components above the threshold are suggested as trend, and all remaining components are left to noise. The Durbin-Watson (DW) statistic is then computed on the noise residual; if DW falls outside [1.5, 2.5] the algorithm expands the assignment one component at a time, tracking the assignment closest to DW = 2.0, until the criterion is met or all components are consumed. If the criterion is never met the user is prompted to try a different window size. The UI renders the result as a suggested grouping table, prepopulates the Trend, Seasonality, and Noise inputs, and still lets you override before applying reconstruction. Changing the window size slider re-runs the heuristic automatically.
 
@@ -328,7 +364,7 @@ A detailed user guide is available at [`docs/user_guide.md`](docs/user_guide.md)
 - Data requirements and input format
 - Step-by-step walkthrough of all three workflow phases
 - Interpreting SSA decomposition outputs (eigenvalue profile, component groupings, Durbin-Watson test)
-- Change point detection
+- Change point detection (trend shifts and seasonal amplitude shifts — see [Change Point Detection](docs/user_guide.md#change-point-detection))
 - AIC-based model order selection
 - Exporting reports and knowledge base entries
 - Setting up the Gemini chatbot integration
