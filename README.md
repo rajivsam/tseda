@@ -49,22 +49,58 @@ This can be changed in the UI. Based on the eigen value distribution, observatio
 
 The decomposition step now also includes an automatic grouping heuristic. Components explaining at least 10% of the total SSA variance are scanned in rank order. Near-equal adjacent pairs within a 5% difference are suggested as seasonality, other components above the threshold are suggested as trend, and all remaining components are left to noise. The Durbin-Watson (DW) statistic is then computed on the noise residual; if DW falls outside [1.5, 2.5] the algorithm expands the assignment one component at a time, tracking the assignment closest to DW = 2.0, until the criterion is met or all components are consumed. If the criterion is never met the user is prompted to try a different window size. The UI renders the result as a suggested grouping table, prepopulates the Trend, Seasonality, and Noise inputs, and still lets you override before applying reconstruction. Changing the window size slider re-runs the heuristic automatically.
 
-```mermaid
-flowchart LR
-    A([SSA with window W]) --> B{Variance ≥ 10%?}
-    B -- No --> C[Noise]
-    B -- Yes --> D{Adjacent pair\n≤ 5% diff?}
-    D -- Yes --> E[Seasonality pair]
-    D -- No --> F[Trend]
-    E & F & C --> G[Compute DW on Noise]
-    G --> H{DW ∈ 1.5–2.5?}
-    H -- Yes --> I([✅ Assignment accepted])
-    H -- No --> J{Unassigned\nremain?}
-    J -- No --> K([⚠ Best assignment\n+ warn user])
-    J -- Yes --> L{Next is\na pair?}
-    L -- Yes --> M[Expand Seasonality]
-    L -- No --> N[Expand Trend]
-    M & N --> G
+**Algorithm: SSA Eigenvalue Group Assignment**
+
+```
+Input:  eigenvalues λ₁ ≥ λ₂ ≥ ... ≥ λₖ (sorted descending),
+        noise residual r
+Params: variance_threshold = 0.10, pair_tolerance = 0.05,
+        dw_low = 1.5, dw_high = 2.5
+
+--- Initial classification ---
+1.  total  ← Σᵢ λᵢ
+2.  For each i: vᵢ ← λᵢ / total           // explained variance ratio
+3.  Eligible ← { i : vᵢ ≥ variance_threshold }
+4.  Noise   ← { i : vᵢ < variance_threshold }
+5.  Trend ← ∅;  Seasonality ← ∅
+
+--- Scan eligible components in rank order ---
+6.  cursor ← 0
+7.  While cursor < |Eligible|:
+      j ← Eligible[cursor]
+      k ← Eligible[cursor + 1]  (if it exists)
+      if k = j + 1  and  |λⱼ − λₖ| / max(λⱼ, λₖ) ≤ pair_tolerance then
+          Seasonality ← Seasonality ∪ { j, k }
+          cursor ← cursor + 2
+      else
+          Trend ← Trend ∪ { j }
+          cursor ← cursor + 1
+
+--- Validate with Durbin-Watson ---
+8.  r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
+9.  dw ← DurbinWatson(r_noise)
+10. best ← current assignment;  best_dist ← |dw − 2.0|
+
+--- Iterative expansion from noise pool ---
+11. While dw ∉ [dw_low, dw_high]  and  |Noise| > 2:
+      candidate ← Noise[0]          // largest remaining noise eigenvalue
+      next      ← Noise[1]  (if it exists)
+      if next = candidate + 1  and  |λ_candidate − λ_next| / max(…) ≤ pair_tolerance then
+          Seasonality ← Seasonality ∪ { candidate, next }
+          Noise ← Noise \ { candidate, next }
+      else
+          Trend ← Trend ∪ { candidate }
+          Noise ← Noise \ { candidate }
+      r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
+      dw ← DurbinWatson(r_noise)
+      if |dw − 2.0| < best_dist then
+          best ← current assignment;  best_dist ← |dw − 2.0|
+
+--- Output ---
+12. If dw ∉ [dw_low, dw_high]:
+        Return best  with warning "DW criterion not met — try a different window size"
+13. Else:
+        Return (Trend, Seasonality, Noise)
 ```
 
 ### (c) Observation Logging

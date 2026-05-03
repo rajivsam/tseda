@@ -164,55 +164,61 @@ Plots of the leading eigenvectors. **Paired eigenvectors** (similar shape, simil
 
 #### Seasonality Heuristic
 
-The automatic grouping heuristic runs in two phases.
+The automatic grouping heuristic assigns each SSA component to Trend, Seasonality,
+or Noise using the following procedure:
 
-**Phase 1 — initial assignment**
+```
+Algorithm: SSA Eigenvalue Group Assignment
 
-- Only components explaining at least 10% of total variance are considered signal-bearing (eligible).
-- Eligible components are scanned in rank order (lowest index first).
-- If two adjacent eligible components differ by at most 5%, they are suggested as a **seasonal pair**.
-- Any other eligible component is suggested as **trend**.
-- All remaining components are assigned to **noise**.
+Input:  eigenvalues λ₁ ≥ λ₂ ≥ ... ≥ λₖ (sorted descending),
+      noise residual r
+Params: variance_threshold = 0.10, pair_tolerance = 0.05,
+      dw_low = 1.5, dw_high = 2.5
 
-**Phase 2 — Durbin-Watson refinement**
+--- Initial classification ---
+1.  total  ← Σᵢ λᵢ
+2.  For each i: vᵢ ← λᵢ / total           // explained variance ratio
+3.  Eligible ← { i : vᵢ ≥ variance_threshold }
+4.  Noise   ← { i : vᵢ < variance_threshold }
+5.  Trend ← ∅;  Seasonality ← ∅
 
-After the initial assignment the Durbin-Watson (DW) statistic is computed on the noise residual. A value in the range **1.5 – 2.5** indicates that the noise is approximately uncorrelated and the assignment is accepted. If DW is outside this range the algorithm expands the assignment one step at a time:
+--- Scan eligible components in rank order ---
+6.  cursor ← 0
+7.  While cursor < |Eligible|:
+     j ← Eligible[cursor]
+     k ← Eligible[cursor + 1]  (if it exists)
+     if k = j + 1  and  |λⱼ − λₖ| / max(λⱼ, λₖ) ≤ pair_tolerance then
+        Seasonality ← Seasonality ∪ { j, k }
+        cursor ← cursor + 2
+     else
+        Trend ← Trend ∪ { j }
+        cursor ← cursor + 1
 
-- The next unassigned component (highest remaining variance) is examined.
-- If it forms a near-equal pair with its neighbour, both are added to seasonality; otherwise the single component is added to trend.
-- DW is recomputed and compared against the target range.
-- The assignment closest to DW = 2.0 is tracked as the current best.
-- The loop continues until DW is satisfied **or** all components are assigned.
+--- Validate with Durbin-Watson ---
+8.  r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
+9.  dw ← DurbinWatson(r_noise)
+10. best ← current assignment;  best_dist ← |dw − 2.0|
 
-If no assignment satisfies the DW criterion, the best-found assignment is returned and a warning is shown asking you to try a different window size.
+--- Iterative expansion from noise pool ---
+11. While dw ∉ [dw_low, dw_high]  and  |Noise| > 2:
+     candidate ← Noise[0]          // largest remaining noise eigenvalue
+     next      ← Noise[1]  (if it exists)
+     if next = candidate + 1  and  |λ_candidate − λ_next| / max(…) ≤ pair_tolerance then
+        Seasonality ← Seasonality ∪ { candidate, next }
+        Noise ← Noise \ { candidate, next }
+     else
+        Trend ← Trend ∪ { candidate }
+        Noise ← Noise \ { candidate }
+     r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
+     dw ← DurbinWatson(r_noise)
+     if |dw − 2.0| < best_dist then
+        best ← current assignment;  best_dist ← |dw − 2.0|
 
-**Assignment flowchart**
-
-```mermaid
-flowchart TD
-    A([SSA decomposed\nwith window W]) --> B["Rank components by\nexplained variance"]
-    B --> C{"Variance ≥ 10%?"}
-    C -- No --> D[Assign to Noise]
-    C -- Yes --> E{"Adjacent component also eligible\nand difference ≤ 5%?"}
-    E -- Yes --> F["Add pair → Seasonality"]
-    E -- No --> G["Add component → Trend"]
-    F --> H{More components?}
-    G --> H
-    D --> H
-    H -- Yes --> C
-    H -- No --> I["Compute Durbin-Watson\non Noise residual"]
-    I --> J{"DW ∈ \[1.5, 2.5\]?"}
-    J -- Yes --> K(["Return assignment\n✅ dw_satisfied = True"])
-    J -- No --> L["Track best assignment\n(closest DW to 2.0)"]
-    L --> M{Unassigned\ncomponents remain?}
-    M -- No --> N(["Return best assignment\n⚠ dw_satisfied = False"])
-    N --> O([Warn: try a different\nwindow size])
-    M -- Yes --> P{"Next unassigned is\na near-equal pair?"}
-    P -- Yes --> Q[Add pair → Seasonality]
-    P -- No --> R[Add component → Trend]
-    Q --> S[Recompute Durbin-Watson]
-    R --> S
-    S --> J
+--- Output ---
+12. If dw ∉ [dw_low, dw_high]:
+      Return best  with warning "DW criterion not met — try a different window size"
+13. Else:
+      Return (Trend, Seasonality, Noise)
 ```
 
 #### Weighted Correlation Matrix
