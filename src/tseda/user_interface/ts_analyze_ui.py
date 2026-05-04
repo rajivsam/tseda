@@ -331,7 +331,8 @@ def update_ssa_plots(
                     html.Strong("Dataset not suitable for SSA decomposition. "),
                     f"The top {k} eigenvectors explain only {top_k_ratio:.1%} of total variance "
                     f"(minimum required: {min_ev:.0%}). The eigenspectrum is too diffuse — "
-                    "consider a noise-based modelling approach (e.g., ARIMA/SARIMA).",
+                    "this application is SSA-focused. Please try an external stochastic approach "
+                    "such as random walk/Brownian-motion-style models or ARIMA/SARIMA.",
                 ],
                 color="danger",
                 className="mb-0",

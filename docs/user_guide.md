@@ -36,6 +36,8 @@ Version 0.1.7 &nbsp;|&nbsp; April 2026
 2. **SSA decomposition** — apply Singular Spectrum Analysis (SSA) to separate the series into trend, seasonal, and noise components.
 3. **Observation logging** — review auto-generated narrative summaries, annotate your findings, and export results.
 
+> **Configuration callout:** all thresholds, constants, and heuristics used by the app are configurable in [src/tseda/config/tseda_config.yaml](../src/tseda/config/tseda_config.yaml).
+
 ---
 
 ## Installation
@@ -217,7 +219,7 @@ Params: top_k = 5, min_explained_variance = 0.40
 4.  If top_k_ratio < min_explained_variance:
         → Block Apply Grouping
         → Show: "Top k eigenvectors explain X.X% — minimum required Y%"
-        → Recommend: noise-based modelling (ARIMA / SARIMA)
+  → Recommend: external stochastic modelling (outside this SSA app)
 5.  Else:
         → Allow grouping to proceed
 ```
@@ -227,7 +229,7 @@ The alert reports the **actual ratio** alongside the threshold so you can judge 
 **What to do if the check fails:**
 - Try a larger SSA window using the slider. Sometimes a cadence-based default window is too small to reveal seasonal structure.
 - Inspect the eigenvalue profile plot — if the bars form a steep drop-off rather than a flat line, the series may still be worth exploring at a different scale.
-- If the spectrum remains flat at all window sizes, the series is most likely noise-dominated. Consider ARIMA/SARIMA modelling instead of SSA decomposition.
+- If the spectrum remains flat at all window sizes, the series is most likely noise-dominated. Since this tool is SSA-focused, switch to an external stochastic approach (for example random walk/Brownian-motion-style models or ARIMA/SARIMA).
 
 #### Seasonality Heuristic
 
@@ -314,6 +316,8 @@ Applied to the noise component to assess residual independence:
 - **Value ≈ 2**: residuals are uncorrelated (good).
 - **Value < 1.5**: positive autocorrelation remains (consider adding more components to the structured groups).
 - **Value > 2.5**: negative autocorrelation.
+
+**Export gating behavior:** The **Export Components** button is enabled only when Durbin-Watson is within the configured valid range (`noise_validation.dw_low` to `noise_validation.dw_high`, default `[1.5, 2.5]`). When enabled, clicking export downloads a CSV containing timestamp, Trend, Seasonality, and Noise.
 
 ---
 

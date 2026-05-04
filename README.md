@@ -79,7 +79,7 @@ This can be changed in the UI. Based on the eigen value distribution, observatio
 
 Before the grouping UI is enabled, `tseda` checks whether the series is structurally suited to SSA decomposition. The check is grounded in a fundamental property of SSA: **meaningful decomposition requires that variance be concentrated in a small number of leading eigenvectors**. When a time series contains real structure — a trend, a seasonal pattern, or both — those components manifest as dominant eigenvectors that together account for a large share of total variance. The remaining eigenvectors represent noise and should contribute comparatively little.
 
-A flat eigenspectrum, where variance is spread roughly equally across many eigenvectors, is the signature of white noise. Applying SSA to such a series produces a decomposition that is mathematically valid but practically meaningless: the algorithm will assign components to Trend and Seasonality groups that are indistinguishable from random fluctuations, and the Durbin-Watson test on the residual will rarely produce a clean pass. The right approach for such a series is a noise-based model (ARIMA, SARIMA, or a simple exponential smoother), not spectral decomposition.
+A flat eigenspectrum, where variance is spread roughly equally across many eigenvectors, is the signature of white noise. Applying SSA to such a series produces a decomposition that is mathematically valid but practically meaningless: the algorithm will assign components to Trend and Seasonality groups that are indistinguishable from random fluctuations, and the Durbin-Watson test on the residual will rarely produce a clean pass. Since `tseda` is SSA-focused, unsuitable datasets should be analyzed with external stochastic approaches (for example random walk/Brownian-motion-style models or ARIMA/SARIMA), not with SSA decomposition in this app.
 
 The suitability check is:
 
@@ -91,7 +91,7 @@ Params: top_k = 5, min_explained_variance = 0.40
 3.  If top_k_ratio < min_explained_variance:
         Block Apply Grouping
         Display: "Top k eigenvectors explain X% — minimum required Y%"
-        Suggest: noise-based modelling approach
+    Suggest: try external stochastic modelling approaches
 4.  Else:
         Proceed with grouping
 ```
@@ -109,6 +109,10 @@ The plot overlays both sets of markers on a single continuous signal line, with 
 The explained variance from signal and noise components and the assessment of the noise structure (independent or correlated) is provided.
 
 The decomposition step now also includes an automatic grouping heuristic. Components explaining at least 10% of the total SSA variance are scanned in rank order. Near-equal adjacent pairs within a 5% difference are suggested as seasonality, other components above the threshold are suggested as trend, and all remaining components are left to noise. The Durbin-Watson (DW) statistic is then computed on the noise residual; if DW falls outside [1.5, 2.5] the algorithm expands the assignment one component at a time, tracking the assignment closest to DW = 2.0, until the criterion is met or all components are consumed. If the criterion is never met the user is prompted to try a different window size. The UI renders the result as a suggested grouping table, prepopulates the Trend, Seasonality, and Noise inputs, and still lets you override before applying reconstruction. Changing the window size slider re-runs the heuristic automatically.
+
+The **Export Components** action in the decomposition panel is DW-gated: it is enabled only when the current reconstruction has DW in the configured valid range. When enabled, export downloads a CSV with timestamp, Trend, Seasonality, and Noise.
+
+> **Configuration callout:** all constants and heuristics shown here (window mapping, suitability thresholds, grouping tolerances, DW bounds, change-point penalty, etc.) are configurable via [src/tseda/config/tseda_config.yaml](src/tseda/config/tseda_config.yaml).
 
 **Algorithm: SSA Eigenvalue Group Assignment**
 
@@ -266,14 +270,14 @@ TSEDA_HOST=0.0.0.0 TSEDA_PORT=8050 TSEDA_DEBUG=false tseda
 - Your file must be a **CSV or Excel** file with at least two columns: a **timestamp** column (first) and a **numeric value** column (second).
 - The data must be **regularly sampled at hourly or lower frequency** (e.g., hourly, daily, monthly).
 - The dataset must contain **no missing values** (NA / NaN). Clean your data before uploading.
-- Files are limited to **2,000 rows** (configurable via `MAX_FILE_LINES` in `ts_analyze_ui.py`).
+- Files are limited to **2,000 rows** (configurable via `file_upload.max_file_lines` in `src/tseda/config/tseda_config.yaml`).
 
 ### 4. Explore In Three Steps
 
 | Step | Panel | What to do |
 |------|-------|------------|
 | 1 | **Initial Assessment of Time Series** | Review distribution plots (KDE, box plot) and the ACF / PACF for autocorrelation patterns. |
-| 2 | **Time Series Decomposition** | Review the suggested grouping table, adjust the prepopulated Trend, Seasonality, and Noise inputs if needed, then click **Apply Grouping**. |
+| 2 | **Time Series Decomposition** | Review the suggested grouping table, adjust the prepopulated Trend, Seasonality, and Noise inputs if needed, then click **Apply Grouping**. When Durbin-Watson is in range [1.5, 2.5], the **Export Components** button is enabled to download Trend/Seasonality/Noise as CSV. |
 | 3 | **Observation Logging** | Review the AIC rank diagnostics, read the auto-generated summary, and add your own observations before saving the report. |
 
 ## Development Install (From Source)
