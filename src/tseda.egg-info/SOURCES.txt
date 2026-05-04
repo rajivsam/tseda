@@ -10,6 +10,7 @@ src/tseda.egg-info/entry_points.txt
 src/tseda.egg-info/requires.txt
 src/tseda.egg-info/top_level.txt
 src/tseda/change_point/change_point_estimator.py
+src/tseda/config/config_loader.py
 src/tseda/config/prompts_config.csv
 src/tseda/data_writers/kmds_writer.py
 src/tseda/dataloader/coffee_prices_data_loader.py
@@ -27,7 +28,6 @@ src/tseda/series_stats/sampling_prop.py
 src/tseda/series_stats/summary_statistics.py
 src/tseda/user_interface/analysis.py
 src/tseda/user_interface/callback_services.py
-src/tseda/user_interface/gemini_chat.py
 src/tseda/user_interface/initial_assessment.py
 src/tseda/user_interface/initial_assessment_layout.py
 src/tseda/user_interface/kmds_capture.py

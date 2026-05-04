@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: tseda
-Version: 2.0.0
+Version: 2.1.0
 Summary: A package for exploration of regularly sampled time series.
 License-Expression: LicenseRef-Proprietary
 Keywords: time-series,ssa,dash,analytics,decomposition
@@ -367,7 +367,7 @@ A detailed user guide is available at [`docs/user_guide.md`](docs/user_guide.md)
 - Change point detection (trend shifts and seasonal amplitude shifts — see [Change Point Detection](docs/user_guide.md#change-point-detection))
 - AIC-based model order selection
 - Exporting reports and knowledge base entries
-- Setting up the Gemini chatbot integration
+- Configuration guide
 
 ## Contributing & Feature Requests
 
