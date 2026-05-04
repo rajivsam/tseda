@@ -13,10 +13,13 @@ src/tseda/change_point/change_point_estimator.py
 src/tseda/config/config_loader.py
 src/tseda/data_writers/kmds_writer.py
 src/tseda/dataloader/coffee_prices_data_loader.py
+src/tseda/dataloader/hyndman_examples_data_loader.py
 src/tseda/dataloader/kaggle_data_loader.py
 src/tseda/dataloader/kmds_data_loader.py
 src/tseda/dataloader/local_dataloader.py
 src/tseda/dataloader/synthetic_series_data_loader.py
+src/tseda/dataloader/ticket_resolution_data_loader.py
+src/tseda/dataloader/uci_air_quality_data_loader.py
 src/tseda/dataloader/white_noise_data_loader.py
 src/tseda/decomposition/automatic_grouping_heuristic.py
 src/tseda/decomposition/ssa_decomposition.py

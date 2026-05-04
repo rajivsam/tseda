@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: tseda
-Version: 2.5.0
+Version: 2.6.0
 Summary: A package for exploration of regularly sampled time series.
 License-Expression: LicenseRef-Proprietary
 Keywords: time-series,ssa,dash,analytics,decomposition
