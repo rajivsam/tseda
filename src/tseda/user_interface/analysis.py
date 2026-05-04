@@ -158,6 +158,7 @@ def build_main_layout(assessment_layout: html.Div, decomposition_layout: html.Di
     return dbc.Container([
         dcc.Store(id="step-tracker", data=1),
         dcc.Store(id="analysis-complete-store", data=False),
+        dcc.Store(id="dw-valid-store", data=False),
         dcc.Store(id="uploaded-file-store", storage_type="memory", data=None),
         dcc.Store(id="kb-save-dir-store", storage_type="memory", data=None),
         dcc.Store(id="kb-save-filename-store", storage_type="memory", data=None),

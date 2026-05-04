@@ -36,6 +36,7 @@ from tseda.user_interface.callback_services import (
 )
 from tseda.decomposition.ssa_decomposition import SSADecomposition
 from tseda.decomposition.ssa_result_summary import SSAResultSummary
+from tseda.config.config_loader import ConfigurationManager
 from kmds.ontology.kmds_ontology import *
 from kmds.tagging.tag_types import ExploratoryTags
 from kmds.ontology.intent_types import IntentType
@@ -43,8 +44,15 @@ from kmds.ontology.intent_types import IntentType
 # Use a non-interactive backend since figures are rendered to buffers in callbacks.
 matplotlib.use('Agg')
 
-# Configuration
-MAX_FILE_LINES = 2000  # Configurable maximum number of lines in uploaded files
+# Load configuration at startup
+try:
+    ConfigurationManager.load_config()
+except Exception as e:
+    print(f"Warning: Failed to load configuration: {e}")
+    print("Using default values as fallback.")
+
+# Configuration - loaded from config file, with fallback defaults
+MAX_FILE_LINES = ConfigurationManager.get("file_upload.max_file_lines", 2000)
 
 series: pd.Series | None = None
 window_size: int = 0
@@ -278,16 +286,18 @@ def update_ssa_plots(
             window_size = selected_window_size
 
         # Refinement: if this is an initial (non-slider) window assignment and the
-        # smallest eigenvalue still accounts for >= 10 % of total variance, the
+        # smallest eigenvalue still accounts for >= min_tail_spread of total variance, the
         # spectrum is too flat — double the window and recompute until the invariant
         # holds or the window would exceed half the series length.
+        min_tail_spread = ConfigurationManager.get("window_refinement.min_tail_spread", 0.10)
+        
         if trigger_id != 'ssa-window-slider':
             _eigs = np.asarray(getattr(ssa_obj, "_eigenvalues", []), dtype=float)
             _total = float(np.sum(_eigs))
             while (
                 _eigs.size > 0
                 and _total > 0.0
-                and float(_eigs[-1]) / _total >= 0.10
+                and float(_eigs[-1]) / _total >= min_tail_spread
                 and selected_window_size * 2 <= len(series) // 2
             ):
                 selected_window_size *= 2
@@ -362,15 +372,15 @@ def validate_components(
     slider_window_size: int | None,
     refined_window: int | None,
     loess_fraction: float | None,
-) -> tuple[Any, go.Figure, go.Figure, str, Any, go.Figure, bool]:
-    """Validate component inputs."""
+) -> tuple[Any, go.Figure, go.Figure, str, Any, go.Figure, bool, bool]:
+    """Validate component inputs and return DW validity status."""
     global series, window_size, ssa_obj
 
     empty_fig = empty_figure("No reconstruction available")
     empty_metadata = "Reconstruction metadata will appear here after applying grouping."
 
     if uploaded_file is None and series is None:
-        return "", empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+        return "", empty_fig, empty_fig, "", empty_metadata, empty_fig, False, False
 
     if series is None and uploaded_file and uploaded_file.get('contents') and uploaded_file.get('filename'):
         try:
@@ -379,7 +389,7 @@ def validate_components(
             pass
 
     if series is None:
-        return dbc.Alert("No data loaded. Please upload a file first.", color="warning"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+        return dbc.Alert("No data loaded. Please upload a file first.", color="warning"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False, False
 
     if window_size <= 0:
         # Prefer the slider value (set by user or defaulted from SamplingProp); fall back to SamplingProp.
@@ -393,7 +403,7 @@ def validate_components(
                     raise ValueError("invalid-window")
                 window_size = int(freq_window)
             except Exception:
-                return dbc.Alert("No data loaded. Please upload a file first.", color="warning"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+                return dbc.Alert("No data loaded. Please upload a file first.", color="warning"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False, False
 
     selected_window_size = int(slider_window_size) if slider_window_size is not None and int(slider_window_size) > 0 else window_size
     refined_default = int(refined_window) if refined_window is not None and int(refined_window) > 0 else 0
@@ -434,17 +444,23 @@ def validate_components(
             else:
                 status_alert = dbc.Alert("Components applied successfully!", color="success")
 
-            return status_alert, signal_fig, change_point_fig, wcorr_src, metadata, noise_kde_fig, True
+            # Check if DW is in valid range
+            dw = getattr(ssa_obj, "_durbin_watson", None)
+            dw_low = ConfigurationManager.get("noise_validation.dw_low", 1.5)
+            dw_high = ConfigurationManager.get("noise_validation.dw_high", 2.5)
+            dw_valid = dw is not None and dw_low <= dw <= dw_high
 
-        return dbc.Alert("No valid component groups were provided.", color="warning"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+            return status_alert, signal_fig, change_point_fig, wcorr_src, metadata, noise_kde_fig, True, dw_valid
+
+        return dbc.Alert("No valid component groups were provided.", color="warning"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False, False
 
     except ValueError as e:
         err_msg = str(e)
         if err_msg.startswith("Error: Overlapping components detected"):
-            return dbc.Alert(err_msg, color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
-        return dbc.Alert(f"Validation error: {err_msg}", color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+            return dbc.Alert(err_msg, color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False, False
+        return dbc.Alert(f"Validation error: {err_msg}", color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False, False
     except Exception as e:
-        return dbc.Alert(f"Error: {str(e)}", color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False
+        return dbc.Alert(f"Error: {str(e)}", color="danger"), empty_fig, empty_fig, "", empty_metadata, empty_fig, False, False
 
 
 def update_verification_plot(
@@ -774,7 +790,8 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          Output('wcorr-plot', 'src'),
          Output('reconstruction-metadata', 'children'),
          Output('noise-kde-plot', 'figure'),
-         Output('analysis-complete-store', 'data')],
+         Output('analysis-complete-store', 'data'),
+         Output('dw-valid-store', 'data')],
         [Input('apply-grouping-trigger', 'data'),
          Input('uploaded-file-store', 'data')],
         [State('component-name-1', 'value'), State('component-list-1', 'value'),
@@ -847,6 +864,54 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          State('save-filename-input', 'value')],
         prevent_initial_call=True,
     )(save_kmds_knowledge_base)
+
+    dash_app.callback(
+        Output('export-components-btn', 'disabled'),
+        Input('dw-valid-store', 'data'),
+        prevent_initial_call=True,
+    )(lambda dw_valid: not dw_valid)
+
+    dash_app.callback(
+        Output('download-components-csv', 'data'),
+        Input('export-components-btn', 'n_clicks'),
+        prevent_initial_call=True,
+    )(export_components_to_csv)
+
+
+def export_components_to_csv(n_clicks: int) -> dict:
+    """Export the decomposed components (Trend, Seasonality, Noise) to CSV.
+    
+    Returns:
+        Dictionary with base64-encoded CSV data for download.
+    """
+    global ssa_obj, series
+    
+    if ssa_obj is None or series is None or not hasattr(ssa_obj, "_group_signals"):
+        return None
+    
+    try:
+        # Prepare data for export
+        data_dict = {"timestamp": series.index}
+        
+        # Add reconstructed components
+        for group_name, signal in ssa_obj._group_signals.items():
+            # Capitalize group name for display
+            display_name = group_name.capitalize()
+            data_dict[display_name] = signal.values
+        
+        # Create DataFrame
+        df = pd.DataFrame(data_dict)
+        
+        # Convert to CSV string
+        csv_string = df.to_csv(index=False)
+        
+        return dict(
+            content=csv_string,
+            filename="ssa_components.csv"
+        )
+    except Exception as e:
+        print(f"Error exporting components: {str(e)}", flush=True)
+        return None
 
 
 def create_app() -> dash.Dash:

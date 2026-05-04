@@ -2,6 +2,7 @@
 
 from dash import dcc, html
 import dash_bootstrap_components as dbc
+from tseda.config.config_loader import ConfigurationManager
 
 
 def analysis_layout() -> html.Div:
@@ -14,6 +15,13 @@ def analysis_layout() -> html.Div:
     Returns:
         Dash ``html.Div`` containing the complete decomposition panel.
     """
+    # Load LOESS configuration
+    loess_config = ConfigurationManager.get_section("loess")
+    loess_min = loess_config.get("min_fraction", 0.05)
+    loess_max = loess_config.get("max_fraction", 0.5)
+    loess_step = loess_config.get("step", 0.05)
+    loess_default = loess_config.get("default_fraction", 0.05)
+    
     return html.Div([
         html.H3("Time Series Decomposition"),
         dbc.Container([
@@ -65,7 +73,17 @@ def analysis_layout() -> html.Div:
                                 ]),
                             ], borderless=True, style={'width': '100%'}),
                             html.Div(id='component-validation-error', className='text-danger mt-2'),
-                            dbc.Button("Apply Grouping", id='apply-components-btn', color='primary', className='mt-3'),
+                            dbc.Row([
+                                dbc.Col(
+                                    dbc.Button("Apply Grouping", id='apply-components-btn', color='primary', className='w-100'),
+                                    width=6
+                                ),
+                                dbc.Col(
+                                    dbc.Button("Export Components", id='export-components-btn', color='success', className='w-100', disabled=True),
+                                    width=6
+                                ),
+                            ], className='mt-3 g-2'),
+                            dcc.Download(id='download-components-csv'),
                             html.Div(id='noisy-series-message', className='mt-2'),
                             html.Hr(),
                             dbc.Label("SSA Window Size", html_for='ssa-window-slider', className='mt-2'),
@@ -107,17 +125,16 @@ def analysis_layout() -> html.Div:
                             dbc.Label("LOESS Fraction", html_for='loess-fraction-slider', className='mt-1'),
                             dcc.Slider(
                                 id='loess-fraction-slider',
-                                min=0.05,
-                                max=0.5,
-                                step=0.05,
-                                value=0.05,
+                                min=loess_min,
+                                max=loess_max,
+                                step=loess_step,
+                                value=loess_default,
                                 marks={
-                                    0.05: '0.05',
-                                    0.1: '0.1',
-                                    0.2: '0.2',
-                                    0.3: '0.3',
-                                    0.4: '0.4',
-                                    0.5: '0.5',
+                                    loess_min: f'{loess_min:.2f}',
+                                    loess_min + (loess_max - loess_min) * 0.25: f'{loess_min + (loess_max - loess_min) * 0.25:.2f}',
+                                    loess_min + (loess_max - loess_min) * 0.5: f'{loess_min + (loess_max - loess_min) * 0.5:.2f}',
+                                    loess_min + (loess_max - loess_min) * 0.75: f'{loess_min + (loess_max - loess_min) * 0.75:.2f}',
+                                    loess_max: f'{loess_max:.2f}',
                                 },
                                 tooltip={"placement": "bottom", "always_visible": False}
                             ),

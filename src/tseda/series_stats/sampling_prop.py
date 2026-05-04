@@ -3,6 +3,7 @@
 from typing import Any
 import re
 import pandas as pd
+from tseda.config.config_loader import ConfigurationManager
 
 
 class SamplingProp:
@@ -156,13 +157,18 @@ class SamplingProp:
         # This handles variants like '2W-SUN' -> 'W' or 'ME' -> 'ME'
         base = re.sub(r"\d+", "", freq_str).split("-")[0]
 
-        # 3. Define the requested mapping
+        # 3. Load mapping from configuration
+        window_config = ConfigurationManager.get_section("window_selection")
         mapping = {
-            "h": 24, "H": 24,  # Hourly
-            "D": 5, "d": 5,  # Daily
-            "W": 4, "w": 4,  # Weekly
-            "M": 12, "ME": 12,  # Monthly (end)
-            "MS": 12,  # Monthly (start)
+            "h": window_config.get("hourly", 24),
+            "H": window_config.get("hourly", 24),
+            "D": window_config.get("daily", 5),
+            "d": window_config.get("daily", 5),
+            "W": window_config.get("weekly", 4),
+            "w": window_config.get("weekly", 4),
+            "M": window_config.get("monthly", 12),
+            "ME": window_config.get("monthly", 12),
+            "MS": window_config.get("monthly", 12),
         }
 
         return mapping.get(base)

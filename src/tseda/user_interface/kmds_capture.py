@@ -13,24 +13,8 @@ import os
 from tseda.dataloader.kmds_data_loader import KMDSDataLoader
 from tseda.data_writers.kmds_writer import KMDSDataWriter
 
-from dataclasses import dataclass
 from kmds.utils.load_utils import *
 import pandas as pd
-from google import genai
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
-@dataclass
-class TemplateData:
-    start_of_series: str
-    end_of_series: str
-    num_samples: str
-    num_change_points: str
-    change_point_model: str
-    segment_summary: str
-
 
 
 class KMDS_Capture_Mode(Enum):
@@ -98,8 +82,6 @@ def init_kmds_capture() -> None:
 
     if "current_kmds_step" not in st.session_state:
         st.session_state.current_kmds_step = KMDS_Capture_Mode.GET_CAPTURE_MODE.value
-    if "use_template" not in st.session_state:
-        st.session_state.use_template = False
     
     return
 
@@ -360,11 +342,7 @@ def do_update_existing_kb()->None:
 
             st.button("Add to KB", on_click=click_add_to_kb_btn,\
                 args=(user_input,), disabled= not st.session_state.get("no_addl_facts_added", False))
-        with col3:
-            st.button("Use a Template", disabled=not "kb_file_path" in st.session_state, on_click=click_use_template_btn)
-        
-        if st.session_state.get("use_template", False):
-            show_template_form()
+
         
 
             
@@ -373,73 +351,7 @@ def do_update_existing_kb()->None:
     return
 
 
-def click_use_template_btn():
-    st.session_state.use_template = True
 
-def click_cancel_template_btn():
-    st.session_state.use_template = False
-
-
-
-def show_template_form():
-    with st.container():
-        st.text_input("Start of Series", key="start_of_series")
-        st.text_input("End of Series", key="end_of_series")
-        st.text_input("Number of Samples", key="num_samples")
-        st.text_input("Number of Change Points", key="num_change_points")
-        st.text_input("Model Used for Change Point Detection", key="change_point_model")
-        st.text_area("Segment Summary", help="Summarize the results of singular spectrum analysis", key="segment_summary")
-
-        def handle_template_submission():
-            template_data = TemplateData(
-                start_of_series=st.session_state.start_of_series,
-                end_of_series=st.session_state.end_of_series,
-                num_samples=st.session_state.num_samples,
-                num_change_points=st.session_state.num_change_points,
-                change_point_model=st.session_state.change_point_model,
-                segment_summary=st.session_state.segment_summary,
-            )
-            
-            # The processing logic
-            prompt = f"""
-            Based on the following information, provide a concise summary for an exploratory observation:
-            - Start of Series: {template_data.start_of_series}
-            - End of Series: {template_data.end_of_series}
-            - Number of Samples: {template_data.num_samples}
-            - Number of Change Points: {template_data.num_change_points}
-            - Change Point Model: {template_data.change_point_model}
-            - Segment Summary: {template_data.segment_summary}
-            """
-            
-            # Call Gemini
-            API_KEY = os.getenv("GEMINI_API_KEY")
-            client = genai.Client(api_key=API_KEY)
-
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-            )
-            summary = response.text
-            client.close()
-            
-            # Add to KB
-            file_path = st.session_state.get("kb_file_path")
-            if file_path:
-                kmds_writer = KMDSDataWriter(file_path)
-                kmds_writer.add_exploratory_obs(summary, file_path)
-                
-                # Reload data to show update
-                kmds_data_loader = KMDSDataLoader(file_path)
-                exp_df = kmds_data_loader.load_exploratory_obs()
-                st.session_state.exp_df = exp_df
-
-            st.session_state.use_template = False
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.button("Submit", on_click=handle_template_submission)
-        with col2:
-            st.button("Cancel", on_click=click_cancel_template_btn)
 
 
 

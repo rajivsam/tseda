@@ -22,7 +22,7 @@ Version 0.1.7 &nbsp;|&nbsp; April 2026
    - [Step 1 — Initial Assessment](#step-1--initial-assessment)
    - [Step 2 — SSA Decomposition](#step-2--ssa-decomposition)
    - [Step 3 — Observation Logging & Export](#step-3--observation-logging--export)
-6. [Gemini Chatbot](#gemini-chatbot)
+6. [Configuration](#configuration)
 7. [Knowledge Base Export](#knowledge-base-export)
 8. [Limitations](#limitations)
 
@@ -416,21 +416,161 @@ are reset when you click **Clear Uploaded File** in Step 1.
 
 ---
 
-## Gemini Chatbot
+## Configuration
 
-A supplementary Streamlit-based chatbot powered by **Google Gemini 2.5 Flash** is available for in-analysis research and Q&A.
+`tseda` uses an externalized configuration file to manage thresholds, parameters, and limits across the application. This allows you to customize algorithm behavior without modifying code.
 
-### Setup
+### Configuration File Location
 
-Create a `.env` file in the project root containing your API key:
+The configuration file is stored at: `src/tseda/config/tseda_config.yaml`
 
+When the application starts, it automatically loads this configuration into memory. You can modify any settings in this file to customize the application behavior.
+
+### Configuration Sections
+
+#### 1. File Upload Limits
+
+```yaml
+file_upload:
+  max_file_lines: 2000  # Maximum rows allowed in uploaded CSV/Excel files
 ```
-GEMINI_API_KEY=your_key_here
+
+**Default:** `2000` rows
+**Suggested range:** 1,000 – 5,000
+**Purpose:** Prevents memory exhaustion from very large files and maintains UI responsiveness.
+
+#### 2. Window Selection (Cadence-to-Window Mapping)
+
+```yaml
+window_selection:
+  hourly: 24    # One diurnal cycle
+  daily: 5      # One business week
+  weekly: 4     # Approximately one month
+  monthly: 12   # One full annual cycle
 ```
 
-### Usage
+**Default values:** As listed above
+**Purpose:** Provides initial SSA window sizes based on detected sampling frequency. Values represent one expected seasonal cycle at each cadence.
 
-The chatbot can be used to ask questions about your findings, look up domain knowledge, or explore interpretations of the decomposition results. It runs as a separate interface from the main Dash app.
+#### 3. SSA Eigenvalue Grouping Heuristic
+
+```yaml
+grouping_heuristic:
+  variance_threshold: 0.10           # Minimum explained variance ratio to classify as "eligible"
+  pair_similarity_tolerance: 0.05    # Maximum allowed difference (as fraction) for paired eigenvalues
+```
+
+**Variance threshold:**
+  - **Default:** `0.10` (10%)
+  - **Range:** `0.05` – `0.20`
+  - **Purpose:** Components explaining less than this fraction of total variance are classified as noise.
+
+**Pair similarity tolerance:**
+  - **Default:** `0.05` (5%)
+  - **Range:** `0.02` – `0.10`
+  - **Purpose:** When two adjacent eigenvalues differ by ≤ this fraction, they are paired and assigned to seasonality.
+
+#### 4. Durbin-Watson Noise Quality Check
+
+```yaml
+noise_validation:
+  dw_low: 1.5    # Minimum acceptable Durbin-Watson statistic
+  dw_high: 2.5   # Maximum acceptable Durbin-Watson statistic
+```
+
+**Default range:** `[1.5, 2.5]`
+**Suggested range:** `[1.4, 2.6]`
+**Purpose:** The Durbin-Watson (DW) statistic measures autocorrelation in the noise residual. A value near 2.0 indicates uncorrelated noise; values outside this range suggest residual autocorrelation that should be addressed by adjusting component grouping.
+
+#### 5. Window Refinement
+
+```yaml
+window_refinement:
+  min_tail_spread: 0.10    # Minimum acceptable smallest eigenvalue (as fraction of total variance)
+```
+
+**Default:** `0.10` (10%)
+**Suggested range:** `0.05` – `0.15`
+**Purpose:** After initial window selection, the algorithm checks if the smallest eigenvalue explains too much variance. If it does, the window is doubled and SSA is recomputed until this invariant is satisfied or the half-length bound is reached. This ensures the eigenvalue spectrum has meaningful spread.
+
+#### 6. SSA Seasonality Heuristic
+
+```yaml
+seasonality_heuristic:
+  leading_eigenvalues_to_check: 6    # Number of top eigenvalues inspected for paired structure
+```
+
+**Default:** `6`
+**Suggested range:** `4` – `12`
+**Purpose:** When deciding whether to flag the series as seasonal, the algorithm examines the top N eigenvalues for paired (near-equal) structure. Higher values inspect more components.
+
+#### 7. FFT / Periodicity Analysis
+
+```yaml
+periodicity:
+  fmin: 0.1          # Minimum search frequency (cycles per sample)
+  fmax: 2.0          # Maximum search frequency (cycles per sample)
+  num_frequencies: 1000  # Number of discrete frequency points to evaluate
+```
+
+**fmin / fmax:**
+  - **Default:** `0.1` – `2.0`
+  - **Purpose:** Defines the frequency range for Lomb-Scargle periodogram analysis.
+
+**num_frequencies:**
+  - **Default:** `1000`
+  - **Suggested range:** `500` – `2000`
+  - **Purpose:** Higher values give finer frequency resolution but increase computation cost.
+
+#### 8. LOESS Smoothing
+
+```yaml
+loess:
+  min_fraction: 0.05     # Minimum smoothing fraction (data points to use per local regression)
+  max_fraction: 0.5      # Maximum smoothing fraction
+  default_fraction: 0.05 # Default value shown in the UI slider
+  step: 0.05             # Slider increment
+```
+
+**Default values:** As listed above
+**Purpose:** The LOESS smoother uses a sliding-window local regression. The fraction parameter controls the width of each window; lower values produce noisier but more detailed curves, while higher values produce smoother curves that may hide detail.
+
+#### 9. Change Point Detection
+
+```yaml
+change_point_detection:
+  model: "rbf"   # Cost model for PELT algorithm ("rbf", "l2", "linear")
+  penalty_multiplier: 2.0  # Multiplier for BIC-style penalty = penalty_multiplier * log(n)
+```
+
+**Model:**
+  - **Default:** `"rbf"`
+  - **Options:** `"rbf"`, `"l2"`, `"linear"`
+  - **Purpose:** Defines the cost function used by the PELT algorithm. "rbf" (radial basis function) is robust and recommended for most time series.
+
+**Penalty multiplier:**
+  - **Default:** `2.0` (yields BIC penalty = 2 * log(n))
+  - **Suggested range:** `1.5` – `2.5`
+  - **Purpose:** Higher values discourage finding many small segments (conservative), while lower values permit more breakpoints (liberal).
+
+### Modifying Configuration
+
+1. Open `src/tseda/config/tseda_config.yaml` in a text editor.
+2. Modify any values in the appropriate section.
+3. Save the file.
+4. Restart the `tseda` application. Configuration is loaded at startup.
+
+### Example: Adjusting the Durbin-Watson Range
+
+If you find that the automatic component grouping rarely satisfies the DW criterion on your datasets, try relaxing the bounds:
+
+```yaml
+noise_validation:
+  dw_low: 1.4   # Relaxed from 1.5
+  dw_high: 2.6  # Relaxed from 2.5
+```
+
+This will allow groupings with slightly more residual autocorrelation to be accepted.
 
 ---
 
@@ -455,4 +595,3 @@ The chatbot can be used to ask questions about your findings, look up domain kno
 | Input format | CSV or Excel with timestamp + numeric value columns only |
 | Frequency range | Hourly cadence or lower (sub-hourly not supported) |
 | Missing values | Not supported |
-| Gemini chatbot | Requires a valid `GEMINI_API_KEY` environment variable |

@@ -25,7 +25,6 @@ Unlock the potential of your data.
 | 📊 **Change Point Detection** | Automatically segment your time series into statistically distinct regimes. |
 | 🧩 **Time Series Decomposition** | Use Singular Spectrum Analysis (SSA) to break down each segment into trend, seasonality, and noise. |
 | 🧠 **Knowledge Integration** | Capture findings in a `kmds` knowledge base for collaborative, incremental analysis. |
-| 🤖 **LLM-Powered Summarization**| Generate concise, human-readable summaries of your data's characteristics. |
 
 ---
 
@@ -42,7 +41,7 @@ Unlock the potential of your data.
 **⬇**
 
 ### **3. SUMMARIZE & CAPTURE**
-> **LLMs** help create clear descriptions of the findings, which are then stored in your `kmds` knowledge base.
+> Create clear descriptions of the findings, which are then stored in your `kmds` knowledge base.
 
 ---
 
@@ -51,23 +50,17 @@ Unlock the potential of your data.
 `tseda` + `kmds` = A powerful, shared understanding of your data.
 
 - **Incremental Knowledge:** Build your knowledge base as you learn.
-- **LLM Research:** Chat with an LLM to explore your findings further.
 - **RAG-Ready:** Export data to power Retrieval Augmented Generation apps.
-- **Auto-Summaries:** Use templates to log data characteristics automatically.
 
 ---
 
-## **Getting Started in 4 Steps**
+## **Getting Started in 3 Steps**
 
 1.  **Setup KB Repo**
     ```bash
     # kmds uses git. Create or clone a repo for your knowledge base.
     ```
-2.  **Add API Key**
-    - Create a `.env` file.
-    - Add: `GEMINI_API_KEY="YOUR_API_KEY"`
-
-3.  **Install**
+2.  **Install**
     ```bash
     pip install -r requirements.txt
     ```

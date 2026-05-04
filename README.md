@@ -319,7 +319,7 @@ A detailed user guide is available at [`docs/user_guide.md`](docs/user_guide.md)
 - Change point detection (trend shifts and seasonal amplitude shifts — see [Change Point Detection](docs/user_guide.md#change-point-detection))
 - AIC-based model order selection
 - Exporting reports and knowledge base entries
-- Setting up the Gemini chatbot integration
+- Configuration guide
 
 ## Contributing & Feature Requests
 

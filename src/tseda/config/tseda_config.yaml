@@ -1,0 +1,171 @@
+# ============================================================================
+# TSEDA Configuration File
+# ============================================================================
+# This file contains all configurable thresholds, parameters, and limits
+# used throughout the tseda application. Modify these values to customize
+# algorithm behavior without changing code.
+#
+# Configuration is loaded at application startup. Changes take effect only
+# after restarting the application.
+# ============================================================================
+
+# ============================================================================
+# Section 1: File Upload Limits
+# ============================================================================
+file_upload:
+  # Maximum number of rows allowed in uploaded CSV/Excel files.
+  # Higher values require more memory and may impact UI responsiveness.
+  # Default: 2000
+  # Suggested range: 1000 - 5000
+  max_file_lines: 2000
+
+# ============================================================================
+# Section 2: Window Selection (Cadence-to-Window Mapping)
+# ============================================================================
+# Initial SSA window sizes based on detected sampling frequency.
+# Each value represents one expected seasonal cycle at the given cadence.
+# These are starting points; windows may be doubled during refinement if
+# the eigenvalue spectrum is too flat.
+window_selection:
+  # One diurnal (24-hour) cycle
+  # Default: 24
+  hourly: 24
+
+  # One business week (5 trading/working days)
+  # Default: 5
+  daily: 5
+
+  # Approximately one calendar month (4 weeks)
+  # Default: 4
+  weekly: 4
+
+  # One full annual cycle (12 months)
+  # Default: 12
+  monthly: 12
+
+# ============================================================================
+# Section 3: SSA Eigenvalue Grouping Heuristic
+# ============================================================================
+# Parameters controlling how SSA components are classified as Trend,
+# Seasonality, or Noise.
+grouping_heuristic:
+  # Minimum explained variance ratio for a component to be considered "eligible".
+  # Components explaining less than this fraction are automatically classified as noise.
+  # Default: 0.10
+  # Suggested range: 0.05 - 0.20
+  variance_threshold: 0.10
+
+  # Maximum allowed relative difference between paired eigenvalues.
+  # When two adjacent eigenvalues differ by <= this fraction, they are
+  # considered a pair and assigned to seasonality.
+  # Formula: (larger - smaller) / larger <= pair_similarity_tolerance
+  # Default: 0.05
+  # Suggested range: 0.02 - 0.10
+  pair_similarity_tolerance: 0.05
+
+# ============================================================================
+# Section 4: Durbin-Watson Noise Quality Check
+# ============================================================================
+# The Durbin-Watson (DW) statistic measures autocorrelation in the noise
+# residual. A value near 2.0 indicates uncorrelated noise (ideal).
+# Values outside the range [dw_low, dw_high] suggest residual autocorrelation.
+noise_validation:
+  # Minimum acceptable Durbin-Watson statistic.
+  # Default: 1.5
+  # Suggested range: 1.4 - 1.6
+  dw_low: 1.5
+
+  # Maximum acceptable Durbin-Watson statistic.
+  # Default: 2.5
+  # Suggested range: 2.4 - 2.6
+  dw_high: 2.5
+
+# ============================================================================
+# Section 5: Window Refinement
+# ============================================================================
+# After initial window selection, the algorithm checks if the spectrum
+# has enough spread. If the smallest eigenvalue explains too much variance,
+# the window is doubled and SSA is recomputed.
+window_refinement:
+  # Minimum acceptable fraction of total variance explained by the smallest
+  # eigenvalue. If the smallest eigenvalue explains MORE than this fraction,
+  # the window is doubled and SSA is recomputed.
+  # This ensures the eigenvalue spectrum has meaningful spread.
+  # Default: 0.10
+  # Suggested range: 0.05 - 0.15
+  min_tail_spread: 0.10
+
+# ============================================================================
+# Section 6: SSA Seasonality Heuristic
+# ============================================================================
+# Parameters controlling the seasonality detection check.
+seasonality_heuristic:
+  # Number of leading eigenvalues to inspect for paired (near-equal) structure.
+  # Higher values inspect more components; lower values focus on top components only.
+  # Default: 6
+  # Suggested range: 4 - 12
+  leading_eigenvalues_to_check: 6
+
+# ============================================================================
+# Section 7: Periodicity Analysis (FFT / Lomb-Scargle)
+# ============================================================================
+# Parameters for frequency-domain analysis using Lomb-Scargle periodograms.
+periodicity:
+  # Minimum search frequency (cycles per sample).
+  # Default: 0.1
+  fmin: 0.1
+
+  # Maximum search frequency (cycles per sample).
+  # Default: 2.0
+  fmax: 2.0
+
+  # Number of discrete frequency points to evaluate.
+  # Higher values give finer frequency resolution but increase computation cost.
+  # Default: 1000
+  # Suggested range: 500 - 2000
+  num_frequencies: 1000
+
+# ============================================================================
+# Section 8: LOESS Smoothing
+# ============================================================================
+# Parameters for LOESS (Locally Estimated Scatterplot Smoothing) verification plot.
+# The LOESS smoother uses a sliding-window local regression; the fraction
+# parameter controls the width of each window.
+loess:
+  # Minimum smoothing fraction.
+  # Lower values produce noisier but more detailed curves.
+  # Default: 0.05
+  min_fraction: 0.05
+
+  # Maximum smoothing fraction.
+  # Higher values produce smoother curves but may hide detail.
+  # Default: 0.5
+  max_fraction: 0.5
+
+  # Default LOESS fraction shown in the UI slider.
+  # Default: 0.05
+  default_fraction: 0.05
+
+  # Slider increment step size.
+  # Default: 0.05
+  step: 0.05
+
+# ============================================================================
+# Section 9: Change Point Detection
+# ============================================================================
+# Parameters for the PELT (Pruned Exact Linear Time) change-point detection
+# algorithm applied to both Trend and Seasonal components.
+change_point_detection:
+  # Cost model for PELT algorithm.
+  # Options: "rbf" (radial basis function), "l2", "linear"
+  # "rbf" is robust and recommended for most time series.
+  # Default: "rbf"
+  model: "rbf"
+
+  # Multiplier for BIC-style penalty: penalty = penalty_multiplier * log(n)
+  # where n is the series length.
+  # Higher values discourage finding many small segments (conservative).
+  # Lower values permit more breakpoints (liberal).
+  # Default: 2.0 (standard BIC)
+  # Suggested range: 1.5 - 2.5
+  penalty_multiplier: 2.0

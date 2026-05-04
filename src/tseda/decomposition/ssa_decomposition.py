@@ -13,14 +13,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from tseda.decomposition.automatic_grouping_heuristic import AutomaticGroupingHeuristic
+from tseda.config.config_loader import ConfigurationManager
 
 
 class SSADecomposition:
     """
     A class to perform Singular Spectrum Analysis (SSA) on a time series.
     """
-
-    SEASONALITY_HEURISTIC_LEADING_EIGENVALUES = 6
 
     def __init__(self, series: pd.Series, window: int) -> None:
         """
@@ -30,6 +29,11 @@ class SSADecomposition:
             series: Input numeric series indexed by datetime.
             window: Window size for SSA trajectory matrix construction.
         """
+        # Load seasonality heuristic leading eigenvalues from config
+        self.SEASONALITY_HEURISTIC_LEADING_EIGENVALUES = ConfigurationManager.get(
+            "seasonality_heuristic.leading_eigenvalues_to_check", 6
+        )
+        
         self._series = series
         self._window = window
         self._ssa = SingularSpectrumAnalysis(series, window=window)
@@ -54,25 +58,39 @@ class SSADecomposition:
 
     def get_automatic_grouping_heuristic(self) -> AutomaticGroupingHeuristic:
         """Return the automatic grouping heuristic for the current eigen spectrum."""
-        return AutomaticGroupingHeuristic(eigenvalues=np.asarray(self._eigenvalues, dtype=float))
+        variance_threshold = ConfigurationManager.get(
+            "grouping_heuristic.variance_threshold", 0.10
+        )
+        pair_similarity_tolerance = ConfigurationManager.get(
+            "grouping_heuristic.pair_similarity_tolerance", 0.05
+        )
+        return AutomaticGroupingHeuristic(
+            eigenvalues=np.asarray(self._eigenvalues, dtype=float),
+            variance_threshold=variance_threshold,
+            pair_similarity_tolerance=pair_similarity_tolerance,
+        )
 
     def suggest_reconstruction_groups(self) -> tuple[dict[str, list[int]], bool]:
         """Return the best auto-inferred grouping and a Durbin-Watson satisfied flag.
 
         Starting from the threshold-based initial assignment, the method expands the
         assignment one component (or one seasonal pair) at a time until the
-        Durbin-Watson statistic of the noise residual falls in [1.5, 2.5] or the
+        Durbin-Watson statistic of the noise residual falls in [dw_low, dw_high] or the
         candidate pool is exhausted.  The assignment with the DW value closest to
         2.0 is returned.  When no assignment achieves a DW in range the flag is
         False, signalling the caller to prompt the user to try a different window.
 
         Side effect: leaves SSA reconstruction state set to the returned assignment.
         """
+        # Load DW bounds from config
+        dw_low = ConfigurationManager.get("noise_validation.dw_low", 1.5)
+        dw_high = ConfigurationManager.get("noise_validation.dw_high", 2.5)
+        
         heuristic = self.get_automatic_grouping_heuristic()
         assignment = heuristic.suggest_reconstruction()
 
         dw = self._compute_dw_for_assignment(assignment)
-        if dw is not None and 1.5 <= dw <= 2.5:
+        if dw is not None and dw_low <= dw <= dw_high:
             return assignment, True
 
         best_assignment = assignment
@@ -89,7 +107,7 @@ class SSADecomposition:
                 if dist < best_dw_distance:
                     best_assignment = expanded
                     best_dw_distance = dist
-                if 1.5 <= dw <= 2.5:
+                if dw_low <= dw <= dw_high:
                     return best_assignment, True
 
         if best_assignment is not assignment:

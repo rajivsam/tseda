@@ -428,11 +428,7 @@ Reload → 2 observations remain, sequences are intact
 
 2. **Single series per session**: The app holds one global `series` and one global `ssa_obj`. Multi-series comparison within a session is not supported.
 
-3. **Observation auto-summary**: The auto-generated text summary on the Logging page is a template-based construction from `SSAResultSummary`. It does not yet incorporate Gemini LLM-assisted narrative generation from the KMDS KB, which would produce more readable reports.
-
-4. **Gemini chat isolation**: The Gemini chatbot (`gemini_chat.py`) is a standalone Streamlit app, not embedded in the Dash UI. Integrating it as a sidebar panel in the Dash workflow would eliminate the context-switch penalty.
-
-5. **No export of decomposed components**: Users can capture observations but cannot export the reconstructed Trend/Seasonality/Noise components as CSV from the UI. A data-writer for component export is a natural extension.
+3. **No export of decomposed components**: Users can capture observations but cannot export the reconstructed Trend/Seasonality/Noise components as CSV from the UI. A data-writer for component export is a natural extension.
 
 ---
 
@@ -445,4 +441,4 @@ The design evolved through eight phases, each addressing a concrete analytical r
 - **Methodological discipline**: Key design decisions (PELT on smooth signal, Lomb-Scargle over FFT, SSA before change-point) directly prevent common analyst errors.
 - **Honest accounting**: Known limitations (sample cap, single-series sessions, disconnected chat) are documented for future iteration.
 
-The application is production-ready for regularly sampled time series at hourly or coarser resolution, with a clear roadmap for multi-series comparison, LLM-assisted narrative, and component export.
+The application is production-ready for regularly sampled time series at hourly or coarser resolution, with a clear roadmap for multi-series comparison and component export.

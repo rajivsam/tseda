@@ -22,7 +22,6 @@ Before a data scientist or analyst can draw conclusions from a time series, they
 | Select model rank with principled criterion | AIC computed as a function of SSA rank; optimal rank identified automatically |
 | Write up analysis findings | Automatic text summary generated from decomposition results on the Observation Logging page |
 | Preserve findings for future reference | KMDS OWL knowledge-base integration captures observations in a structured, queryable ontology |
-| Research background methodology | Embedded Gemini chatbot allows in-app methodology questions without leaving the workflow |
 
 ---
 
@@ -51,7 +50,6 @@ The **AIC rank selection** converts a subjective eigenvalue elbow-inspection tas
 | **Dual-detector change-point analysis** | Separate PELT runs on Trend (mean shifts) and Seasonality amplitude envelope (strength shifts); distinct visual markers and plain-language summary eliminate ambiguity |
 | **AIC model selection** | Rank choice is statistically grounded, not subjective |
 | **KMDS knowledge capture** | Findings are saved as structured OWL observations, searchable and shareable across projects |
-| **Gemini chatbot integration** | In-app methodology lookup without breaking the analysis flow |
 | **Configurable 2,000-sample limit** | Keeps UI responsive; prevents accidental loading of unmanageable series |
 
 ---
