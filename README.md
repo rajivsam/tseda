@@ -47,6 +47,7 @@ Before any component grouping is attempted, the app also performs a **dataset su
 | Daily   | 5              |
 | Weekly  | 4              |
 | Monthly | 12             |
+| Quarterly | 4            |
 
 **Algorithm: Initial SSA Window Setup**
 
@@ -59,18 +60,19 @@ Params: min_tail_spread = 0.10
 2.  If c = daily   -> w ← 5
 3.  If c = weekly  -> w ← 4
 4.  If c = monthly -> w ← 12
-5.  If cadence is unknown -> fail with "invalid window"
+5.  If c = quarterly -> w ← 4
+6.  If cadence is unknown -> fail with "invalid window"
 
 --- Spectrum-spread refinement ---
-6.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
-7.  tail_ratio ← λ_w / Σᵢ λᵢ
-8.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
+7.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
+8.  tail_ratio ← λ_w / Σᵢ λᵢ
+9.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
     w ← 2w
     Rebuild SSA(x, w)
     tail_ratio ← λ_w / Σᵢ λᵢ
 
 --- Output ---
-9.  Return final w as the decomposition default and slider value
+10. Return final w as the decomposition default and slider value
 ```
 
 This can be changed in the UI. Based on the eigen value distribution, observations from the ACF plot and the eigen vector plot, the seasonal components can be determined if present. Based on these initial plots, the user needs to input a set of groupings and reconstruct the series with these groupings. The reconstruction plots are shown.

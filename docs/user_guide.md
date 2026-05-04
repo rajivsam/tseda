@@ -127,6 +127,7 @@ A summary table showing:
 | Daily   | 5              |
 | Weekly  | 4              |
 | Monthly | 12             |
+| Quarterly | 4            |
 
 #### Distribution Plot (KDE + Box Plot)
 
@@ -174,18 +175,19 @@ Params: min_tail_spread = 0.10
 2.  If c = daily   -> w ← 5
 3.  If c = weekly  -> w ← 4
 4.  If c = monthly -> w ← 12
-5.  If cadence is unknown -> fail with "invalid window"
+5.  If c = quarterly -> w ← 4
+6.  If cadence is unknown -> fail with "invalid window"
 
 --- Spectrum-spread refinement ---
-6.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
-7.  tail_ratio ← λ_w / Σᵢ λᵢ
-8.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
+7.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
+8.  tail_ratio ← λ_w / Σᵢ λᵢ
+9.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
    w ← 2w
    Rebuild SSA(x, w)
    tail_ratio ← λ_w / Σᵢ λᵢ
 
 --- Output ---
-9.  Return final w as the decomposition default and slider value
+10. Return final w as the decomposition default and slider value
 ```
 
 Operationally, this means the startup window can be larger than the raw cadence mapping
@@ -482,6 +484,7 @@ window_selection:
   daily: 5      # One business week
   weekly: 4     # Approximately one month
   monthly: 12   # One full annual cycle
+  quarterly: 4  # One full annual cycle (4 quarters)
 ```
 
 **Default values:** As listed above

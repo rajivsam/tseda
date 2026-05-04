@@ -54,3 +54,29 @@ class TestSamplingProp:
         assert len(ag.rowData) == 6
         assert ag.columnDefs[0]['field'] == 'property'
         assert ag.columnDefs[1]['field'] == 'value'
+
+    def test_quarterly_series_maps_to_quarterly_window(self):
+        """Quarterly aliases such as QS/QS-OCT should map to a valid window."""
+        dates = pd.date_range(start="1981-01-01", periods=20, freq="QS-OCT")
+        series = pd.Series(range(20), index=dates)
+
+        sp = SamplingProp(series)
+
+        assert sp._sampling_freq == "quarterly"
+        assert sp._freq_window == 4
+
+    def test_irregular_business_daily_falls_back_to_daily_window(self):
+        """Daily-like series with occasional gaps should still infer a daily window."""
+        dates = pd.to_datetime(
+            [
+                "2023-01-02", "2023-01-03", "2023-01-04", "2023-01-05", "2023-01-06",
+                "2023-01-09", "2023-01-10", "2023-01-11", "2023-01-12", "2023-01-13",
+                "2023-01-17", "2023-01-18", "2023-01-19", "2023-01-20",
+            ]
+        )
+        series = pd.Series(range(len(dates)), index=dates)
+
+        sp = SamplingProp(series)
+
+        assert sp._sampling_freq in {"daily", "daily (business)"}
+        assert sp._freq_window == 5

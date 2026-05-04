@@ -43,6 +43,10 @@ window_selection:
   # Default: 12
   monthly: 12
 
+  # One full annual cycle (4 quarters)
+  # Default: 4
+  quarterly: 4
+
 # ============================================================================
 # Section 3: SSA Eigenvalue Grouping Heuristic
 # ============================================================================

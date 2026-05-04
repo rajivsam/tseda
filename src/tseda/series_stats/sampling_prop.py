@@ -83,16 +83,10 @@ class SamplingProp:
         Returns:
             Human-readable frequency label.
         """
-        # 1. Infer the frequency alias
-        freq_str = pd.infer_freq(series.index)
-        if not freq_str:
+        base = self._infer_base_alias(series.index)
+        if not base:
             return "Unknown"
 
-        # 2. Extract base alias (remove numbers and split at "-")
-        # e.g., '2W-SUN' -> 'W', 'ME' -> 'ME'
-        base = re.sub(r"\d+", "", freq_str).split("-")[0]
-    
-        print(f"base: {base}, freq_str: {freq_str}")
         # 3. Define the mapping
         mapping = {
             "H": "hourly", "h": "hourly",
@@ -105,6 +99,42 @@ class SamplingProp:
         }
 
         return mapping.get(base, f"Other ({base})")
+
+    def _infer_base_alias(self, index: pd.Index) -> str | None:
+        """Infer a normalized pandas base frequency alias from a datetime index.
+
+        This first tries ``pd.infer_freq`` and falls back to a median-delta heuristic
+        when the index has occasional gaps (for example business-day series with
+        holiday closures).
+        """
+        # 1) Native pandas frequency inference
+        freq_str = pd.infer_freq(index)
+        if freq_str:
+            return re.sub(r"\d+", "", freq_str).split("-")[0]
+
+        # 2) Fallback: robustly infer cadence from median spacing
+        diffs = pd.DatetimeIndex(index).to_series().sort_values().diff().dropna()
+        if diffs.empty:
+            return None
+
+        median = diffs.median()
+        median_hours = median / pd.Timedelta(hours=1)
+        median_days = median / pd.Timedelta(days=1)
+
+        if 0.75 <= median_hours <= 1.25:
+            return "H"
+        if 0.75 <= median_days <= 1.5:
+            return "D"
+        if 6.0 <= median_days <= 8.0:
+            return "W"
+        if 27.0 <= median_days <= 32.0:
+            return "M"
+        if 80.0 <= median_days <= 98.0:
+            return "Q"
+        if 350.0 <= median_days <= 380.0:
+            return "Y"
+
+        return None
 
     def get_freq_window(self, index: pd.Index) -> int | None:
         """Map pandas inferred frequency to a default SSA window size.
@@ -148,27 +178,28 @@ class SamplingProp:
             Initial candidate SSA window size for the inferred frequency, or
             ``None`` when the frequency cannot be determined.
         """
-        # 1. Infer the frequency alias (e.g., 'h', 'D', 'W-SUN', 'ME')
-        freq_str = pd.infer_freq(index)
-        if not freq_str:
+        # 1. Infer the base alias (e.g., 'H', 'D', 'W', 'ME', 'QS')
+        base = self._infer_base_alias(index)
+        if not base:
             return None
 
-        # 2. Extract base alias: strip numbers and split at "-"
-        # This handles variants like '2W-SUN' -> 'W' or 'ME' -> 'ME'
-        base = re.sub(r"\d+", "", freq_str).split("-")[0]
-
-        # 3. Load mapping from configuration
+        # 2. Load mapping from configuration
         window_config = ConfigurationManager.get_section("window_selection")
         mapping = {
             "h": window_config.get("hourly", 24),
             "H": window_config.get("hourly", 24),
             "D": window_config.get("daily", 5),
             "d": window_config.get("daily", 5),
+            "B": window_config.get("daily", 5),
+            "b": window_config.get("daily", 5),
             "W": window_config.get("weekly", 4),
             "w": window_config.get("weekly", 4),
             "M": window_config.get("monthly", 12),
             "ME": window_config.get("monthly", 12),
             "MS": window_config.get("monthly", 12),
+            "Q": window_config.get("quarterly", 4),
+            "QE": window_config.get("quarterly", 4),
+            "QS": window_config.get("quarterly", 4),
         }
 
         return mapping.get(base)
