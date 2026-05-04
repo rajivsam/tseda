@@ -55,9 +55,9 @@ window_selection:
 grouping_heuristic:
   # Minimum explained variance ratio for a component to be considered "eligible".
   # Components explaining less than this fraction are automatically classified as noise.
-  # Default: 0.10
+  # Default: 0.05
   # Suggested range: 0.05 - 0.20
-  variance_threshold: 0.10
+  variance_threshold: 0.05
 
   # Maximum allowed relative difference between paired eigenvalues.
   # When two adjacent eigenvalues differ by <= this fraction, they are
