@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: tseda
-Version: 2.6.0
+Version: 3.0.0
 Summary: A package for exploration of regularly sampled time series.
 License-Expression: LicenseRef-Proprietary
 Keywords: time-series,ssa,dash,analytics,decomposition
@@ -226,6 +226,142 @@ The SSA is based on the eigen decomposition of the trajectory matrix. Though the
 
 The package also provides a notebook interface to these features. If you have a new dataset that you want to analyze, look at the data loader directory for examples. Download your dataset, clean it, produce your time series, and analyze it with `tseda`.
 
+### Design Philosophy
+
+- **UI and notebook parity**: Anything you can do in the UI should be scriptable in notebooks.
+- **Configuration-first behavior**: Runtime thresholds and heuristics are externalized in `src/tseda/config/tseda_config.yaml`.
+- **Explicit controls for decomposition**: Window size and component grouping are treated as first-class controls in both UI and Python API.
+- **Composable feature calls**: Plotting, decomposition, diagnostics, and reporting are exposed as separate methods so users can build custom analysis flows.
+
+### Developer Notebook API
+
+Use `NotebookThreeStepAPI` for the same three-step workflow directly in Python:
+
+```python
+from tseda.notebook_api import NotebookThreeStepAPI, load_series_from_csv
+
+series = load_series_from_csv("data/coffee_prices.csv")
+api = NotebookThreeStepAPI(series)
+
+# Step 1: initial assessment
+fig_kde = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
+fig_acf = api.get_acf_plot(lags=40)
+
+# Step 2: decomposition with explicit window and grouping control
+current_window = api.get_window()
+api.set_window(current_window, apply_window_refinement=True)
+grouping, dw_ok = api.suggest_grouping()
+api.set_grouping(grouping=grouping)
+fig_recon = api.get_reconstruction_plot()
+
+# Step 3: observation logging outputs
+fig_var = api.get_variance_explained_plot()
+report_text = api.generate_observation_text()
+```
+
+Key notebook API capabilities:
+
+- `get_kde_plot(..., bin_algorithm="scott")` with configurable histogram bin algorithms (`auto`, `fd`, `doane`, `scott`, `stone`, `rice`, `sturges`, `sqrt`).
+- `get_window()` / `set_window(...)` for explicit SSA window control.
+- `suggest_grouping()` / `set_grouping(...)` / `get_grouping()` for explicit component assignment control.
+- `get_suitability_result(...)` for the same top-k eigenvalue suitability gate used by the UI.
+
+#### End-to-End Script Example (Copy/Paste)
+
+```python
+from pathlib import Path
+
+from tseda.notebook_api import NotebookThreeStepAPI, load_example_series
+
+# Assumes this script runs from the repository root.
+workspace_root = Path.cwd()
+
+# Load an example dataset.
+series = load_example_series("coffee_prices", workspace_root=workspace_root)
+api = NotebookThreeStepAPI(series)
+
+# -------------------------
+# Step 1: Initial Assessment
+# -------------------------
+sampling_df = api.get_sampling_properties()
+stats_df = api.get_summary_statistics()
+kde_fig = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
+acf_fig = api.get_acf_plot(lags=30)
+pacf_fig = api.get_pacf_plot(lags=30, method="yw")
+
+# -------------------------
+# Step 2: Decomposition
+# -------------------------
+window_before = api.get_window()
+window_after = api.set_window(window_before, apply_window_refinement=True)
+
+suitability = api.get_suitability_result()
+if not suitability.is_suitable:
+    raise RuntimeError(
+        f"Dataset not suitable for SSA: top-{suitability.top_k} ratio "
+        f"{suitability.top_k_ratio:.3f} < threshold {suitability.threshold:.3f}"
+    )
+
+grouping, dw_ok = api.suggest_grouping()
+api.set_grouping(grouping=grouping)
+
+eigen_fig = api.get_eigen_plot()
+reconstruction_fig = api.get_reconstruction_plot()
+change_point_fig = api.get_change_point_plot()
+loess_fig = api.get_loess_plot(fraction=0.10)
+noise_kde_fig = api.get_noise_kde_plot(bandwidth="silverman")
+recon_meta = api.get_reconstruction_metadata()
+
+# -------------------------
+# Step 3: Observation Logging
+# -------------------------
+variance_fig = api.get_variance_explained_plot()
+noise_variance_fig = api.get_noise_variance_plot()
+observation_text = api.generate_observation_text()
+components_df = api.export_components_dataframe()
+
+print("Window:", window_before, "->", window_after)
+print("DW in suggested grouping:", dw_ok)
+print("Reconstruction metadata:", recon_meta)
+print("Observation preview:\n", observation_text[:500])
+print("Components head:\n", components_df.head())
+```
+
+#### End-to-End Script Example (Your Own CSV)
+
+```python
+from pathlib import Path
+
+from tseda.notebook_api import NotebookThreeStepAPI, load_series_from_csv
+
+# Replace with your own CSV path.
+csv_path = Path("/absolute/path/to/your_time_series.csv")
+
+# Default expects: column 0 = timestamp, column 1 = numeric value.
+# If your schema is different, pass timestamp_col/value_col as names or indices.
+series = load_series_from_csv(csv_path, timestamp_col=0, value_col=1)
+
+api = NotebookThreeStepAPI(series)
+
+# Optional: inspect and adjust decomposition control points.
+print("Initial window:", api.get_window())
+api.set_window(api.get_window(), apply_window_refinement=True)
+
+grouping, dw_ok = api.suggest_grouping()
+api.set_grouping(grouping=grouping)
+
+# Generate core artifacts.
+kde_fig = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
+reconstruction_fig = api.get_reconstruction_plot()
+variance_fig = api.get_variance_explained_plot()
+observation_text = api.generate_observation_text()
+components_df = api.export_components_dataframe()
+
+print("DW status:", dw_ok)
+print(observation_text[:400])
+print(components_df.head())
+```
+
 ## Requirements
 
 **Python 3.13 or higher** is required to run this package.
@@ -327,11 +463,19 @@ TSEDA_HOST=0.0.0.0 TSEDA_PORT=8050 TSEDA_DEBUG=false tseda
 Example datasets are available directly in the repository under [data](data). They are intentionally **not bundled** inside wheel/sdist package builds to keep distribution artifacts lean.
 
 Hyndman-based example files:
+- [data/hyndman_arrivals_quarterly_japan.csv](data/hyndman_arrivals_quarterly_japan.csv)
 - [data/hyndman_goog_daily_close.csv](data/hyndman_goog_daily_close.csv)
 - [data/hyndman_hyndsight_daily_pageviews.csv](data/hyndman_hyndsight_daily_pageviews.csv)
-- [data/hyndman_arrivals_quarterly_japan.csv](data/hyndman_arrivals_quarterly_japan.csv)
-- [data/hyndman_usconsumption_quarterly_consumption.csv](data/hyndman_usconsumption_quarterly_consumption.csv)
 - [data/hyndman_sunspot_monthly_area.csv](data/hyndman_sunspot_monthly_area.csv)
+- [data/hyndman_usconsumption_quarterly_consumption.csv](data/hyndman_usconsumption_quarterly_consumption.csv)
+
+Additional example files:
+- [data/coffee_prices.csv](data/coffee_prices.csv)
+- [data/monthly-car-sales.csv](data/monthly-car-sales.csv)
+- [data/trimmed_biomass - generated_biomass_MW_series.csv](data/trimmed_biomass%20-%20generated_biomass_MW_series.csv)
+- [data/uci_air_quality_hourly_co.csv](data/uci_air_quality_hourly_co.csv)
+- [data/ticket_resolution_hourly_nyc311.csv](data/ticket_resolution_hourly_nyc311.csv)
+- [data/white_noise_data.csv](data/white_noise_data.csv) — negative example; expected to fail the dataset suitability check
 
 If you install from source (clone the repo), these files are available immediately. If you install from PyPI/package artifacts, download the examples from the repository paths above.
 

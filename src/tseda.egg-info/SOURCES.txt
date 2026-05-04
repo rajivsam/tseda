@@ -3,6 +3,7 @@ pyproject.toml
 src/tseda/__init__.py
 src/tseda/__main__.py
 src/tseda/bump_version.py
+src/tseda/notebook_api.py
 src/tseda.egg-info/PKG-INFO
 src/tseda.egg-info/SOURCES.txt
 src/tseda.egg-info/dependency_links.txt
@@ -43,6 +44,7 @@ src/tseda/visualization/series_visualizer.py
 tests/test_autocorrelation_vis.py
 tests/test_change_point_estimator.py
 tests/test_fft_analyzer.py
+tests/test_notebook_api.py
 tests/test_sampling_prop.py
 tests/test_series_histogram_visualizer.py
 tests/test_series_kde_visualizer.py
