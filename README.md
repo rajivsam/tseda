@@ -279,11 +279,19 @@ TSEDA_HOST=0.0.0.0 TSEDA_PORT=8050 TSEDA_DEBUG=false tseda
 Example datasets are available directly in the repository under [data](data). They are intentionally **not bundled** inside wheel/sdist package builds to keep distribution artifacts lean.
 
 Hyndman-based example files:
+- [data/hyndman_arrivals_quarterly_japan.csv](data/hyndman_arrivals_quarterly_japan.csv)
 - [data/hyndman_goog_daily_close.csv](data/hyndman_goog_daily_close.csv)
 - [data/hyndman_hyndsight_daily_pageviews.csv](data/hyndman_hyndsight_daily_pageviews.csv)
-- [data/hyndman_arrivals_quarterly_japan.csv](data/hyndman_arrivals_quarterly_japan.csv)
-- [data/hyndman_usconsumption_quarterly_consumption.csv](data/hyndman_usconsumption_quarterly_consumption.csv)
 - [data/hyndman_sunspot_monthly_area.csv](data/hyndman_sunspot_monthly_area.csv)
+- [data/hyndman_usconsumption_quarterly_consumption.csv](data/hyndman_usconsumption_quarterly_consumption.csv)
+
+Additional example files:
+- [data/coffee_prices.csv](data/coffee_prices.csv)
+- [data/monthly-car-sales.csv](data/monthly-car-sales.csv)
+- [data/trimmed_biomass - generated_biomass_MW_series.csv](<data/trimmed_biomass - generated_biomass_MW_series.csv>)
+- [data/uci_air_quality_hourly_co.csv](data/uci_air_quality_hourly_co.csv)
+- [data/ticket_resolution_hourly_nyc311.csv](data/ticket_resolution_hourly_nyc311.csv)
+- [data/white_noise_data.csv](data/white_noise_data.csv) — negative example; expected to fail the dataset suitability check
 
 If you install from source (clone the repo), these files are available immediately. If you install from PyPI/package artifacts, download the examples from the repository paths above.
 
