@@ -1,6 +1,6 @@
 [project]
 name = "tseda"
-version = "2.2.0"
+version = "2.5.0"
 description = "A package for exploration of regularly sampled time series."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -69,6 +69,5 @@ dependencies = [
 
   [tool.setuptools.package-data]
   tseda = [
-    "config/*.csv",
     "images/*",
   ]

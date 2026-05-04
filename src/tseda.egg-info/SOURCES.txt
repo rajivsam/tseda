@@ -11,7 +11,6 @@ src/tseda.egg-info/requires.txt
 src/tseda.egg-info/top_level.txt
 src/tseda/change_point/change_point_estimator.py
 src/tseda/config/config_loader.py
-src/tseda/config/prompts_config.csv
 src/tseda/data_writers/kmds_writer.py
 src/tseda/dataloader/coffee_prices_data_loader.py
 src/tseda/dataloader/kaggle_data_loader.py

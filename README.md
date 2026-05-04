@@ -274,6 +274,19 @@ TSEDA_HOST=0.0.0.0 TSEDA_PORT=8050 TSEDA_DEBUG=false tseda
 - The dataset must contain **no missing values** (NA / NaN). Clean your data before uploading.
 - Files are limited to **2,000 rows** (configurable via `file_upload.max_file_lines` in `src/tseda/config/tseda_config.yaml`).
 
+#### Example Datasets (Repository)
+
+Example datasets are available directly in the repository under [data](data). They are intentionally **not bundled** inside wheel/sdist package builds to keep distribution artifacts lean.
+
+Hyndman-based example files:
+- [data/hyndman_goog_daily_close.csv](data/hyndman_goog_daily_close.csv)
+- [data/hyndman_hyndsight_daily_pageviews.csv](data/hyndman_hyndsight_daily_pageviews.csv)
+- [data/hyndman_arrivals_quarterly_japan.csv](data/hyndman_arrivals_quarterly_japan.csv)
+- [data/hyndman_usconsumption_quarterly_consumption.csv](data/hyndman_usconsumption_quarterly_consumption.csv)
+- [data/hyndman_sunspot_monthly_area.csv](data/hyndman_sunspot_monthly_area.csv)
+
+If you install from source (clone the repo), these files are available immediately. If you install from PyPI/package artifacts, download the examples from the repository paths above.
+
 ### 4. Explore In Three Steps
 
 | Step | Panel | What to do |
