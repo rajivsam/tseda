@@ -153,3 +153,54 @@ def test_ssa_decomposition_suggest_reconstruction_groups_returns_tuple():
     assert "Trend" in groups
     assert "Noise" in groups
     assert isinstance(dw_satisfied, bool)
+
+
+# ---------------------------------------------------------------------------
+# Suitability check tests
+# ---------------------------------------------------------------------------
+
+def _top_k_ratio(eigenvalues: np.ndarray, k: int) -> float:
+    """Compute the fraction of total variance explained by the top-k eigenvalues."""
+    eigenvalues = np.asarray(eigenvalues, dtype=float)
+    total = float(np.sum(eigenvalues))
+    if total <= 0:
+        return 0.0
+    k = min(k, eigenvalues.size)
+    return float(np.sum(eigenvalues[:k])) / total
+
+
+def test_suitability_check_fails_on_white_noise():
+    """White noise produces a flat eigenspectrum; top-5 should not reach 40% of variance."""
+    rng = np.random.default_rng(42)
+    noise_values = rng.standard_normal(200)
+    series = pd.Series(noise_values, index=pd.date_range("2021-01-01", periods=200, freq="D"))
+
+    ssa = SSADecomposition(series, window=20)
+    ratio = _top_k_ratio(ssa._eigenvalues, k=5)
+
+    assert ratio < 0.40, (
+        f"Expected white noise to fail suitability check (top-5 < 40%), got {ratio:.2%}"
+    )
+
+
+def test_suitability_check_passes_on_structured_series():
+    """A trend + seasonality series should have concentrated eigenvalues in the top few."""
+    series = build_series(n=120)
+
+    ssa = SSADecomposition(series, window=12)
+    ratio = _top_k_ratio(ssa._eigenvalues, k=5)
+
+    assert ratio >= 0.40, (
+        f"Expected structured series to pass suitability check (top-5 >= 40%), got {ratio:.2%}"
+    )
+
+
+def test_suitability_check_k_capped_at_spectrum_size():
+    """top_k larger than the number of eigenvalues should not raise an error."""
+    series = build_series(n=20)
+    ssa = SSADecomposition(series, window=5)
+
+    # Request k=100 on a very small spectrum — must not crash
+    ratio = _top_k_ratio(ssa._eigenvalues, k=100)
+
+    assert 0.0 <= ratio <= 1.0

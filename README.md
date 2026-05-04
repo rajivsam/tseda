@@ -39,6 +39,8 @@ Explore the distribution and spread of values using a kernel density estimate an
 
 The app first computes an initial SSA window from the detected cadence, then validates whether the eigen spectrum has enough spread. If the smallest eigenvalue still explains too much variance, the window is doubled and SSA is recomputed until the criterion is satisfied (or the SSA half-length bound is reached).
 
+Before any component grouping is attempted, the app also performs a **dataset suitability check** — see below.
+
 | Cadence | Initial Window |
 |---------|----------------|
 | Hourly  | 24             |
@@ -72,6 +74,29 @@ Params: min_tail_spread = 0.10
 ```
 
 This can be changed in the UI. Based on the eigen value distribution, observations from the ACF plot and the eigen vector plot, the seasonal components can be determined if present. Based on these initial plots, the user needs to input a set of groupings and reconstruct the series with these groupings. The reconstruction plots are shown.
+
+#### Dataset Suitability Check
+
+Before the grouping UI is enabled, `tseda` checks whether the series is structurally suited to SSA decomposition. The check is grounded in a fundamental property of SSA: **meaningful decomposition requires that variance be concentrated in a small number of leading eigenvectors**. When a time series contains real structure — a trend, a seasonal pattern, or both — those components manifest as dominant eigenvectors that together account for a large share of total variance. The remaining eigenvectors represent noise and should contribute comparatively little.
+
+A flat eigenspectrum, where variance is spread roughly equally across many eigenvectors, is the signature of white noise. Applying SSA to such a series produces a decomposition that is mathematically valid but practically meaningless: the algorithm will assign components to Trend and Seasonality groups that are indistinguishable from random fluctuations, and the Durbin-Watson test on the residual will rarely produce a clean pass. The right approach for such a series is a noise-based model (ARIMA, SARIMA, or a simple exponential smoother), not spectral decomposition.
+
+The suitability check is:
+
+```
+Params: top_k = 5, min_explained_variance = 0.40
+
+1.  total ← Σᵢ λᵢ
+2.  top_k_ratio ← Σᵢ₌₁ᵏ λᵢ / total    (k = min(top_k, spectrum_length))
+3.  If top_k_ratio < min_explained_variance:
+        Block Apply Grouping
+        Display: "Top k eigenvectors explain X% — minimum required Y%"
+        Suggest: noise-based modelling approach
+4.  Else:
+        Proceed with grouping
+```
+
+Both `top_k` and `min_explained_variance` are configurable in `tseda_config.yaml` under `suitability_check`. When this check fails, the Apply Grouping button is disabled and a prominent alert explains the actual ratio alongside the threshold, so the user can judge whether to try a different window or accept that a different modelling approach is needed.
 
 **Change point detection** is run automatically after grouping, covering two independent analyses:
 

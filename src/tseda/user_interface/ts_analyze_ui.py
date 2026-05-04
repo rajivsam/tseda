@@ -313,18 +313,27 @@ def update_ssa_plots(
         import matplotlib
         matplotlib.pyplot.close(mpl_fig)
 
-        # Flag series as noisy when leading SSA structure is too weak.
+        # Suitability check: top-k eigenvectors must explain >= min_explained_variance of total variance.
+        # A diffuse eigenspectrum means the series lacks dominant structure and SSA is uninformative.
+        top_k = ConfigurationManager.get("suitability_check.top_k_eigenvectors", 5)
+        min_ev = ConfigurationManager.get("suitability_check.min_explained_variance", 0.40)
         eigenvalues = np.asarray(getattr(ssa_obj, "_eigenvalues", []), dtype=float)
         total_var = float(np.sum(eigenvalues)) if eigenvalues.size > 0 else 0.0
-        first_two_ratio = (float(np.sum(eigenvalues[:2])) / total_var) if total_var > 0 else 0.0
-        noisy_series = first_two_ratio <= 0.20
+        k = min(top_k, eigenvalues.size)
+        top_k_ratio = (float(np.sum(eigenvalues[:k])) / total_var) if total_var > 0 else 0.0
+        noisy_series = top_k_ratio < min_ev
         ssa_obj._noisy_series = noisy_series
 
         noisy_message = None
         if noisy_series:
             noisy_message = dbc.Alert(
-                "This series is not suitable for this tool: the first two SSA eigenvectors explain 20% or less of total variance.",
-                color="warning",
+                [
+                    html.Strong("Dataset not suitable for SSA decomposition. "),
+                    f"The top {k} eigenvectors explain only {top_k_ratio:.1%} of total variance "
+                    f"(minimum required: {min_ev:.0%}). The eigenspectrum is too diffuse — "
+                    "consider a noise-based modelling approach (e.g., ARIMA/SARIMA).",
+                ],
+                color="danger",
                 className="mb-0",
             )
 

@@ -169,3 +169,24 @@ change_point_detection:
   # Default: 2.0 (standard BIC)
   # Suggested range: 1.5 - 2.5
   penalty_multiplier: 2.0
+
+# ============================================================================
+# Section 10: Dataset Suitability Check
+# ============================================================================
+# SSA requires a structured eigenspectrum where a small number of eigenvectors
+# dominate. If variance is diffusely spread across all eigenvectors, the series
+# is essentially noise and SSA decomposition will be uninformative.
+# When the suitability check fails, the Apply Grouping button is disabled and
+# the user is advised to use a noise-based modelling approach (e.g. ARIMA).
+suitability_check:
+  # Number of top eigenvectors to sum for the concentration test.
+  # These should account for the dominant structural components (trend + seasonality).
+  # Default: 5
+  # Suggested range: 3 - 8
+  top_k_eigenvectors: 5
+
+  # Minimum fraction of total variance the top-k eigenvectors must explain.
+  # If the actual ratio falls below this threshold, the dataset is deemed unsuitable.
+  # Default: 0.40
+  # Suggested range: 0.30 - 0.55
+  min_explained_variance: 0.40

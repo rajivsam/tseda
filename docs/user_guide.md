@@ -198,6 +198,37 @@ A bar chart showing the explained variance for each SSA component (eigenvalue ra
 
 Plots of the leading eigenvectors. **Paired eigenvectors** (similar shape, similar eigenvalues) indicate a periodic/seasonal component.
 
+#### Dataset Suitability Check
+
+Before the grouping controls are activated, the app automatically checks whether this series is structurally suited to SSA decomposition.
+
+**Why this check exists.** SSA decomposes a series by finding a small number of dominant directions (eigenvectors) that capture most of the variance. This works well when the series has real structure — a trend pulling values in a consistent direction, or a seasonal oscillation repeating at a known period. Those structures produce large, concentrated eigenvalues at the top of the spectrum. The remaining eigenvectors, which correspond to noise, are small and comparably sized.
+
+When a series is dominated by noise — white noise, a random walk with no drift, or any process without persistent structure — the eigenspectrum looks completely different: variance is spread roughly equally across all eigenvectors. No single component stands out. Applying SSA to such a series still produces a mathematically valid result, but the Trend and Seasonality groups it generates are statistical artefacts rather than meaningful signal components. The decomposition cannot be trusted, and the Durbin-Watson check on the noise residual will rarely give a clean result because there is no coherent structure left to separate.
+
+The suitability check quantifies this directly: it sums the explained variance of the top `k` eigenvectors and requires that sum to reach a minimum threshold. If it does not, the Apply Grouping button is disabled and a red alert explains what was found:
+
+```
+Params: top_k = 5, min_explained_variance = 0.40
+
+1.  total      ← Σᵢ λᵢ
+2.  k          ← min(top_k, spectrum_length)
+3.  top_k_ratio ← Σᵢ₌₁ᵏ λᵢ / total
+4.  If top_k_ratio < min_explained_variance:
+        → Block Apply Grouping
+        → Show: "Top k eigenvectors explain X.X% — minimum required Y%"
+        → Recommend: noise-based modelling (ARIMA / SARIMA)
+5.  Else:
+        → Allow grouping to proceed
+```
+
+The alert reports the **actual ratio** alongside the threshold so you can judge whether the dataset is marginally below the cutoff (and perhaps worth trying with a different window) or deeply unsuitable. Both `top_k` and `min_explained_variance` are configurable — see [Section 10 of the Configuration reference](#10-dataset-suitability-check).
+
+**What to do if the check fails:**
+- Try a larger SSA window using the slider. Sometimes a cadence-based default window is too small to reveal seasonal structure.
+- Inspect the eigenvalue profile plot — if the bars form a steep drop-off rather than a flat line, the series may still be worth exploring at a different scale.
+- If the spectrum remains flat at all window sizes, the series is most likely noise-dominated. Consider ARIMA/SARIMA modelling instead of SSA decomposition.
+
 #### Seasonality Heuristic
 
 The automatic grouping heuristic assigns each SSA component to Trend, Seasonality,
@@ -552,6 +583,32 @@ change_point_detection:
   - **Default:** `2.0` (yields BIC penalty = 2 * log(n))
   - **Suggested range:** `1.5` – `2.5`
   - **Purpose:** Higher values discourage finding many small segments (conservative), while lower values permit more breakpoints (liberal).
+
+#### 10. Dataset Suitability Check
+
+```yaml
+suitability_check:
+  top_k_eigenvectors: 5       # Number of leading eigenvectors to sum for the concentration test
+  min_explained_variance: 0.40  # Minimum fraction of total variance the top-k must explain
+```
+
+**top_k_eigenvectors:**
+  - **Default:** `5`
+  - **Suggested range:** `3` – `8`
+  - **Purpose:** Defines how many leading eigenvectors are summed for the suitability check. A value of 5 is a reasonable default for most series — it covers one trend component and up to two seasonal pairs. For series with complex multi-period seasonality (e.g. hourly data with daily and weekly cycles), you may want to raise this to 7 or 8.
+
+**min_explained_variance:**
+  - **Default:** `0.40` (40%)
+  - **Suggested range:** `0.30` – `0.55`
+  - **Purpose:** The minimum fraction of total variance the top-k eigenvectors must collectively explain. If the actual ratio falls below this threshold, the series is deemed unsuitable for SSA and the Apply Grouping button is disabled. Raising this threshold makes the check stricter (only highly structured series pass); lowering it is more permissive and appropriate if your series has moderate but real structure diluted by heavy noise.
+
+**Example: relaxing the check for a noisy-but-structured series:**
+
+```yaml
+suitability_check:
+  top_k_eigenvectors: 6
+  min_explained_variance: 0.30  # Allow series where top-6 explain at least 30%
+```
 
 ### Modifying Configuration
 
