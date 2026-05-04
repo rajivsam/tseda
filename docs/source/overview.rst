@@ -29,4 +29,18 @@ Core capabilities
 - Observation logging: AIC-by-rank summaries, editable narrative reporting, and
 	validated knowledge-base save locations.
 
+Design philosophy
+-----------------
+
+The package follows a few explicit design rules:
+
+- UI and notebook parity: features available in the Dash UI are exposed through
+	Python calls for notebook workflows.
+- Configuration over hard-coding: algorithm constants and thresholds are loaded
+	from ``tseda_config.yaml`` and can be tuned without editing source.
+- Explicit decomposition controls: SSA window and component grouping are treated
+	as first-class controls rather than hidden internals.
+- Composable analysis: each plotting/diagnostic feature is a separate callable,
+	allowing custom notebook pipelines and automated reports.
+
 For installation and usage details, see :doc:`installation` and :doc:`workflow`.

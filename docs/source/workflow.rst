@@ -218,6 +218,32 @@ The generated observation text combines sampling metadata, descriptive statistic
 SSA decomposition notes, and residual diagnostics. You can edit this narrative before
 export so the final report reflects both automated diagnostics and expert judgment.
 
+Notebook API parity
+-------------------
+
+The same three-step workflow is available in notebooks through
+``tseda.notebook_api.NotebookThreeStepAPI``.
+
+The API exposes one-call-per-feature methods for:
+
+- Step 1: KDE, box, scatter, ACF, PACF, sampling properties, and summary stats.
+- Step 2: eigen plots, change-point plots, LOESS, noise KDE, and reconstruction.
+- Step 3: rank-wise variance plots and generated observation text.
+
+Important control points are explicit in the notebook API:
+
+- ``get_window()`` and ``set_window(...)`` for SSA window control.
+- ``suggest_grouping()``, ``get_grouping()``, and ``set_grouping(...)`` for
+    component assignments.
+- ``get_kde_plot(..., bin_algorithm=...)`` for histogram bin-rule selection,
+    including ``scott``, ``fd``, ``sturges``, and other NumPy-supported rules.
+- ``get_suitability_result(...)`` for the same top-k eigenvalue concentration
+    gate used by the UI.
+
+For a complete multi-dataset notebook walkthrough, see:
+
+- ``notebooks/notebook_three_step_api_examples.ipynb``
+
 References
 ----------
 

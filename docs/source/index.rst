@@ -17,5 +17,6 @@ API Quick Links
 
 - :doc:`SSA decomposition module <api/tseda.decomposition.ssa_decomposition>`
 - :doc:`SSA result summary module <api/tseda.decomposition.ssa_result_summary>`
+- :doc:`Notebook API module <api/tseda.notebook_api>`
 - :doc:`Decomposition namespace <api/tseda.decomposition>`
 - :doc:`Full API index <api/modules>`
