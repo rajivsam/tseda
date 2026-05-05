@@ -25,7 +25,9 @@ Core capabilities
 -----------------
 
 - Initial assessment: data profile, spread, distribution, and autocorrelation cues.
-- SSA decomposition: component extraction, grouping, reconstruction, and diagnostics.
+- SSA decomposition: component extraction, grouping, reconstruction, and diagnostics,
+  including a knee-based (commonly used elbow heuristic) noise-floor estimate for
+  initial signal-pool selection.
 - Observation logging: AIC-by-rank summaries, editable narrative reporting, and
 	validated knowledge-base save locations.
 

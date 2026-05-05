@@ -69,6 +69,31 @@ class SuitabilityResult:
     is_suitable: bool
 
 
+@dataclass(slots=True)
+class GroupingAutoTuneResult:
+    """Result payload from automatic window reassignment for DW gating.
+
+    Attributes:
+        grouping: Final grouping assignment applied to reconstruction.
+        dw_in_range: Whether final Durbin-Watson value is in configured range.
+        durbin_watson: Final Durbin-Watson statistic, if available.
+        initial_window: Window before auto-tuning.
+        final_window: Final window after auto-tuning.
+        windows_tried: Ordered list of windows evaluated.
+        suitability_passed: Whether suitability gate passed at final window.
+        reason: Machine-readable terminal status.
+    """
+
+    grouping: dict[str, list[int]]
+    dw_in_range: bool
+    durbin_watson: float | None
+    initial_window: int
+    final_window: int
+    windows_tried: list[int]
+    suitability_passed: bool
+    reason: str
+
+
 def _as_datetime_numeric_series(
     frame: pd.DataFrame,
     timestamp_col: int | str = 0,
@@ -245,6 +270,14 @@ class NotebookThreeStepAPI:
             Deep copy of the currently loaded ``tseda_config.yaml`` content.
         """
         return deepcopy(ConfigurationManager.load_config())
+
+    def get_grouping_heuristic_configuration(self) -> dict[str, Any]:
+        """Return grouping heuristic configuration used for SSA auto-grouping.
+
+        Returns:
+            Deep copy of ``grouping_heuristic`` configuration section.
+        """
+        return deepcopy(ConfigurationManager.get_section("grouping_heuristic"))
 
     def get_sampling_properties(self) -> pd.DataFrame:
         """Return sampling properties used in Step 1.
@@ -493,18 +526,141 @@ class NotebookThreeStepAPI:
         """
         return self._ensure_ssa().wcorr_plot()
 
-    def suggest_grouping(self) -> tuple[dict[str, list[int]], bool]:
+    def suggest_grouping(
+        self,
+        grouping_config: Mapping[str, int | float | str] | None = None,
+    ) -> tuple[dict[str, list[int]], bool]:
         """Run automatic grouping heuristic and apply the suggested grouping.
+
+        Args:
+            grouping_config: Optional per-call overrides for
+                ``grouping_heuristic`` settings (for example
+                ``pool_selection_method``, ``kneedle_min_distance``, and
+                ``pair_similarity_tolerance``).
 
         Returns:
             A tuple of ``(grouping, durbin_watson_in_range)`` where grouping has
             ``Trend``, ``Seasonality``, and ``Noise`` keys.
         """
         ssa = self._ensure_ssa()
-        grouping, dw_satisfied = ssa.suggest_reconstruction_groups()
+        grouping_payload = dict(grouping_config) if grouping_config is not None else None
+        grouping, dw_satisfied = ssa.suggest_reconstruction_groups(grouping_config=grouping_payload)
         self._grouping = {k: list(v) for k, v in grouping.items()}
         self._summary = None
         return self.get_grouping(), bool(dw_satisfied)
+
+    def suggest_grouping_with_window_autotune(
+        self,
+        grouping_config: Mapping[str, int | float | str] | None = None,
+        max_window: int | None = None,
+        doubling_factor: int = 2,
+    ) -> GroupingAutoTuneResult:
+        """Auto-suggest grouping and reassign window until DW gate is met.
+
+        The method mirrors UI behavior used during manual retries: run grouping,
+        evaluate DW, and when not in range, increase window size and retry until
+        either DW is satisfied or the max window limit is reached.
+
+        Args:
+            grouping_config: Optional overrides for ``grouping_heuristic``.
+            max_window: Upper bound for reassignment; defaults to ``len(series)//2``.
+            doubling_factor: Multiplier for each reassignment step.
+
+        Returns:
+            GroupingAutoTuneResult with final grouping, DW status, and diagnostics.
+
+        Raises:
+            ValueError: If doubling_factor is less than 2.
+        """
+        if int(doubling_factor) < 2:
+            raise ValueError("doubling_factor must be >= 2.")
+
+        ssa = self._ensure_ssa()
+        initial_window = int(self.get_window())
+        current_window = initial_window
+        upper_bound = int(max_window) if max_window is not None else len(self._series) // 2
+        upper_bound = max(1, upper_bound)
+
+        windows_tried: list[int] = [current_window]
+        grouping_payload = dict(grouping_config) if grouping_config is not None else None
+
+        suitability = self.get_suitability_result()
+        if not suitability.is_suitable:
+            return GroupingAutoTuneResult(
+                grouping={},
+                dw_in_range=False,
+                durbin_watson=None,
+                initial_window=initial_window,
+                final_window=current_window,
+                windows_tried=windows_tried,
+                suitability_passed=False,
+                reason="suitability_failed",
+            )
+
+        grouping, dw_ok = self.suggest_grouping(grouping_config=grouping_payload)
+        self.set_grouping(grouping=grouping)
+        metadata = self.get_reconstruction_metadata(auto_suggest_if_missing=False)
+        dw_value = metadata.get("durbin_watson")
+
+        if dw_ok:
+            return GroupingAutoTuneResult(
+                grouping=self.get_grouping(),
+                dw_in_range=True,
+                durbin_watson=float(dw_value) if dw_value is not None else None,
+                initial_window=initial_window,
+                final_window=current_window,
+                windows_tried=windows_tried,
+                suitability_passed=True,
+                reason="dw_satisfied",
+            )
+
+        while current_window * int(doubling_factor) <= upper_bound:
+            current_window = self.set_window(
+                current_window * int(doubling_factor),
+                apply_window_refinement=False,
+            )
+            windows_tried.append(current_window)
+
+            suitability = self.get_suitability_result()
+            if not suitability.is_suitable:
+                return GroupingAutoTuneResult(
+                    grouping={},
+                    dw_in_range=False,
+                    durbin_watson=None,
+                    initial_window=initial_window,
+                    final_window=current_window,
+                    windows_tried=windows_tried,
+                    suitability_passed=False,
+                    reason="suitability_failed_after_reassignment",
+                )
+
+            grouping, dw_ok = self.suggest_grouping(grouping_config=grouping_payload)
+            self.set_grouping(grouping=grouping)
+            metadata = self.get_reconstruction_metadata(auto_suggest_if_missing=False)
+            dw_value = metadata.get("durbin_watson")
+
+            if dw_ok:
+                return GroupingAutoTuneResult(
+                    grouping=self.get_grouping(),
+                    dw_in_range=True,
+                    durbin_watson=float(dw_value) if dw_value is not None else None,
+                    initial_window=initial_window,
+                    final_window=current_window,
+                    windows_tried=windows_tried,
+                    suitability_passed=True,
+                    reason="dw_satisfied_after_reassignment",
+                )
+
+        return GroupingAutoTuneResult(
+            grouping=self.get_grouping(),
+            dw_in_range=False,
+            durbin_watson=float(dw_value) if dw_value is not None else None,
+            initial_window=initial_window,
+            final_window=current_window,
+            windows_tried=windows_tried,
+            suitability_passed=True,
+            reason="dw_not_satisfied_max_window",
+        )
 
     def get_grouping(self) -> dict[str, list[int]]:
         """Get the active component grouping.

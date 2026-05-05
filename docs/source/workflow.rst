@@ -98,10 +98,13 @@ In this step you inspect:
   seasonality, and noise).
 - Residual diagnostics, including Durbin-Watson on the noise component.
 
-Component grouping starts with an automatic heuristic: components explaining at least
-10 percent of total variance are scanned in rank order, adjacent pairs within a 5
-percent eigenvalue difference are suggested as seasonality, remaining eligible
-components are suggested as trend, and everything else is assigned to noise.
+Component grouping starts with an automatic heuristic that uses a knee-based
+noise-floor estimate on the eigen spectrum. This type of knee/elbow detection is a
+commonly used heuristic for separating dominant structure from tail components in
+ranked spectra. In ``tseda``, components up to the detected knee are treated as the
+initial signal pool, then scanned in rank order: adjacent pairs within a 5 percent
+eigenvalue difference are suggested as seasonality, remaining eligible components are
+suggested as trend, and everything else is assigned to noise.
 
 The Durbin-Watson (DW) statistic is computed on the noise residual to validate the
 assignment. If DW falls outside [1.5, 2.5] the algorithm expands the assignment one
@@ -117,19 +120,31 @@ The pseudocode below describes the full group-assignment procedure:
 
     Input:  eigenvalues λ₁ ≥ λ₂ ≥ ... ≥ λₖ (sorted descending),
             noise residual r
-    Params: variance_threshold = 0.10, pair_tolerance = 0.05,
+    Params: pool_selection_method = "kneedle",
+            kneedle_min_distance = 0.03,
+            min_signal_components = 1,
+            min_noise_components = 2,
+            variance_threshold = 0.10,   // legacy fallback mode only
+            pair_tolerance = 0.05,
             dw_low = 1.5, dw_high = 2.5
 
     --- Initial classification ---
-    1.  total  ← Σᵢ λᵢ
-    2.  For each i: vᵢ ← λᵢ / total           // explained variance ratio
-    3.  Eligible ← { i : vᵢ ≥ variance_threshold }
-    4.  Noise   ← { i : vᵢ < variance_threshold }
-    5.  Trend ← ∅;  Seasonality ← ∅
+    1.  Trend ← ∅;  Seasonality ← ∅
+    2.  If pool_selection_method = "kneedle":
+          a) yᵢ ← log(1 + λᵢ)
+          b) Normalize y between first and last points
+          c) Compute distance to endpoint chord line
+          d) knee ← argmax(distance) if max(distance) ≥ kneedle_min_distance
+          e) Eligible ← {0..knee} with bounds:
+                min |Eligible| = min_signal_components
+                max |Eligible| = K - min_noise_components
+        Else (legacy fallback):
+          Eligible ← { i : (λᵢ / Σⱼ λⱼ) ≥ variance_threshold }
+    3.  Noise ← all indices not in Eligible
 
     --- Scan eligible components in rank order ---
-    6.  cursor ← 0
-    7.  While cursor < |Eligible|:
+    4.  cursor ← 0
+    5.  While cursor < |Eligible|:
           j ← Eligible[cursor]
           k ← Eligible[cursor + 1]  (if it exists)
           if k = j + 1  and  |λⱼ − λₖ| / max(λⱼ, λₖ) ≤ pair_tolerance then
@@ -140,12 +155,12 @@ The pseudocode below describes the full group-assignment procedure:
               cursor ← cursor + 1
 
     --- Validate with Durbin-Watson ---
-    8.  r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
-    9.  dw ← DurbinWatson(r_noise)
-    10. best ← current assignment;  best_dist ← |dw − 2.0|
+    6.  r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
+    7.  dw ← DurbinWatson(r_noise)
+    8.  best ← current assignment;  best_dist ← |dw − 2.0|
 
     --- Iterative expansion from noise pool ---
-    11. While dw ∉ [dw_low, dw_high]  and  |Noise| > 2:
+    9.  While dw ∉ [dw_low, dw_high]  and  |Noise| > 0:
           candidate ← Noise[0]          // largest remaining noise eigenvalue
           next      ← Noise[1]  (if it exists)
           if next = candidate + 1  and  |λ_candidate − λ_next| / max(…) ≤ pair_tolerance then
@@ -160,9 +175,9 @@ The pseudocode below describes the full group-assignment procedure:
               best ← current assignment;  best_dist ← |dw − 2.0|
 
     --- Output ---
-    12. If dw ∉ [dw_low, dw_high]:
+        10. If dw ∉ [dw_low, dw_high]:
             Return best  with warning "DW criterion not met — try a different window size"
-    13. Else:
+        11. Else:
             Return (Trend, Seasonality, Noise)
 
 The suggested grouping is rendered directly in the UI and prepopulates the editable

@@ -11,15 +11,20 @@ import numpy as np
 class AutomaticGroupingHeuristic:
     """Suggest SSA grouping labels from the eigenvalue spectrum.
 
-    Components explaining at least ``variance_threshold`` of total variance are
-    classified as either trend or seasonality. Near-equal adjacent pairs are
-    treated as seasonal pairs; the remaining eligible components are treated as
-    trend. All other components fall into noise.
+    The initial trend/seasonality candidate pool is selected from the leading
+    eigenvalues up to a detected noise floor (kneedle-style elbow on the
+    normalized log-spectrum). Near-equal adjacent pairs are treated as seasonal
+    pairs; the remaining eligible components are treated as trend. All other
+    components fall into noise.
     """
 
     eigenvalues: np.ndarray
+    pool_selection_method: str = "kneedle"
     variance_threshold: float = 0.10
     pair_similarity_tolerance: float = 0.05
+    kneedle_min_distance: float = 0.03
+    min_signal_components: int = 1
+    min_noise_components: int = 2
 
     def __post_init__(self) -> None:
         values = np.asarray(self.eigenvalues, dtype=float)
@@ -27,6 +32,10 @@ class AutomaticGroupingHeuristic:
             raise ValueError("eigenvalues must be a one-dimensional array.")
         if np.any(values < 0):
             raise ValueError("eigenvalues must be non-negative.")
+        if self.min_signal_components < 1:
+            raise ValueError("min_signal_components must be >= 1.")
+        if self.min_noise_components < 0:
+            raise ValueError("min_noise_components must be >= 0.")
 
         self.eigenvalues = values
 
@@ -61,10 +70,75 @@ class AutomaticGroupingHeuristic:
                 return True
         return False
 
+    def _resolve_signal_count_bounds(self) -> tuple[int, int]:
+        """Return min/max bounds for the initial eligible signal pool size."""
+        n = int(len(self.eigenvalues))
+        min_signal = min(max(int(self.min_signal_components), 1), n)
+        max_signal = n - max(int(self.min_noise_components), 0)
+        if max_signal < 1:
+            max_signal = 1
+        max_signal = min(max_signal, n)
+        if min_signal > max_signal:
+            min_signal = max_signal
+        return min_signal, max_signal
+
+    def _kneedle_noise_floor_index(self) -> int | None:
+        """Return the last structural component index from a kneedle-style elbow.
+
+        The spectrum is converted to log scale to stabilize dynamic range,
+        normalized to [0, 1], and compared against the straight line between
+        endpoints. The elbow is the point of maximum positive distance.
+        """
+        n = int(len(self.eigenvalues))
+        if n < 3:
+            return None
+
+        values = np.log1p(np.asarray(self.eigenvalues, dtype=float))
+        first = float(values[0])
+        last = float(values[-1])
+        denom = first - last
+        if denom <= 0.0:
+            return None
+
+        x = np.linspace(0.0, 1.0, n)
+        y = (values - last) / denom
+        line = 1.0 - x
+        distance = y - line
+
+        knee_index = int(np.argmax(distance))
+        if float(distance[knee_index]) < float(self.kneedle_min_distance):
+            return None
+        return knee_index
+
     def eligible_component_indices(self) -> list[int]:
-        """Return component indices meeting the minimum explained-variance threshold."""
-        ratios = self.explained_variance_ratios
-        return [index for index, ratio in enumerate(ratios) if float(ratio) >= self.variance_threshold]
+        """Return initial signal-pool component indices for grouping.
+
+        Default strategy uses a kneedle-style elbow to estimate the noise floor.
+        Legacy ``variance_threshold`` mode is retained as a configurable fallback.
+        """
+        min_signal, max_signal = self._resolve_signal_count_bounds()
+        n = int(len(self.eigenvalues))
+
+        method = str(self.pool_selection_method).strip().lower()
+        if method == "variance_threshold":
+            ratios = self.explained_variance_ratios
+            threshold_indices = [
+                index for index, ratio in enumerate(ratios)
+                if float(ratio) >= float(self.variance_threshold)
+            ]
+            if threshold_indices:
+                count = len(threshold_indices)
+            else:
+                count = min_signal
+        else:
+            knee_index = self._kneedle_noise_floor_index()
+            if knee_index is None:
+                count = min_signal
+            else:
+                count = knee_index + 1
+
+        count = max(min_signal, min(count, max_signal))
+        return list(range(min(count, n)))
 
     def suggest_reconstruction(self) -> dict[str, list[int]]:
         """Return a trend/seasonality/noise grouping suggestion."""

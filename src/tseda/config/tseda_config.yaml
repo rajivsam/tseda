@@ -53,10 +53,16 @@ window_selection:
 # Parameters controlling how SSA components are classified as Trend,
 # Seasonality, or Noise.
 grouping_heuristic:
+  # Strategy used to define the initial signal pool before DW-guided expansion.
+  # "kneedle" detects a noise floor via an elbow in the eigen spectrum.
+  # "variance_threshold" retains the legacy explained-variance rule.
+  # Default: "kneedle"
+  pool_selection_method: "kneedle"
+
   # Minimum explained variance ratio for a component to be considered "eligible".
-  # Components explaining less than this fraction are automatically classified as noise.
+  # Used only when pool_selection_method is "variance_threshold".
   # Default: 0.05
-  # Suggested range: 0.05 - 0.20
+  # Suggested range: 0.03 - 0.20
   variance_threshold: 0.05
 
   # Maximum allowed relative difference between paired eigenvalues.
@@ -66,6 +72,22 @@ grouping_heuristic:
   # Default: 0.05
   # Suggested range: 0.02 - 0.10
   pair_similarity_tolerance: 0.05
+
+  # Minimum normalized knee distance required to accept a detected elbow.
+  # Larger values make the algorithm more conservative (smaller signal pool).
+  # Default: 0.03
+  # Suggested range: 0.01 - 0.08
+  kneedle_min_distance: 0.03
+
+  # Lower bound on number of components to include in the initial signal pool.
+  # This prevents empty or unstable signal assignments on flat spectra.
+  # Default: 1
+  min_signal_components: 1
+
+  # Lower bound on number of components kept in the initial noise pool.
+  # This preserves room for DW-guided reassignment and residual validation.
+  # Default: 2
+  min_noise_components: 2
 
 # ============================================================================
 # Section 4: Durbin-Watson Noise Quality Check

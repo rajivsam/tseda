@@ -56,21 +56,56 @@ class SSADecomposition:
         self._seasonality_check_heuristic = heuristic.has_seasonal_pair(max_components=max_components)
         return self._seasonality_check_heuristic
 
-    def get_automatic_grouping_heuristic(self) -> AutomaticGroupingHeuristic:
-        """Return the automatic grouping heuristic for the current eigen spectrum."""
-        variance_threshold = ConfigurationManager.get(
-            "grouping_heuristic.variance_threshold", 0.10
+    def get_automatic_grouping_heuristic(
+        self,
+        grouping_config: dict[str, int | float | str] | None = None,
+    ) -> AutomaticGroupingHeuristic:
+        """Return the automatic grouping heuristic for the current eigen spectrum.
+
+        Args:
+            grouping_config: Optional per-call overrides for
+                ``grouping_heuristic.*`` settings.
+        """
+        overrides = grouping_config or {}
+        pool_selection_method = overrides.get(
+            "pool_selection_method",
+            ConfigurationManager.get("grouping_heuristic.pool_selection_method", "kneedle"),
         )
-        pair_similarity_tolerance = ConfigurationManager.get(
-            "grouping_heuristic.pair_similarity_tolerance", 0.05
+        variance_threshold = overrides.get(
+            "variance_threshold",
+            ConfigurationManager.get("grouping_heuristic.variance_threshold", 0.10),
         )
-        return AutomaticGroupingHeuristic(
-            eigenvalues=np.asarray(self._eigenvalues, dtype=float),
-            variance_threshold=variance_threshold,
-            pair_similarity_tolerance=pair_similarity_tolerance,
+        pair_similarity_tolerance = overrides.get(
+            "pair_similarity_tolerance",
+            ConfigurationManager.get("grouping_heuristic.pair_similarity_tolerance", 0.05),
+        )
+        kneedle_min_distance = overrides.get(
+            "kneedle_min_distance",
+            ConfigurationManager.get("grouping_heuristic.kneedle_min_distance", 0.03),
+        )
+        min_signal_components = overrides.get(
+            "min_signal_components",
+            ConfigurationManager.get("grouping_heuristic.min_signal_components", 1),
+        )
+        min_noise_components = overrides.get(
+            "min_noise_components",
+            ConfigurationManager.get("grouping_heuristic.min_noise_components", 2),
         )
 
-    def suggest_reconstruction_groups(self) -> tuple[dict[str, list[int]], bool]:
+        return AutomaticGroupingHeuristic(
+            eigenvalues=np.asarray(self._eigenvalues, dtype=float),
+            pool_selection_method=str(pool_selection_method),
+            variance_threshold=variance_threshold,
+            pair_similarity_tolerance=pair_similarity_tolerance,
+            kneedle_min_distance=kneedle_min_distance,
+            min_signal_components=int(min_signal_components),
+            min_noise_components=int(min_noise_components),
+        )
+
+    def suggest_reconstruction_groups(
+        self,
+        grouping_config: dict[str, int | float | str] | None = None,
+    ) -> tuple[dict[str, list[int]], bool]:
         """Return the best auto-inferred grouping and a Durbin-Watson satisfied flag.
 
         Starting from the threshold-based initial assignment, the method expands the
@@ -86,7 +121,7 @@ class SSADecomposition:
         dw_low = ConfigurationManager.get("noise_validation.dw_low", 1.5)
         dw_high = ConfigurationManager.get("noise_validation.dw_high", 2.5)
         
-        heuristic = self.get_automatic_grouping_heuristic()
+        heuristic = self.get_automatic_grouping_heuristic(grouping_config=grouping_config)
         assignment = heuristic.suggest_reconstruction()
 
         dw = self._compute_dw_for_assignment(assignment)

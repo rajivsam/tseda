@@ -94,6 +94,7 @@ def test_signal_reconstruction_plot_updates_seasonality_heuristic_flag():
 def test_automatic_grouping_heuristic_suggests_trend_seasonality_and_noise():
     heuristic = AutomaticGroupingHeuristic(
         eigenvalues=np.array([40.0, 21.0, 20.2, 8.0, 5.0, 2.0]),
+        pool_selection_method="variance_threshold",
     )
 
     assert heuristic.suggest_reconstruction() == {
@@ -107,6 +108,7 @@ def test_suggest_next_expansion_adds_trend_component():
     # eigenvalue[3]=8.0, eigenvalue[4]=5.0 → not near-equal → trend
     heuristic = AutomaticGroupingHeuristic(
         eigenvalues=np.array([40.0, 21.0, 20.2, 8.0, 5.0, 2.0]),
+        pool_selection_method="variance_threshold",
     )
     current = {"Trend": [0], "Seasonality": [1, 2], "Noise": [3, 4, 5]}
 
@@ -122,6 +124,7 @@ def test_suggest_next_expansion_adds_seasonal_pair():
     # eigenvalue[3]=10.0, eigenvalue[4]=9.7 → near-equal adjacent pair → seasonality
     heuristic = AutomaticGroupingHeuristic(
         eigenvalues=np.array([40.0, 21.0, 20.2, 10.0, 9.7, 2.0]),
+        pool_selection_method="variance_threshold",
     )
     current = {"Trend": [0], "Seasonality": [1, 2], "Noise": [3, 4, 5]}
 
@@ -135,6 +138,7 @@ def test_suggest_next_expansion_adds_seasonal_pair():
 def test_suggest_next_expansion_returns_false_when_pool_empty():
     heuristic = AutomaticGroupingHeuristic(
         eigenvalues=np.array([40.0, 21.0, 20.2]),
+        pool_selection_method="variance_threshold",
     )
     current = {"Trend": [0], "Seasonality": [1, 2], "Noise": []}
 
@@ -148,6 +152,37 @@ def test_ssa_decomposition_suggest_reconstruction_groups_returns_tuple():
     ssa = SSADecomposition(series, window=12)
 
     groups, dw_satisfied = ssa.suggest_reconstruction_groups()
+
+    assert isinstance(groups, dict)
+    assert "Trend" in groups
+    assert "Noise" in groups
+    assert isinstance(dw_satisfied, bool)
+
+
+def test_kneedle_selection_detects_noise_floor_and_preserves_noise_pool():
+    heuristic = AutomaticGroupingHeuristic(
+        eigenvalues=np.array([100.0, 55.0, 30.0, 8.0, 4.0, 2.0, 1.0]),
+        pool_selection_method="kneedle",
+        min_signal_components=1,
+        min_noise_components=2,
+    )
+
+    eligible = heuristic.eligible_component_indices()
+
+    assert eligible == [0, 1, 2]
+
+
+def test_ssa_decomposition_accepts_grouping_config_overrides():
+    series = build_series()
+    ssa = SSADecomposition(series, window=12)
+
+    groups, dw_satisfied = ssa.suggest_reconstruction_groups(
+        grouping_config={
+            "pool_selection_method": "variance_threshold",
+            "variance_threshold": 0.10,
+            "pair_similarity_tolerance": 0.05,
+        }
+    )
 
     assert isinstance(groups, dict)
     assert "Trend" in groups

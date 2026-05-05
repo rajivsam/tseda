@@ -244,18 +244,29 @@ Algorithm: SSA Eigenvalue Group Assignment
 Input:  eigenvalues λ₁ ≥ λ₂ ≥ ... ≥ λₖ (sorted descending),
       noise residual r
 Params: variance_threshold = 0.10, pair_tolerance = 0.05,
+  pool_selection_method = "kneedle",
+  kneedle_min_distance = 0.03,
+  min_signal_components = 1,
+  min_noise_components = 2,
       dw_low = 1.5, dw_high = 2.5
 
 --- Initial classification ---
-1.  total  ← Σᵢ λᵢ
-2.  For each i: vᵢ ← λᵢ / total           // explained variance ratio
-3.  Eligible ← { i : vᵢ ≥ variance_threshold }
-4.  Noise   ← { i : vᵢ < variance_threshold }
-5.  Trend ← ∅;  Seasonality ← ∅
+1.  Trend ← ∅;  Seasonality ← ∅
+2.  If pool_selection_method = "kneedle":
+      a) yᵢ ← log(1 + λᵢ)
+      b) Normalize y between first and last points
+      c) Compute distance to endpoint chord line
+      d) knee ← argmax(distance) if max(distance) ≥ kneedle_min_distance
+      e) Eligible ← {0..knee} with bounds:
+            min |Eligible| = min_signal_components
+            max |Eligible| = K - min_noise_components
+    Else (legacy fallback):
+      Eligible ← { i : (λᵢ / Σⱼ λⱼ) ≥ variance_threshold }
+3.  Noise ← all indices not in Eligible
 
 --- Scan eligible components in rank order ---
-6.  cursor ← 0
-7.  While cursor < |Eligible|:
+4.  cursor ← 0
+5.  While cursor < |Eligible|:
      j ← Eligible[cursor]
      k ← Eligible[cursor + 1]  (if it exists)
      if k = j + 1  and  |λⱼ − λₖ| / max(λⱼ, λₖ) ≤ pair_tolerance then
@@ -266,12 +277,12 @@ Params: variance_threshold = 0.10, pair_tolerance = 0.05,
         cursor ← cursor + 1
 
 --- Validate with Durbin-Watson ---
-8.  r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
-9.  dw ← DurbinWatson(r_noise)
-10. best ← current assignment;  best_dist ← |dw − 2.0|
+6.  r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
+7.  dw ← DurbinWatson(r_noise)
+8.  best ← current assignment;  best_dist ← |dw − 2.0|
 
 --- Iterative expansion from noise pool ---
-11. While dw ∉ [dw_low, dw_high]  and  |Noise| > 2:
+9.  While dw ∉ [dw_low, dw_high]  and  |Noise| > 0:
      candidate ← Noise[0]          // largest remaining noise eigenvalue
      next      ← Noise[1]  (if it exists)
      if next = candidate + 1  and  |λ_candidate − λ_next| / max(…) ≤ pair_tolerance then
@@ -286,9 +297,9 @@ Params: variance_threshold = 0.10, pair_tolerance = 0.05,
         best ← current assignment;  best_dist ← |dw − 2.0|
 
 --- Output ---
-12. If dw ∉ [dw_low, dw_high]:
+10. If dw ∉ [dw_low, dw_high]:
       Return best  with warning "DW criterion not met — try a different window size"
-13. Else:
+11. Else:
       Return (Trend, Seasonality, Noise)
 ```
 
@@ -311,6 +322,11 @@ Assign SSA components to interpretable groups by entering index ranges (0-based)
 The app reconstructs the signal for each group and displays the result overlaid on the original series.
 
 If you click **Clear Uploaded File** in Step 1, the suggested grouping table and the prepopulated grouping fields are reset with the rest of the session analysis state.
+
+For notebook users, the same retry pattern is available via
+`NotebookThreeStepAPI.suggest_grouping_with_window_autotune(...)`, which
+automatically reapplies grouping after each window reassignment until the
+Durbin-Watson gate passes or the configured maximum window is reached.
 
 #### Durbin-Watson Test
 
@@ -494,14 +510,36 @@ window_selection:
 
 ```yaml
 grouping_heuristic:
-  variance_threshold: 0.10           # Minimum explained variance ratio to classify as "eligible"
+  pool_selection_method: "kneedle"   # "kneedle" (default) or legacy "variance_threshold"
+  variance_threshold: 0.10           # Used only in legacy variance_threshold mode
   pair_similarity_tolerance: 0.05    # Maximum allowed difference (as fraction) for paired eigenvalues
+  kneedle_min_distance: 0.03         # Minimum normalized knee distance to accept elbow
+  min_signal_components: 1           # Minimum initial signal pool size
+  min_noise_components: 2            # Minimum initial noise pool size
 ```
 
-**Variance threshold:**
+**Pool selection method:**
+  - **Default:** `kneedle`
+  - **Options:** `kneedle`, `variance_threshold`
+  - **Purpose:** Defines how the initial signal pool is selected before DW-guided expansion.
+
+**Kneedle minimum distance:**
+  - **Default:** `0.03`
+  - **Range:** `0.01` – `0.08`
+  - **Purpose:** Controls how strong the elbow must be to accept a detected noise floor.
+
+**Minimum signal components:**
+  - **Default:** `1`
+  - **Purpose:** Prevents empty initial signal pools on flat spectra.
+
+**Minimum noise components:**
+  - **Default:** `2`
+  - **Purpose:** Preserves room for DW-based reassignment and residual checks.
+
+**Variance threshold (legacy mode):**
   - **Default:** `0.10` (10%)
   - **Range:** `0.05` – `0.20`
-  - **Purpose:** Components explaining less than this fraction of total variance are classified as noise.
+  - **Purpose:** Used only when `pool_selection_method` is set to `variance_threshold`.
 
 **Pair similarity tolerance:**
   - **Default:** `0.05` (5%)
