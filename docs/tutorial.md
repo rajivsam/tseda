@@ -70,7 +70,7 @@ The daily coffee price series has a clear trend and seasonal structure. The auto
 
 1. Click **Choose File** on the landing page.
 2. Select `data/coffee_prices.csv` from the repository, or upload any two-column CSV (column 0: timestamp, column 1: numeric value).
-3. The app parses the file, infers daily cadence, and sets an initial window of **5**.
+3. The app parses the file, infers monthly cadence, and sets an initial window of **12**.
 
 **Step 2 — Initial Assessment**
 
@@ -84,7 +84,7 @@ The app automatically navigates to the **Initial Assessment** panel. Review:
 
 Switch to the **Decomposition** panel.
 
-1. The app has already run window refinement; the slider shows the refined window value (typically **5** for this series).
+1. The app has already run window refinement; the slider shows the refined window value (typically **12** for this series).
 2. Click **Suggest Grouping**. The algorithm runs the kneedle noise-floor heuristic, assigns Trend and Seasonality components, and evaluates Durbin-Watson on the residual.
 3. The suggested grouping table is pre-populated. For example:
    - **Trend:** `[0]`
