@@ -1,4 +1,4 @@
-# Time Series Explorer (`tseda`)
+# tseda: Enterprise-Grade Time Series Signal Decomposition & Automated Diagnostics
 
 <p align="center">
 	<a href="#non-developer-quick-start">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-	<strong>Time series exploration and decomposition for fast, reliable insights.</strong>
+	<strong>Automated signal decomposition and diagnostic engine for high-fidelity time series preprocessing.</strong>
 </p>
 
 <p align="center">
@@ -21,169 +21,64 @@
 	<a href="https://tseda.readthedocs.io/en/latest/"><strong>Read the Docs</strong></a>
 </p>
 
-An application for time series exploration.
-
 ## Overview
 
-`tseda` lets you explore regularly sampled time series with a sampling frequency of one hour or greater. It is currently limited to 2,000 samples (this is configurable).
+`tseda` is a high-fidelity Python framework designed to automate the preprocessing, 
+signal decomposition, and structural validation of regularly sampled time-series data. 
 
-## Three-Step Exploration Workflow
+By automating Singular Spectrum Analysis (SSA) parameter selection, `tseda` eliminates 
+the manual guesswork that traditionally introduces bias into production analytical pipelines. 
+It bridges the gap between raw data ingestion and model-ready signals by providing 
+deterministic heuristics for window selection and component grouping.
+
+## Core Systematic Capabilities
+
+* **Automated SSA Window Calibration:** Automates optimal window selections derived directly from sampling frequencies and eigen-spectrum spread, preventing the distortion of latent signals.
+* **Deterministic Component Grouping:** Implements a robust variance-and-correlation heuristic (leveraging the Kneedle algorithm) to mathematically isolate trend and seasonality from ambient noise.
+* **Bi-Directional Interface Flex:** Seamlessly transition between a **headless Notebook SDK** for automated CI/CD batch pipelines and an **interactive Plotly Observability Dashboard** for expert human-in-the-loop validation.
+* **KMDS Lineage Persistence:** Serializes pipeline decisions, reconstruction metadata, and analytical summaries directly into an ontology-backed KMDS knowledge graph for compliance auditing and data lineage tracking.
+* **Structural Suitability Validation:** A built-in gate that quantifies whether a dataset possesses enough internal structure for meaningful decomposition, preventing the "garbage-in, garbage-out" failure mode common in automated SSA.
+
+## Production Deployment Workflow
+
+`tseda` is designed to fit into standard enterprise version-control and deployment lifecycles:
+
+1. **Pull:** Checkout the project branch within your enterprise version-control environment.
+2. **Execute:** Run `tseda` headlessly via the Notebook SDK to compute baseline signal profiles and export components.
+3. **Verify:** Launch the interactive dashboard to audit edge cases or manually override heuristics for complex signals.
+4. **Commit:** Persist the final analytical state and observations directly to the metadata repository via the KMDS integration.
+
+---
+
+## Three-Step Validation Workflow
+
+`tseda` organizes time series analysis into a structured three-phase process to ensure methodological consistency.
 
 ### (a) Initial Assessment
 
-Explore the distribution and spread of values using a kernel density estimate and box plot. You get to see the raw distribution of the values. The PACF and ACF provide clues about seasonality and autoregressive components.
+Evaluate the raw signal's statistical properties before decomposition.
 
-### (b) Decomposition Using Singular Spectral Analysis
+* **Distribution Analysis:** Utilize Kernel Density Estimates (KDE) and box plots to identify multi-modality or outliers.
+* **Autocorrelation Profiling:** ACF and PACF plots provide immediate indicators of seasonal structure and autoregressive components.
 
-**Window selection and component grouping are the two hardest decisions when applying SSA.** Choosing the wrong window distorts the eigen spectrum and makes meaningful grouping impossible; grouping the wrong components together conflates trend with seasonality or buries signal in noise. `tseda` automates both steps: it selects a window from the sampling frequency and derives a grouping from the eigen spectrum using a variance-and-correlation heuristic. Expert users can override both — the window via a slider and the grouping via direct input — but the defaults are designed to produce a defensible starting point without manual tuning.
+### (b) Automated Decomposition & Heuristics
 
-The app first computes an initial SSA window from the detected cadence, then validates whether the eigen spectrum has enough spread. If the smallest eigenvalue still explains too much variance, the window is doubled and SSA is recomputed until the criterion is satisfied (or the SSA half-length bound is reached).
+**Window selection and component grouping are the two hardest engineering bottlenecks when applying SSA.** Choosing the wrong window distorts the eigen spectrum; grouping the wrong components conflates trend with noise. `tseda` automates both.
 
-Before any component grouping is attempted, the app also performs a **dataset suitability check** — see below.
+The app first computes an initial SSA window from the detected cadence, then validates whether the eigen spectrum has enough spread. If the smallest eigenvalue still explains too much variance, the window is doubled and SSA is recomputed until the criterion is satisfied.
 
-| Cadence | Initial Window |
-|---------|----------------|
-| Hourly  | 24             |
-| Daily   | 5              |
-| Weekly  | 4              |
-| Monthly | 12             |
-| Quarterly | 4            |
+#### Structural Suitability Check
+Before grouping, `tseda` checks if variance is concentrated in a small number of leading eigenvectors. A flat eigenspectrum is the signature of white noise; applying SSA to such a series is mathematically valid but practically meaningless.
 
-**Algorithm: Initial SSA Window Setup**
-
-```
-Input:  regular time series x, inferred cadence c
-Params: min_tail_spread = 0.10
-
---- Cadence-based initialization ---
-1.  If c = hourly  -> w ← 24
-2.  If c = daily   -> w ← 5
-3.  If c = weekly  -> w ← 4
-4.  If c = monthly -> w ← 12
-5.  If c = quarterly -> w ← 4
-6.  If cadence is unknown -> fail with "invalid window"
-
---- Spectrum-spread refinement ---
-7.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
-8.  tail_ratio ← λ_w / Σᵢ λᵢ
-9.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
-    w ← 2w
-    Rebuild SSA(x, w)
-    tail_ratio ← λ_w / Σᵢ λᵢ
-
---- Output ---
-10. Return final w as the decomposition default and slider value
-```
-
-This can be changed in the UI. Based on the eigen value distribution, observations from the ACF plot and the eigen vector plot, the seasonal components can be determined if present. Based on these initial plots, the user needs to input a set of groupings and reconstruct the series with these groupings. The reconstruction plots are shown.
-
-#### Dataset Suitability Check
-
-Before the grouping UI is enabled, `tseda` checks whether the series is structurally suited to SSA decomposition. The check is grounded in a fundamental property of SSA: **meaningful decomposition requires that variance be concentrated in a small number of leading eigenvectors**. When a time series contains real structure — a trend, a seasonal pattern, or both — those components manifest as dominant eigenvectors that together account for a large share of total variance. The remaining eigenvectors represent noise and should contribute comparatively little.
-
-A flat eigenspectrum, where variance is spread roughly equally across many eigenvectors, is the signature of white noise. Applying SSA to such a series produces a decomposition that is mathematically valid but practically meaningless: the algorithm will assign components to Trend and Seasonality groups that are indistinguishable from random fluctuations, and the Durbin-Watson test on the residual will rarely produce a clean pass. Since `tseda` is SSA-focused, unsuitable datasets should be analyzed with external stochastic approaches (for example random walk/Brownian-motion-style models or ARIMA/SARIMA), not with SSA decomposition in this app.
-
-The suitability check is:
-
-```
-Params: top_k = 5, min_explained_variance = 0.40
-
-1.  total ← Σᵢ λᵢ
-2.  top_k_ratio ← Σᵢ₌₁ᵏ λᵢ / total    (k = min(top_k, spectrum_length))
-3.  If top_k_ratio < min_explained_variance:
-        Block Apply Grouping
-        Display: "Top k eigenvectors explain X% — minimum required Y%"
-    Suggest: try external stochastic modelling approaches
-4.  Else:
-        Proceed with grouping
-```
-
-Both `top_k` and `min_explained_variance` are configurable in `tseda_config.yaml` under `suitability_check`. When this check fails, the Apply Grouping button is disabled and a prominent alert explains the actual ratio alongside the threshold, so the user can judge whether to try a different window or accept that a different modelling approach is needed.
-
-**Change point detection** is run automatically after grouping, covering two independent analyses:
+#### Deterministic Change Point Detection
+Change point detection is executed automatically post-grouping, covering two structural shifts:
 
 - **Trend shifts** — detects permanent changes in the long-run mean level (PELT on the normalised Trend component).
 - **Seasonal amplitude shifts** — detects points where the seasonal pattern becomes noticeably stronger or weaker (PELT on the rolling-RMS envelope of the Seasonality component).
-- **Noise** — excluded from change-point analysis by design; noise has no persistent structure.
 
-The plot overlays both sets of markers on a single continuous signal line, with a plain-language date summary below. See the [User Guide — Change Point Detection](docs/user_guide.md#change-point-detection) section for the full algorithm and visualisation reference.
+### (c) Lineage Logging & Model Order
 
-The explained variance from signal and noise components and the assessment of the noise structure (independent or correlated) is provided.
-
-The decomposition step now also includes an automatic grouping heuristic. Instead of a fixed explained-variance cutoff, the initial signal pool is selected up to a kneedle-style noise floor detected from the eigen spectrum. Near-equal adjacent pairs within a 5% difference are suggested as seasonality, other components in that pool are suggested as trend, and all remaining components are left to noise. The Durbin-Watson (DW) statistic is then computed on the noise residual; if DW falls outside [1.5, 2.5] the algorithm expands the assignment one component at a time, tracking the assignment closest to DW = 2.0, until the criterion is met or all components are consumed. If the criterion is never met the user is prompted to try a different window size. The UI renders the result as a suggested grouping table, prepopulates the Trend, Seasonality, and Noise inputs, and still lets you override before applying reconstruction. Changing the window size slider re-runs the heuristic automatically.
-
-The **Export Components** action in the decomposition panel is DW-gated: it is enabled only when the current reconstruction has DW in the configured valid range. When enabled, export downloads a CSV with timestamp, Trend, Seasonality, and Noise.
-
-> **Configuration callout:** all constants and heuristics shown here (window mapping, suitability thresholds, grouping tolerances, DW bounds, change-point penalty, etc.) are configurable via [src/tseda/config/tseda_config.yaml](src/tseda/config/tseda_config.yaml).
-
-**Algorithm: SSA Eigenvalue Group Assignment**
-
-```
-Input:  eigenvalues λ₁ ≥ λ₂ ≥ ... ≥ λₖ (sorted descending),
-        noise residual r
-Params: variance_threshold = 0.10, pair_tolerance = 0.05,
-        pool_selection_method = "kneedle",
-        kneedle_min_distance = 0.03,
-        min_signal_components = 1,
-        min_noise_components = 2,
-        dw_low = 1.5, dw_high = 2.5
-
---- Initial classification ---
-1.  Trend ← ∅;  Seasonality ← ∅
-2.  If pool_selection_method = "kneedle":
-      a) yᵢ ← log(1 + λᵢ)
-      b) Normalize y between first and last points
-      c) Compute distance to endpoint chord line
-      d) knee ← argmax(distance) if max(distance) ≥ kneedle_min_distance
-      e) Eligible ← {0..knee} with bounds:
-            min |Eligible| = min_signal_components
-            max |Eligible| = K - min_noise_components
-    Else (legacy fallback):
-      Eligible ← { i : (λᵢ / Σⱼ λⱼ) ≥ variance_threshold }
-3.  Noise ← all indices not in Eligible
-
---- Scan eligible components in rank order ---
-4.  cursor ← 0
-5.  While cursor < |Eligible|:
-      j ← Eligible[cursor]
-      k ← Eligible[cursor + 1]  (if it exists)
-      if k = j + 1  and  |λⱼ − λₖ| / max(λⱼ, λₖ) ≤ pair_tolerance then
-          Seasonality ← Seasonality ∪ { j, k }
-          cursor ← cursor + 2
-      else
-          Trend ← Trend ∪ { j }
-          cursor ← cursor + 1
-
---- Validate with Durbin-Watson ---
-6.  r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
-7.  dw ← DurbinWatson(r_noise)
-8.  best ← current assignment;  best_dist ← |dw − 2.0|
-
---- Iterative expansion from noise pool ---
-9.  While dw ∉ [dw_low, dw_high]  and  |Noise| > 0:
-      candidate ← Noise[0]          // largest remaining noise eigenvalue
-      next      ← Noise[1]  (if it exists)
-      if next = candidate + 1  and  |λ_candidate − λ_next| / max(…) ≤ pair_tolerance then
-          Seasonality ← Seasonality ∪ { candidate, next }
-          Noise ← Noise \ { candidate, next }
-      else
-          Trend ← Trend ∪ { candidate }
-          Noise ← Noise \ { candidate }
-      r_noise ← r − Σᵢ∈(Trend∪Seasonality) component(i)
-      dw ← DurbinWatson(r_noise)
-      if |dw − 2.0| < best_dist then
-          best ← current assignment;  best_dist ← |dw − 2.0|
-
---- Output ---
-10. If dw ∉ [dw_low, dw_high]:
-        Return best  with warning "DW criterion not met — try a different window size"
-11. Else:
-        Return (Trend, Seasonality, Noise)
-```
-
-### (c) Observation Logging
-
-The SSA is based on the eigen decomposition of the trajectory matrix. Though the raw signal is correlated, the eigenvectors are uncorrelated. If we assume that the signal is Gaussian, this also implies independence. We can use the Akaike Information Criterion for model selection and determine the AIC as a function of the rank of the model. This is shown in the observation page. An automatic summary of all the observations is provided.
+Use the Akaike Information Criterion (AIC) as a function of model rank to provide a principled guide for model order selection. Finalize the analysis by saving structured findings to the KMDS knowledge base.
 
 ## Notebook Interface
 

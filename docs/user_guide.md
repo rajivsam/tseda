@@ -4,7 +4,7 @@
 
 # tseda User Guide
 
-**Time Series Explorer & Decomposition App**
+**Enterprise-Grade Time Series Decomposition & Automated Diagnostics**
 
 Version 0.1.7 &nbsp;|&nbsp; April 2026
 
@@ -30,7 +30,7 @@ Version 0.1.7 &nbsp;|&nbsp; April 2026
 
 ## Overview
 
-`tseda` is an interactive, browser-based tool for exploratory analysis of regularly sampled time series data. It is designed for analysts working with data at **hourly cadence or lower** (daily, monthly, quarterly, etc.) and guides you through a structured three-phase process:
+`tseda` is an automated signal decomposition and diagnostic engine for high-fidelity time series preprocessing. It is designed for enterprise data pipelines working with data at **hourly cadence or lower** (daily, monthly, quarterly, etc.) and guides you through a structured validation process:
 
 1. **Initial assessment** — upload your data, inspect its statistical properties, and understand its autocorrelation structure.
 2. **SSA decomposition** — apply Singular Spectrum Analysis (SSA) to separate the series into trend, seasonal, and noise components.
