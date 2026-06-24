@@ -4,7 +4,7 @@ Installation
 Requirements
 ------------
 
-- Python 3.13+
+- Python 3.12+
 
 Install from PyPI
 -----------------

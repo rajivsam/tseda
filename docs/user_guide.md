@@ -45,7 +45,7 @@ Version 0.1.7 &nbsp;|&nbsp; April 2026
 ### Recommended (conda + pip)
 
 ```bash
-conda create -n tseda python=3.13
+conda create -n tseda python=3.12
 conda activate tseda
 pip install tseda
 ```

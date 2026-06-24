@@ -224,7 +224,7 @@ print(components_df.head())
 
 ## Requirements
 
-**Python 3.13 or higher** is required to run this package.
+**Python 3.12 or higher** is required to run this package.
 
 Before starting the installation, verify your Python version:
 
@@ -232,7 +232,7 @@ Before starting the installation, verify your Python version:
 python --version
 ```
 
-Ensure the output shows Python 3.13 or higher. If not, please upgrade Python before proceeding.
+Ensure the output shows Python 3.12 or higher. If not, please upgrade Python before proceeding.
 
 ## Install And Run From PyPI
 
@@ -241,7 +241,7 @@ Ensure the output shows Python 3.13 or higher. If not, please upgrade Python bef
 Conda is the recommended package manager for development and installation (development was done with conda):
 
 ```bash
-conda create -n tseda python=3.13
+conda create -n tseda python=3.12
 conda activate tseda
 pip install tseda
 ```
@@ -274,7 +274,7 @@ If `pipx` is not available, use the standard Python install instructions below.
 
 ### 1. Install
 
-Verify you have Python 3.13 or higher installed:
+Verify you have Python 3.12 or higher installed:
 
 ```bash
 python --version

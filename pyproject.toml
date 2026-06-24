@@ -1,9 +1,9 @@
 [project]
 name = "tseda"
-version = "3.1.0"
+version = "3.1.1"
 description = "A package for exploration of regularly sampled time series."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 license = "LicenseRef-Proprietary"
 keywords = ["time-series", "ssa", "dash", "analytics", "decomposition"]
 classifiers = [

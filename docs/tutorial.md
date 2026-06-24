@@ -14,16 +14,16 @@ This tutorial walks through three scenarios that cover the full range of behavio
 
 ## 1. Installation
 
-**Requirement:** Python 3.13 or higher.
+**Requirement:** Python 3.12 or higher.
 
 ```bash
-python --version   # must show 3.13+
+python --version   # must show 3.12+
 ```
 
 ### Option A — conda (recommended)
 
 ```bash
-conda create -n tseda python=3.13
+conda create -n tseda python=3.12
 conda activate tseda
 pip install tseda
 ```
