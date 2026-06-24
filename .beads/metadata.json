@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "tseda",
+  "project_id": "383f8735-0028-4135-ae78-ecb560e0f51b"
+}
