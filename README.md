@@ -31,6 +31,8 @@ the manual guesswork that traditionally introduces bias into production analytic
 It bridges the gap between raw data ingestion and model-ready signals by providing 
 deterministic heuristics for window selection and component grouping.
 
+For a short guided tour of `tseda`, watch the overview video on YouTube: [https://www.youtube.com/watch?v=baoJrIpSTE8](https://www.youtube.com/watch?v=baoJrIpSTE8).
+
 ## Core Systematic Capabilities
 
 * **Automated SSA Window Calibration:** Automates optimal window selections derived directly from sampling frequencies and eigen-spectrum spread, preventing the distortion of latent signals.
