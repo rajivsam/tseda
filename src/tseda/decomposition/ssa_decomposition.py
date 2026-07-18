@@ -430,6 +430,53 @@ class SSADecomposition:
         # --- Seasonal amplitude shift detection -------------------------------
         seas_signal = self._group_signals.get("seasonality")
         seasonal_change_points: np.ndarray = np.array([], dtype=int)
+        phase_change_points: np.ndarray = np.array([], dtype=int)
+
+        def _dominant_period(signal: np.ndarray) -> float | None:
+            if signal.size < 4:
+                return None
+            spectrum = np.fft.rfft(signal - np.mean(signal))
+            magnitudes = np.abs(spectrum)
+            if magnitudes.size <= 1:
+                return None
+            best_idx = int(np.argmax(magnitudes[1:]) + 1)
+            freqs = np.fft.rfftfreq(signal.size, d=1.0)
+            dominant_freq = freqs[best_idx]
+            return 1.0 / dominant_freq if dominant_freq > 0 else None
+
+        def _cross_correlation_lag(segment1: np.ndarray, segment2: np.ndarray) -> int:
+            if segment1.size < 2 or segment2.size < 2:
+                return 0
+            centered1 = segment1 - np.mean(segment1)
+            centered2 = segment2 - np.mean(segment2)
+            corr = np.correlate(centered1, centered2, mode="full")
+            return int(np.argmax(corr) - (segment1.size - 1))
+
+        def _detect_phase_change_points() -> np.ndarray:
+            if seas_signal is None or seas_signal.size < self._window * 2:
+                return np.array([], dtype=int)
+
+            phase_points: list[int] = []
+            boundaries = list(range(0, n, self._window))
+            if boundaries[-1] != n:
+                boundaries.append(n)
+            for seg_idx in range(len(boundaries) - 2):
+                start = boundaries[seg_idx]
+                boundary = boundaries[seg_idx + 1]
+                end = boundaries[seg_idx + 2]
+                segment1 = seas_signal.values[start:boundary].astype(float)
+                segment2 = seas_signal.values[boundary:end].astype(float)
+                if min(segment1.size, segment2.size) < max(4, int(self._window / 4)):
+                    continue
+                period = _dominant_period(np.concatenate([segment1, segment2]))
+                if period is None:
+                    continue
+                lag = _cross_correlation_lag(segment1, segment2)
+                threshold = max(1, int(round(period / 4)))
+                if abs(lag) > threshold:
+                    phase_points.append(boundary)
+            return np.array(sorted(set(phase_points)), dtype=int)
+
         if seas_signal is not None:
             rms_envelope = (
                 pd.Series(seas_signal.values.astype(float))
@@ -440,6 +487,7 @@ class SSADecomposition:
                 .values
             )
             seasonal_change_points = _pelt_on(rms_envelope)
+            phase_change_points = _detect_phase_change_points()
 
         # --- Segment labels (stored for downstream consumers) -----------------
         segment_ids = np.ones(n, dtype=int)
@@ -491,6 +539,17 @@ class SSADecomposition:
                 annotation_position="bottom left" if i % 2 == 0 else "bottom right",
             )
 
+        # Seasonal phase change points — dashdot lines, purple palette
+        phase_colors = px.colors.qualitative.Dark24
+        for i, cp_idx in enumerate(phase_change_points):
+            fig.add_vline(
+                x=_ts_to_ms(cp_idx),
+                line_dash="dashdot",
+                line_color=phase_colors[i % len(phase_colors)],
+                annotation_text=f"P{i + 1}",
+                annotation_position="bottom left" if i % 2 == 0 else "bottom right",
+            )
+
         # --- Plain-language summary annotations below the plot ----------------
         def _fmt_dates(indices: np.ndarray) -> str:
             if indices.size == 0:
@@ -506,8 +565,11 @@ class SSADecomposition:
         seasonal_summary = (
             f"Seasonal amplitude shifts (···): {_fmt_dates(seasonal_change_points)}"
         )
+        phase_summary = (
+            f"Seasonal phase shifts (-·-): {_fmt_dates(phase_change_points)}"
+        )
 
-        for row_idx, text in enumerate([trend_summary, seasonal_summary]):
+        for row_idx, text in enumerate([trend_summary, seasonal_summary, phase_summary]):
             fig.add_annotation(
                 text=text,
                 xref="paper", yref="paper",

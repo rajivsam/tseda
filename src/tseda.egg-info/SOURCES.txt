@@ -49,5 +49,6 @@ tests/test_sampling_prop.py
 tests/test_series_histogram_visualizer.py
 tests/test_series_kde_visualizer.py
 tests/test_ssa_decomposition.py
+tests/test_ssa_phase_change_detection.py
 tests/test_ssa_result_summary.py
 tests/test_ts_analyze_ui.py
