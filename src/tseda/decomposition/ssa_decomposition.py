@@ -389,6 +389,99 @@ class SSADecomposition:
 
         return fig
 
+    def _run_change_point_analysis(self) -> dict[str, list[int]]:
+        """Run the internal change-point detection logic and return detected indices."""
+        smoothed_signal = self.get_reconstructed_series("smoothed_signal")
+        if smoothed_signal is None:
+            raise ValueError("Smoothed signal is unavailable. Ensure reconstruction grouping is applied.")
+
+        n = len(smoothed_signal)
+        penalty = float(np.log(max(n, 2)))
+
+        def _pelt_on(signal_1d: np.ndarray) -> np.ndarray:
+            std = float(np.std(signal_1d))
+            normed = ((signal_1d - np.mean(signal_1d)) / std if std > 0.0 else signal_1d.copy())
+            bkps = rpt.Pelt(model="l2").fit(normed.reshape(-1, 1)).predict(pen=penalty)
+            return np.array([b for b in bkps if b < n], dtype=int)
+
+        trend_signal = self._group_signals.get("trend", smoothed_signal)
+        trend_change_points = _pelt_on(trend_signal.values.astype(float))
+        self._change_points = trend_change_points
+
+        seas_signal = self._group_signals.get("seasonality")
+        seasonal_change_points: np.ndarray = np.array([], dtype=int)
+        phase_change_points: np.ndarray = np.array([], dtype=int)
+
+        def _dominant_period(signal: np.ndarray) -> float | None:
+            if signal.size < 4:
+                return None
+            spectrum = np.fft.rfft(signal - np.mean(signal))
+            magnitudes = np.abs(spectrum)
+            if magnitudes.size <= 1:
+                return None
+            best_idx = int(np.argmax(magnitudes[1:]) + 1)
+            freqs = np.fft.rfftfreq(signal.size, d=1.0)
+            dominant_freq = freqs[best_idx]
+            return 1.0 / dominant_freq if dominant_freq > 0 else None
+
+        def _cross_correlation_lag(segment1: np.ndarray, segment2: np.ndarray) -> int:
+            if segment1.size < 2 or segment2.size < 2:
+                return 0
+            centered1 = segment1 - np.mean(segment1)
+            centered2 = segment2 - np.mean(segment2)
+            corr = np.correlate(centered1, centered2, mode="full")
+            return int(np.argmax(corr) - (segment1.size - 1))
+
+        def _detect_phase_change_points() -> np.ndarray:
+            if seas_signal is None or seas_signal.size < self._window * 2:
+                return np.array([], dtype=int)
+
+            phase_points: list[int] = []
+            boundaries = list(range(0, n, self._window))
+            if boundaries[-1] != n:
+                boundaries.append(n)
+            for seg_idx in range(len(boundaries) - 2):
+                start = boundaries[seg_idx]
+                boundary = boundaries[seg_idx + 1]
+                end = boundaries[seg_idx + 2]
+                segment1 = seas_signal.values[start:boundary].astype(float)
+                segment2 = seas_signal.values[boundary:end].astype(float)
+                if min(segment1.size, segment2.size) < max(4, int(self._window / 4)):
+                    continue
+                period = _dominant_period(np.concatenate([segment1, segment2]))
+                if period is None:
+                    continue
+                lag = _cross_correlation_lag(segment1, segment2)
+                threshold = max(1, int(round(period / 4)))
+                if abs(lag) > threshold:
+                    phase_points.append(boundary)
+            return np.array(sorted(set(phase_points)), dtype=int)
+
+        if seas_signal is not None:
+            rms_envelope = (
+                pd.Series(seas_signal.values.astype(float))
+                .pow(2)
+                .rolling(self._window, center=True, min_periods=1)
+                .mean()
+                .pow(0.5)
+                .values
+            )
+            seasonal_change_points = _pelt_on(rms_envelope)
+            phase_change_points = _detect_phase_change_points()
+
+        return {
+            "trend": trend_change_points.tolist(),
+            "seasonal_amplitude": seasonal_change_points.tolist(),
+            "seasonal_phase": phase_change_points.tolist(),
+        }
+
+    def get_change_points(self) -> dict[str, list[int]]:
+        """Return detected change points for trend, seasonal amplitude, and phase."""
+        if not hasattr(self, "_recon"):
+            raise ValueError("Reconstruction map is not set. Call set_reconstruction() first.")
+        self._ensure_reconstruction_cache()
+        return self._run_change_point_analysis()
+
     def change_point_plot(self) -> go.Figure:
         """Return a change-point analysis plot using the smoothed signal.
 

@@ -94,6 +94,15 @@ class GroupingAutoTuneResult:
     reason: str
 
 
+def _get_column(frame: pd.DataFrame, col: int | str) -> pd.Series:
+    """Resolve a column reference by position or label."""
+    if isinstance(col, int):
+        if col < 0 or col >= frame.shape[1]:
+            raise IndexError(f"Column position {col} is out of range for frame with {frame.shape[1]} columns.")
+        return frame.iloc[:, col]
+    return frame[col]
+
+
 def _as_datetime_numeric_series(
     frame: pd.DataFrame,
     timestamp_col: int | str = 0,
@@ -112,8 +121,8 @@ def _as_datetime_numeric_series(
     Raises:
         ValueError: If conversion fails or no numeric values remain.
     """
-    timestamp = pd.to_datetime(frame[timestamp_col], errors="coerce")
-    values = pd.to_numeric(frame[value_col], errors="coerce")
+    timestamp = pd.to_datetime(_get_column(frame, timestamp_col), errors="coerce")
+    values = pd.to_numeric(_get_column(frame, value_col), errors="coerce")
     series = pd.Series(values.values, index=timestamp).dropna().sort_index()
 
     if series.empty:
@@ -771,6 +780,12 @@ class NotebookThreeStepAPI:
         if self._grouping is None and auto_suggest_if_missing:
             self._ensure_grouping()
         return self._ensure_ssa().change_point_plot()
+
+    def get_change_points(self, auto_suggest_if_missing: bool = True) -> dict[str, list[int]]:
+        """Return detected change points for the current grouped reconstruction."""
+        if self._grouping is None and auto_suggest_if_missing:
+            self._ensure_grouping()
+        return self._ensure_ssa().get_change_points()
 
     def get_loess_plot(self, fraction: float | None = None) -> go.Figure:
         """Get LOESS verification plot for the reconstructed signal.

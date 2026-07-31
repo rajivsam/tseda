@@ -86,6 +86,19 @@ Use the Akaike Information Criterion (AIC) as a function of model rank to provid
 
 The package also provides a notebook interface to these features. If you have a new dataset that you want to analyze, look at the data loader directory for examples. Download your dataset, clean it, produce your time series, and analyze it with `tseda`.
 
+## Agent Instructions Included with the Package
+
+The repository ships the agent guidance file as package data so it is available to anyone who installs `tseda`.
+
+After installing the package, you can access the agent documentation directly from Python:
+
+```python
+import tseda
+print(tseda.get_agent_instructions())
+```
+
+This returns the full `AGENTS.md` content as a string, including package interfaces, documentation sources, design principles, and test-suite organization.
+
 ### Design Philosophy
 
 - **UI and notebook parity**: Anything you can do in the UI should be scriptable in notebooks.

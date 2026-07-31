@@ -1,0 +1,12 @@
+dataset,samples,window,suitability_passed,top_k_ratio,top_k,threshold,trend,seasonality,variance_explained,durbin_watson,change_points,component_rows
+coffee_prices,426,12,True,0.9941945743755296,5,0.4,✔,–,100.0,1.7065303752398788,"trend, phase",426
+white_noise_data,720,24,False,0.2504465268136848,5,0.4,rejected,rejected,0.0,,rejected,720
+trimmed_biomass,1998,24,True,0.9486269011277519,5,0.4,✔,–,100.0,1.7201571160561697,"trend, phase",1998
+monthly_car_sales,108,12,True,0.93909351456972,5,0.4,✔,✔,100.0,2.414672929676177,"trend, amplitude",108
+uci_air_quality_hourly_co,2000,24,True,0.7883696397157091,5,0.4,✔,✔,100.0,1.5677727965182653,"trend, amplitude, phase",2000
+ticket_resolution_hourly_nyc311,721,24,True,0.5470567104270704,5,0.4,✔,–,100.0,1.5272124253249215,"trend, phase",721
+hyndman_arrivals_quarterly_japan,127,4,True,1.0,4,0.4,✔,–,100.00000000000001,2.062390391408394,"trend, phase",127
+hyndman_goog_daily_close,1000,5,True,1.0,5,0.4,✔,–,99.99999999999999,2.121087273049771,"trend, phase",1000
+hyndman_hyndsight_daily_pageviews,365,5,True,1.0,5,0.4,✔,✔,100.00000000000003,2.3510354920837018,"trend, amplitude, phase",365
+hyndman_sunspot_monthly_area,1709,12,True,0.9044745646318169,5,0.4,✔,–,100.0,1.6231811325972851,"trend, phase",1709
+hyndman_usconsumption_quarterly_consumption,227,8,True,0.7950561620010681,5,0.4,✔,–,100.0,2.218193762974913,"trend, phase",227

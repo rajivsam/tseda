@@ -70,4 +70,5 @@ dependencies = [
   [tool.setuptools.package-data]
   tseda = [
     "images/*",
+    "AGENTS.md",
   ]

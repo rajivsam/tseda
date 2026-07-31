@@ -126,3 +126,124 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+## Package and feature guidance
+
+This repository implements a time series analysis package with both a notebook-oriented Python API and an interactive Dash UI. Use the sections below when adding a new feature.
+
+### Core package interfaces
+
+Primary package exports are defined in `src/tseda/__init__.py`.
+The key public objects available to package consumers are:
+
+- `NotebookThreeStepAPI` — main notebook workflow wrapper.
+- `SuitabilityResult` — dataset suitability check result.
+- `load_series_from_csv` — helper that loads a timestamp-indexed numeric series from CSV.
+- `load_example_series` — helper that loads example CSV data from the repository.
+- `list_example_datasets` — registry helper for built-in example dataset names.
+- `AVAILABLE_BIN_ALGORITHMS` — supported histogram/binning algorithms for KDE plots.
+
+### Notebook API surface
+
+The notebook API is implemented in `src/tseda/notebook_api.py` and mirrors the three-step UI workflow.
+Important developer-facing methods include:
+
+- `NotebookThreeStepAPI(series, window=None, apply_window_refinement=True)`
+- `get_window()` / `set_window(window, apply_window_refinement=False)`
+- `suggest_grouping(grouping_config=None)`
+- `suggest_grouping_with_window_autotune(doubling_factor=2, max_window=None)`
+- `get_grouping()` / `set_grouping(grouping)`
+- `get_grouping_heuristic_configuration()`
+- `get_suitability_result()`
+- `get_kde_plot(show_kde=True, bin_algorithm="scott")`
+- `get_box_plot()` / `get_scatter_plot()` / `get_acf_plot()` / `get_pacf_plot()`
+- `get_reconstruction_plot()` / `get_eigen_plot()` / `get_change_point_plot()` / `get_loess_plot()`
+- `get_variance_explained_plot()`
+- `generate_observation_text()`
+- `export_components_dataframe()`
+
+The notebook API also includes CSV and example-data helpers:
+
+- `load_series_from_csv(csv_path, timestamp_col=0, value_col=1, **read_csv_kwargs)`
+- `load_example_series(dataset_name, workspace_root=None, timestamp_col=0, value_col=1)`
+
+### UI entrypoints and organization
+
+The Dash app entrypoint is `src/tseda/user_interface/ts_analyze_ui.py`.
+The `tseda` console script is registered in `pyproject.toml` and points to `tseda.user_interface.ts_analyze_ui:main`.
+
+UI responsibilities are split into:
+
+- `src/tseda/user_interface/initial_assessment.py` / `initial_assessment_layout.py` — initial screening step and upload flow,
+- `src/tseda/user_interface/analysis.py` — layout and figure helpers for the decomposition step,
+- `src/tseda/user_interface/components/` — reusable Dash layout components for assessment and decomposition,
+- `src/tseda/user_interface/callback_services.py` — pure callback business logic and validation,
+- `src/tseda/user_interface/kmds_capture.py` — KMDS metadata persistence capture flows.
+
+### Configuration and design philosophy
+
+Configuration is centralized in `src/tseda/config/tseda_config.yaml` and loaded by `src/tseda/config/config_loader.py`.
+Key config categories include:
+
+- `window_selection` — cadence-to-window defaults for hourly/daily/weekly/monthly/quarterly series,
+- `grouping_heuristic` — eigenvalue knee selection, variance threshold fallback, pair similarity tolerance, and signal/noise pool limits,
+- `noise_validation` — Durbin-Watson acceptance range for residual noise,
+- `window_refinement` — eigen-spectrum tail-spread threshold for reassigned SSA windows,
+- `seasonality_heuristic` — how many leading eigenvalues to inspect for seasonal pairing,
+- `periodicity` — FFT/Lomb-Scargle frequency search bounds,
+- `loess` — smoothing fraction range and slider defaults,
+- `change_point_detection` — PELT model and penalty multiplier,
+- `suitability_check` — top-k variance concentration gating.
+
+Design principles to preserve when extending the package:
+
+- UI and notebook parity: features available in the Dash UI should also be exposed in Python.
+- Configuration-first behavior: algorithm thresholds belong in YAML, not hard-coded source.
+- Explicit decomposition controls: treat window size and grouping as first-class inputs.
+- Composable feature calls: keep plotting, diagnostics, decomposition, and reporting separate.
+- Separation of wiring and business logic: keep UI callback wiring in `user_interface` and computational logic in `decomposition`, `series_stats`, `visualization`, and `periodicity`.
+
+### Documentation and user guides
+
+The repository includes both user-facing docs and developer-facing references.
+Important documentation sources:
+
+- `README.md` — high-level project summary and package purpose.
+- `docs/source/overview.rst` — package overview, SSA-first motivation, and design philosophy.
+- `docs/source/workflow.rst` — detailed three-phase workflow, window selection logic, component grouping algorithm, and observation logging.
+- `docs/source/index.rst` — documentation landing page and API quick links.
+- `docs/source/api/modules` — generated API documentation for Python modules.
+
+Additional context is available in top-level docs such as `PRODUCT.md`, `ARCHITECTURE.md`, and `DESIGN_HISTORY.md`.
+
+### Test suite organization
+
+The test suite uses `pytest` and is organized by feature area.
+Key test modules include:
+
+- `tests/test_notebook_api.py` — notebook workflow state, grouping configuration overrides, auto-tune behavior, and report text generation.
+- `tests/test_ssa_decomposition.py` — low-level decomposition logic and reconstruction behavior.
+- `tests/test_ssa_result_summary.py` — summary diagnostics and narrative report generation.
+- `tests/test_change_point_estimator.py` — change-point detection and PELT wrapper logic.
+- `tests/test_sampling_prop.py` — cadence inference and window mapping.
+- `tests/test_fft_analyzer.py` — periodicity and frequency analysis utilities.
+- `tests/test_autocorrelation_vis.py` — ACF/PACF and autocorrelation visual diagnostics.
+- `tests/test_series_histogram_visualizer.py` / `tests/test_series_kde_visualizer.py` — distribution visualization.
+- `tests/test_ts_analyze_ui.py` — UI entrypoint and callback wiring behavior.
+- `tests/test_comprehensive_dataset.py` — end-to-end integration over real example datasets.
+
+Development dependencies are declared in `pyproject.toml` under `[project.optional-dependencies].dev`.
+
+### Adding a new feature
+
+A new feature should generally follow these steps:
+
+1. Identify the correct source layer (`decomposition`, `series_stats`, `visualization`, `user_interface`, `config`, or `notebook_api`).
+2. Add or extend configuration in `src/tseda/config/tseda_config.yaml` if the feature has tunable thresholds or limits.
+3. Expose the feature in `src/tseda/notebook_api.py` if it belongs in the notebook workflow.
+4. Add UI wiring in `src/tseda/user_interface/` only if the feature requires interactive visualization or user controls.
+5. Add unit tests in `tests/` for both logic and public API behavior.
+6. Update docs in `README.md`, `docs/source/overview.rst`, or `docs/source/workflow.rst` as appropriate for user guidance.
+
+Use existing features and tests as the pattern for consistency and interface parity.
+

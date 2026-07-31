@@ -43,6 +43,7 @@ src/tseda/visualization/series_kde_visualizer.py
 src/tseda/visualization/series_visualizer.py
 tests/test_autocorrelation_vis.py
 tests/test_change_point_estimator.py
+tests/test_comprehensive_dataset.py
 tests/test_fft_analyzer.py
 tests/test_notebook_api.py
 tests/test_sampling_prop.py
