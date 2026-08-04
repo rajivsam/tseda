@@ -4089,7 +4089,7 @@ wheels = [
 
 [[package]]
 name = "tseda"
-version = "3.1.1"
+version = "3.2"
 source = { editable = "." }
 dependencies = [
     { name = "dash" },
@@ -4108,6 +4108,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "plotly" },
+    { name = "pytest-cov" },
     { name = "python-dotenv" },
     { name = "req" },
     { name = "ruptures" },
@@ -4153,6 +4154,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "plotly", specifier = ">=6.5.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "req", specifier = ">=1.0.0" },

@@ -1,5 +1,6 @@
 README.md
 pyproject.toml
+src/tseda/AGENTS.md
 src/tseda/__init__.py
 src/tseda/__main__.py
 src/tseda/bump_version.py

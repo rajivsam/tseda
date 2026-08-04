@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: tseda
-Version: 3.1.1
+Version: 3.2
 Summary: A package for exploration of regularly sampled time series.
 License-Expression: LicenseRef-Proprietary
 Keywords: time-series,ssa,dash,analytics,decomposition
@@ -27,6 +27,7 @@ Requires-Dist: matplotlib>=3.10.8
 Requires-Dist: numpy>=2.4.0
 Requires-Dist: pandas>=2.3.3
 Requires-Dist: plotly>=6.5.0
+Requires-Dist: pytest-cov>=7.0.0
 Requires-Dist: python-dotenv>=1.2.1
 Requires-Dist: req>=1.0.0
 Requires-Dist: ruptures>=1.1.10
@@ -133,6 +134,19 @@ Use the Akaike Information Criterion (AIC) as a function of model rank to provid
 ## Notebook Interface
 
 The package also provides a notebook interface to these features. If you have a new dataset that you want to analyze, look at the data loader directory for examples. Download your dataset, clean it, produce your time series, and analyze it with `tseda`.
+
+## Agent Instructions Included with the Package
+
+The repository ships the agent guidance file as package data so it is available to anyone who installs `tseda`.
+
+After installing the package, you can access the agent documentation directly from Python:
+
+```python
+import tseda
+print(tseda.get_agent_instructions())
+```
+
+This returns the full `AGENTS.md` content as a string, including package interfaces, documentation sources, design principles, and test-suite organization.
 
 ### Design Philosophy
 
