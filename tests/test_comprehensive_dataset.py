@@ -24,13 +24,13 @@ def _has_component(explained_variance: dict[str, float], component_name: str) ->
     return float(explained_variance.get(component_name, 0.0)) > 0.0
 
 
-def _change_point_summary(change_points: dict[str, list[int]]) -> str:
+def _change_point_summary(change_points: dict[str, list[int]], has_seasonality: bool = False) -> str:
     labels = []
     if change_points.get("trend"):
         labels.append("trend")
     if change_points.get("seasonal_amplitude"):
         labels.append("amplitude")
-    if change_points.get("seasonal_phase"):
+    if has_seasonality and change_points.get("seasonal_phase"):
         labels.append("phase")
     return ", ".join(labels) if labels else "none"
 
@@ -80,16 +80,17 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                 )
                 noise_explained = float(explained_variance.get("Noise", 0.0))
 
+                has_seasonality = _has_component(explained_variance, "Seasonality")
                 result.update(
                     {
                         "trend": "✔" if _has_component(explained_variance, "Trend") else "–",
-                        "seasonality": "✔" if _has_component(explained_variance, "Seasonality") else "–",
+                        "seasonality": "✔" if has_seasonality else "–",
                         "signal_explained": signal_explained,
                         "noise_explained": noise_explained,
                         "durbin_watson": float(reconstructed.get("durbin_watson", float("nan")))
                         if reconstructed.get("durbin_watson") is not None
                         else None,
-                        "change_points": _change_point_summary(change_points),
+                        "change_points": _change_point_summary(change_points, has_seasonality),
                         "component_rows": len(components),
                     }
                 )
@@ -133,7 +134,7 @@ def test_comprehensive_dataset_test(tmp_path: Path):
     pd.DataFrame(results).to_csv(output_csv, index=False)
 
     markdown_lines = [
-        "| Dataset | Trend | Seasonality | Signal Explained | Noise Explained | Change Points | Durbin–Watson |",
+        "| Dataset | Trend | Seasonality | Signal Explained | Noise | Change Points | Durbin–Watson |",
         "|---|---|---|---|---|---|---|",
     ]
     for row in results:
