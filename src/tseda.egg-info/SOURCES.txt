@@ -43,10 +43,17 @@ src/tseda/visualization/series_histogram_visualizer.py
 src/tseda/visualization/series_kde_visualizer.py
 src/tseda/visualization/series_visualizer.py
 tests/test_autocorrelation_vis.py
+tests/test_autocorrelation_vis_additional.py
+tests/test_automatic_grouping_heuristic_additional.py
+tests/test_bump_version.py
+tests/test_callback_services.py
 tests/test_change_point_estimator.py
 tests/test_comprehensive_dataset.py
+tests/test_config_loader.py
 tests/test_fft_analyzer.py
 tests/test_notebook_api.py
+tests/test_notebook_api_additional.py
+tests/test_pelt_change_point_estimator.py
 tests/test_sampling_prop.py
 tests/test_series_histogram_visualizer.py
 tests/test_series_kde_visualizer.py
