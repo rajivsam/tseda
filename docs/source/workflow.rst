@@ -257,7 +257,7 @@ Important control points are explicit in the notebook API:
 
 For a complete multi-dataset notebook walkthrough, see:
 
-- ``notebooks/notebook_three_step_api_examples.ipynb``
+- ``docs/tutorial.md``
 
 References
 ----------

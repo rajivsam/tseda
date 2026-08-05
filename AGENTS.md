@@ -154,11 +154,17 @@ Important developer-facing methods include:
 - `suggest_grouping_with_window_autotune(doubling_factor=2, max_window=None)`
 - `get_grouping()` / `set_grouping(grouping)`
 - `get_grouping_heuristic_configuration()`
+- `get_configuration()`
+- `get_sampling_properties()` / `get_summary_statistics()`
 - `get_suitability_result()`
 - `get_kde_plot(show_kde=True, bin_algorithm="scott")`
 - `get_box_plot()` / `get_scatter_plot()` / `get_acf_plot()` / `get_pacf_plot()`
 - `get_reconstruction_plot()` / `get_eigen_plot()` / `get_change_point_plot()` / `get_loess_plot()`
+- `get_noise_kde_plot(bandwidth="scott")`
+- `get_reconstruction_metadata()`
+- `get_noise_variance_plot()`
 - `get_variance_explained_plot()`
+- `get_change_points()`
 - `generate_observation_text()`
 - `export_components_dataframe()`
 

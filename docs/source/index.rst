@@ -9,6 +9,7 @@ A package and application for exploratory analysis of regularly sampled time ser
 
    overview
    workflow
+   tutorial
    installation
    api/modules
 

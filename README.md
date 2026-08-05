@@ -110,6 +110,8 @@ This returns the full `AGENTS.md` content as a string, including package interfa
 
 Use `NotebookThreeStepAPI` for the same three-step workflow directly in Python:
 
+See the full notebook tutorial at `docs/tutorial.md`.
+
 ```python
 from tseda.notebook_api import NotebookThreeStepAPI, load_series_from_csv
 
@@ -139,6 +141,7 @@ Key notebook API capabilities:
 - `suggest_grouping(grouping_config=...)` / `set_grouping(...)` / `get_grouping()` for explicit component assignment control, including kneedle/noise-floor overrides.
 - `suggest_grouping_with_window_autotune(...)` to retry grouping with automatic window reassignment until DW is in range or the window limit is reached.
 - `get_grouping_heuristic_configuration()` to inspect active grouping-heuristic config values.
+- `get_noise_kde_plot(...)`, `get_reconstruction_metadata()`, and `get_noise_variance_plot()` for noise diagnostics and reconstruction metrics.
 - `get_suitability_result(...)` for the same top-k eigenvalue suitability gate used by the UI.
 
 #### End-to-End Script Example (Copy/Paste)
