@@ -71,13 +71,21 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                 change_points = api.get_change_points(auto_suggest_if_missing=False)
                 components = api.export_components_dataframe(auto_suggest_if_missing=False)
 
+                signal_explained = float(
+                    sum(
+                        value
+                        for name, value in explained_variance.items()
+                        if str(name).casefold() != "noise"
+                    )
+                )
+                noise_explained = float(explained_variance.get("Noise", 0.0))
+
                 result.update(
                     {
                         "trend": "✔" if _has_component(explained_variance, "Trend") else "–",
                         "seasonality": "✔" if _has_component(explained_variance, "Seasonality") else "–",
-                        "variance_explained": float(
-                            sum(explained_variance.get(k, 0.0) for k in explained_variance)
-                        ),
+                        "signal_explained": signal_explained,
+                        "noise_explained": noise_explained,
                         "durbin_watson": float(reconstructed.get("durbin_watson", float("nan")))
                         if reconstructed.get("durbin_watson") is not None
                         else None,
@@ -90,7 +98,8 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                     {
                         "trend": "n/a",
                         "seasonality": "n/a",
-                        "variance_explained": 0.0,
+                        "signal_explained": 0.0,
+                        "noise_explained": 0.0,
                         "durbin_watson": None,
                         "change_points": "none",
                         "component_rows": len(series),
@@ -101,7 +110,8 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                 {
                     "trend": "rejected",
                     "seasonality": "rejected",
-                    "variance_explained": 0.0,
+                    "signal_explained": 0.0,
+                    "noise_explained": 0.0,
                     "durbin_watson": None,
                     "change_points": "rejected",
                     "component_rows": len(series),
@@ -114,7 +124,8 @@ def test_comprehensive_dataset_test(tmp_path: Path):
     assert any(not row["suitability_passed"] for row in results), (
         "Expected at least one dataset to fail the suitability gate."
     )
-    assert all(row["variance_explained"] >= 0.0 for row in results)
+    assert all(row["signal_explained"] >= 0.0 for row in results)
+    assert all(row["noise_explained"] >= 0.0 for row in results)
     assert any(row["change_points"] != "none" and row["change_points"] != "rejected" for row in results)
 
     output_csv = output_dir / "comprehensive_dataset_results.csv"
@@ -122,17 +133,18 @@ def test_comprehensive_dataset_test(tmp_path: Path):
     pd.DataFrame(results).to_csv(output_csv, index=False)
 
     markdown_lines = [
-        "| Dataset | Trend | Seasonality | Variance Explained | Change Points | Durbin–Watson |",
-        "|---|---|---|---|---|---|",
+        "| Dataset | Trend | Seasonality | Signal Explained | Noise Explained | Change Points | Durbin–Watson |",
+        "|---|---|---|---|---|---|---|",
     ]
     for row in results:
         markdown_lines.append(
-            "| {dataset} | {trend} | {seasonality} | {variance_explained:.2f} | {change_points} | {durbin_watson} |".format(
+            "| {dataset} | {trend} | {seasonality} | {signal_explained:.2f} | {noise_explained:.2f} | {change_points} | {durbin_watson} |".format(
                 **{
                     "dataset": row["dataset"],
                     "trend": row["trend"],
                     "seasonality": row["seasonality"],
-                    "variance_explained": float(row["variance_explained"]),
+                    "signal_explained": float(row["signal_explained"]),
+                    "noise_explained": float(row.get("noise_explained", 0.0)),
                     "change_points": row["change_points"],
                     "durbin_watson": row["durbin_watson"] if row["durbin_watson"] is not None else "n/a",
                 }

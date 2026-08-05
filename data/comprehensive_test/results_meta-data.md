@@ -11,7 +11,8 @@ top_k | Number of top components selected for reconstruction. | Derived from the
 threshold | Suitability threshold value for the dataset. | Derived from the suitability result returned by the API.
 trend | Whether a Trend component was identified in the reconstruction. | Derived from the explained variance output; checks if `Trend` variance percent is greater than zero.
 seasonality | Whether a Seasonality component was identified. | Derived from the explained variance output; checks if `Seasonality` variance percent is greater than zero.
-variance_explained | Total explained variance percent across all identified components. | Derived by summing all values in `reconstructed['explained_variance_percent']`.
+signal_explained | Percentage of total variance explained by the Trend and Seasonality groups only. | Derived from the reconstruction metadata by summing non-noise group values in `reconstructed['explained_variance_percent']`.
+noise_explained | Percentage of total variance attributed to the Noise group. | Derived from `reconstructed['explained_variance_percent']['Noise']` when present.
 durbin_watson | Durbin–Watson statistic for reconstructed residuals. | Derived from `reconstructed.get('durbin_watson')` when reconstruction metadata is available.
 change_points | Summary of detected change points in trend and seasonal behavior. | Derived from `api.get_change_points()` and formatted as a summary string.
 component_rows | Number of component rows returned by the API when components are exported. | Derived from the length of the component DataFrame or the original series if the grouping was rejected.
