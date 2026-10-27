@@ -1,5 +1,9 @@
 # tseda
 
+<p align="center">
+  <img src="assets/images/tseda_logo.png" alt="tseda logo" width="820">
+</p>
+
 `tseda` is a Python package for automated time-series decomposition, diagnostics, and signal validation.
 
 It helps analysts work with regularly sampled operational data by turning raw measurement streams into interpretable components such as trend, seasonality, and noise, while making the underlying analysis steps explicit, repeatable, and reviewable.
