@@ -20,7 +20,7 @@ For the fuller product story, design rationale, and detailed explanation of the 
 
 ## Why it exists
 
-The hard part in practice is not a single plot or statistic. It is the sequence of choices needed (and this is not a few, see [about_tseda.md] for the details) to get from raw data to a defensible decomposition: selecting a sensible window, identifying regime boundaries, choosing groups of components, checking whether the result is structurally meaningful, and documenting the reasoning for later reuse.
+The hard part in practice is not a single plot or statistic. It is the sequence of choices needed (and this is not a few,  see [about_tseda.md] for the details) to get from raw data to a defensible decomposition: selecting a sensible window, identifying regime boundaries, choosing groups of components, checking whether the result is structurally meaningful, and documenting the reasoning for later reuse.
 
 `tseda` brings those steps together in one workflow.
 
