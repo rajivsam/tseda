@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from tseda.decomposition.ssa_decomposition import SSADecomposition
+from tseda.segmentation.pelt_segmentation import infer_cadence_from_series, resolve_minimum_segment_points
 
 def create_summary_table(sampling_prop: SamplingProp) -> AgGrid:
     """Build an AG Grid table displaying sampling properties.
@@ -136,13 +137,10 @@ def create_box_plot(series: pd.Series) -> go.Figure:
 
 
 def create_scatter_plot(series: pd.Series) -> go.Figure:
-    """Build a scatter/line plot with a trend line overlay.
+    """Build a scatter/line plot with the full series segmented by color.
 
-    Args:
-        series: Timestamp-indexed numeric series.
-
-    Returns:
-        Plotly figure with raw data markers, connecting lines, and an OLS trend line.
+    The Step-1 overview should show how the whole series is partitioned, while the
+    downstream analysis remains bound to the selected segment only.
     """
     x_values = series.index
     y_values = series.values
@@ -154,6 +152,20 @@ def create_scatter_plot(series: pd.Series) -> go.Figure:
     else:
         trend_values = y_values
 
+    cadence = infer_cadence_from_series(series)
+    min_points = resolve_minimum_segment_points(cadence=cadence, series=series)
+    segment_count = max(2, min(5, len(series) // max(1, min_points))) if len(series) > 1 else 1
+    boundaries = []
+    if segment_count > 1:
+        for idx in range(segment_count):
+            start = idx * (len(series) // segment_count)
+            end = len(series) if idx == segment_count - 1 else (idx + 1) * (len(series) // segment_count)
+            boundaries.append((start, end))
+    else:
+        boundaries = [(0, len(series))]
+
+    colors = ["#ff7f0e", "#4c78a8", "#54a24b", "#e45756", "#b279a2"]
+
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
@@ -161,11 +173,28 @@ def create_scatter_plot(series: pd.Series) -> go.Figure:
             y=y_values,
             mode='markers+lines',
             name='Series',
-            marker=dict(color='#ff7f0e', size=6, opacity=0.8),
-            line=dict(color='#ff7f0e', width=1),
+            marker=dict(color='#d0d0d0', size=5, opacity=0.7),
+            line=dict(color='#d0d0d0', width=1),
             hovertemplate="%{x}<br>Value: %{y}<extra></extra>"
         )
     )
+
+    for idx, (start, end) in enumerate(boundaries):
+        segment_x = x_values[start:end]
+        segment_y = y_values[start:end]
+        color = colors[idx % len(colors)]
+        fig.add_trace(
+            go.Scatter(
+                x=segment_x,
+                y=segment_y,
+                mode='markers+lines',
+                name=f'Segment {idx + 1}',
+                marker=dict(color=color, size=6, opacity=0.9),
+                line=dict(color=color, width=2),
+                hovertemplate=f"%{{x}}<br>Segment {idx + 1}: %{{y}}<extra></extra>"
+            )
+        )
+
     fig.add_trace(
         go.Scatter(
             x=x_values,
@@ -192,16 +221,8 @@ def create_scatter_plot(series: pd.Series) -> go.Figure:
     return fig
 
 
-def create_acf_plot(series: pd.Series, lags: int = 40) -> go.Figure:
-    """Create an ACF (Autocorrelation Function) plot.
-    
-    Args:
-        series: Time series data
-        lags: Number of lags to display (default: 40)
-        
-    Returns:
-        dcc.Graph component containing the ACF plot
-    """
+def create_acf_plot(series: pd.Series, lags: int = 40, segment_label: str | None = None) -> go.Figure:
+    """Create an ACF (Autocorrelation Function) plot for the selected segment."""
     clean_series = series.dropna()
     if clean_series.empty:
         raise ValueError('Series contains no numeric values for ACF plotting.')
@@ -280,8 +301,9 @@ def create_acf_plot(series: pd.Series, lags: int = 40) -> go.Figure:
     # Add zero line
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
     
+    title = f"Autocorrelation Function (ACF) — {segment_label}" if segment_label else "Autocorrelation Function (ACF)"
     fig.update_layout(
-        title={"text": "Autocorrelation Function (ACF)", "x": 0.5, "xanchor": "center"},
+        title={"text": title, "x": 0.5, "xanchor": "center"},
         template="plotly_white",
         margin=dict(l=20, r=20, t=40, b=20),
         height=400,
@@ -295,17 +317,8 @@ def create_acf_plot(series: pd.Series, lags: int = 40) -> go.Figure:
     return fig
 
 
-def create_pacf_plot(series: pd.Series, lags: int = 40, method: str = 'yw') -> go.Figure:
-    """Create a PACF (Partial Autocorrelation Function) plot.
-    
-    Args:
-        series: Time series data
-        lags: Number of lags to display (default: 40)
-        method: Method for PACF calculation ('yw' for Yule-Walker or 'ols' for OLS)
-        
-    Returns:
-        Plotly figure containing the PACF plot
-    """
+def create_pacf_plot(series: pd.Series, lags: int = 40, method: str = 'yw', segment_label: str | None = None) -> go.Figure:
+    """Create a PACF (Partial Autocorrelation Function) plot for the selected segment."""
     clean_series = series.dropna()
     if clean_series.empty:
         raise ValueError('Series contains no numeric values for PACF plotting.')
@@ -384,8 +397,9 @@ def create_pacf_plot(series: pd.Series, lags: int = 40, method: str = 'yw') -> g
     # Add zero line
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
     
+    title = f"Partial Autocorrelation Function (PACF) — {segment_label}" if segment_label else "Partial Autocorrelation Function (PACF)"
     fig.update_layout(
-        title={"text": "Partial Autocorrelation Function (PACF)", "x": 0.5, "xanchor": "center"},
+        title={"text": title, "x": 0.5, "xanchor": "center"},
         template="plotly_white",
         margin=dict(l=20, r=20, t=40, b=20),
         height=400,

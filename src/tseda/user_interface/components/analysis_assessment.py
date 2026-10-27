@@ -86,7 +86,47 @@ def analysis_layout() -> html.Div:
                             dcc.Download(id='download-components-csv'),
                             html.Div(id='noisy-series-message', className='mt-2'),
                             html.Hr(),
-                            dbc.Label("SSA Window Size", html_for='ssa-window-slider', className='mt-2'),
+                            html.Div(
+                                [
+                                    dbc.Label("SSA Window Size", html_for='ssa-window-slider', className='mt-2 mb-0'),
+                                    html.Div(
+                                        [
+                                            dbc.Badge("?", color="info", className="me-2", id='window-method-help'),
+                                            dbc.Button(
+                                                "Window selection diagnostics",
+                                                id='window-selection-diagnostics-btn',
+                                                color='secondary',
+                                                outline=True,
+                                                size='sm',
+                                            ),
+                                        ],
+                                        className='d-flex align-items-center',
+                                    ),
+                                ],
+                                className='d-flex align-items-center justify-content-between',
+                            ),
+                            dbc.Tooltip(
+                                "Adaptive spectral refinement is the default heuristic. Use the diagnostics view to compare the spectral and variance curves before you accept a manual override.",
+                                target='window-method-help',
+                                placement='right',
+                            ),
+                            html.Div(
+                                "Adaptive spectral refinement is the default recommendation. Use the diagnostics view to compare the variance and spectral curves before finalizing the manual override.",
+                                className='text-muted small mb-2 mt-1',
+                            ),
+                            html.Div(id='window-selection-summary', className='text-muted small mb-2', style={'display': 'none'}),
+                            dbc.RadioItems(
+                                id='window-selection-method',
+                                options=[
+                                    {"label": "Adaptive spectral refinement", "value": "adaptive-spectral-refinement"},
+                                    {"label": "Variance plateau", "value": "variance-plateau"},
+                                    {"label": "Manual slider", "value": "manual"},
+                                ],
+                                value='adaptive-spectral-refinement',
+                                inline=True,
+                                className='mb-3',
+                                style={'display': 'none'}
+                            ),
                             dcc.Slider(
                                 id='ssa-window-slider',
                                 min=0,
@@ -97,8 +137,30 @@ def analysis_layout() -> html.Div:
                                 tooltip={"placement": "bottom", "always_visible": False}
                             ),
                             html.Small(
-                                "Valid values are integer multiples of the default window size (2W, 3W, ..., KW).",
+                                "This range reflects the default spectral recommendation and can be adjusted manually as needed.",
                                 className='text-muted d-block mt-2'
+                            ),
+                            dbc.Modal(
+                                [
+                                    dbc.ModalHeader(dbc.ModalTitle("Window selection diagnostics")),
+                                    dbc.ModalBody([
+                                        html.Div(
+                                            "Compare the two window-selection curves below. The suggested value for each method is marked directly on the chart.",
+                                            className='text-muted small mb-2'
+                                        ),
+                                        dcc.Graph(
+                                            id='window-selection-comparison-plot',
+                                            config={'displayModeBar': False},
+                                            style={'height': '900px', 'width': '100%'}
+                                        ),
+                                    ]),
+                                    dbc.ModalFooter([
+                                        dbc.Button("Close", id='window-selection-modal-close-btn', color='secondary'),
+                                    ]),
+                                ],
+                                id='window-selection-modal',
+                                is_open=False,
+                                size='fullscreen',
                             )
                         ])
                     ])

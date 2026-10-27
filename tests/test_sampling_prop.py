@@ -2,6 +2,7 @@ import pytest
 import pandas as pd
 from datetime import datetime, timedelta
 from tseda.series_stats.sampling_prop import SamplingProp
+from tseda.config.config_loader import ConfigurationManager
 
 class TestSamplingProp:
     @pytest.fixture
@@ -80,3 +81,39 @@ class TestSamplingProp:
 
         assert sp._sampling_freq in {"daily", "daily (business)"}
         assert sp._freq_window == 5
+
+    @pytest.mark.parametrize(
+        ("frequency", "expected_window"),
+        [
+            ("5min", 288),
+            ("15min", 96),
+            ("30min", 48),
+        ],
+    )
+    def test_subhourly_series_uses_configured_diurnal_cycle(self, frequency, expected_window):
+        """Intervals accepted by the upload limit receive a valid SSA window."""
+        dates = pd.date_range(start="2023-01-01", periods=400, freq=frequency)
+        series = pd.Series(range(len(dates)), index=dates)
+
+        sp = SamplingProp(series)
+
+        assert sp._sampling_freq == f"{frequency.removesuffix('min')}-minute"
+        assert sp._freq_window == expected_window
+
+    def test_subhourly_window_respects_configured_upload_minimum(self, monkeypatch):
+        """The configured upload minimum also defines the supported cadence floor."""
+        dates = pd.date_range(start="2023-01-01", periods=400, freq="5min")
+
+        original_get = ConfigurationManager.get
+
+        def configured_get(key_path, default=None):
+            if key_path == "file_upload.min_sampling_frequency_minutes":
+                return 15
+            return original_get(key_path, default)
+
+        monkeypatch.setattr(ConfigurationManager, "get", configured_get)
+
+        sp = SamplingProp(pd.Series(range(len(dates)), index=dates))
+
+        assert sp._sampling_freq == "Other (min)"
+        assert sp._freq_window is None

@@ -21,6 +21,12 @@ from tseda.decomposition.ssa_decomposition import SSADecomposition
 from tseda.decomposition.ssa_result_summary import SSAResultSummary
 from tseda.series_stats.sampling_prop import SamplingProp
 from tseda.series_stats.summary_statistics import SummaryStatistics
+from tseda.segmentation.pelt_segmentation import (
+    build_adjusted_analysis_segment,
+    get_short_segment_confirmation_message,
+    resolve_minimum_segment_points,
+    select_pelt_model,
+)
 from tseda.user_interface.components.initial_eval_components import (
     create_acf_plot,
     create_box_plot,
@@ -402,6 +408,49 @@ class NotebookThreeStepAPI:
             Plotly PACF figure.
         """
         return create_pacf_plot(self._series, lags=lags, method=method)
+
+    def get_segment_model_advice(
+        self,
+        signal: pd.Series | np.ndarray | None = None,
+        component_type: str = "trend",
+    ) -> str:
+        """Return the programmatic recommendation for the PELT cost model."""
+        source = self._series if signal is None else signal
+        return select_pelt_model(np.asarray(source, dtype=float), component_type=component_type)
+
+    def get_short_segment_alert(
+        self,
+        cadence: str | None = None,
+        required_points: int | None = None,
+        final_length: int = 0,
+    ) -> str:
+        """Return the explicit user-facing message for a short final segment."""
+        resolved_cadence = cadence or self._sampling._freq_name or "weekly"
+        min_points = required_points if required_points is not None else resolve_minimum_segment_points(cadence=resolved_cadence)
+        return get_short_segment_confirmation_message(
+            cadence=resolved_cadence,
+            required_points=min_points,
+            final_len=final_length,
+        )
+
+    def adjust_final_segment_for_analysis(
+        self,
+        segments: Sequence[tuple[int, int]] | Sequence[list[int]],
+        min_points: int | None = None,
+        half_life: float = 30.0,
+        threshold: float = 0.95,
+        cadence: str | None = None,
+    ) -> dict[str, object]:
+        """Compute a statistically stable final-analysis segment if the last one is too short."""
+        resolved_cadence = cadence or (self._sampling._freq_name if hasattr(self._sampling, "_freq_name") else None)
+        return build_adjusted_analysis_segment(
+            self._series.to_numpy(),
+            segments=segments,
+            min_points=min_points,
+            half_life=half_life,
+            threshold=threshold,
+            cadence=resolved_cadence,
+        )
 
     def _build_decomposition(self, window: int, apply_window_refinement: bool) -> None:
         """Build or rebuild the SSA decomposition state.

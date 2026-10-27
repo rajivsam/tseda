@@ -146,6 +146,31 @@ Autocorrelation Function (ACF) and Partial ACF plots computed via `statsmodels`.
 - **Seasonal spikes**: periodicity at regular lags.
 - **PACF cutoff**: guides autoregressive model order if needed.
 
+#### Segment selection and active analysis target
+
+The app now keeps a clear distinction between the full series and the selected analysis segment. The full series remains visible on the exploratory scatter plot for context, but the selected segment becomes the active analysis target for downstream decomposition, ACF/PACF diagnostics, and summary reporting.
+
+This matters because a segment near the tail of a series may be short or structurally unstable. When the final segment does not contain sufficient history, the UI warns the user and applies a half-life-weighted lookback from the preceding segment to stabilize the estimate instead of forcing a brittle fit on too little data.
+
+The half-life parameterization follows the standard exponential-decay mapping:
+
+$$
+\alpha = 1 - (1/2)^{1/h} \quad \text{and} \quad (1 - \alpha)^h = 0.5
+$$
+
+where $h$ is the half-life in observations and $\alpha$ is the equivalent EWMA smoothing parameter.
+
+This is not a new statistical model; it is the customary way of expressing the same exponential decay in an interpretable time scale. The relationship is grounded in the classic exponential smoothing literature of Brown (1956) and Holt (1957), while the intuition of a half-life comes from the earlier physical decay concept introduced by Rutherford (1907). In modern practice, the mapping is widely used in risk and time-series software — notably the J.P. Morgan RiskMetrics tradition and the explicit `halflife` parameter in pandas `ewm`.
+
+**Reference trail used for this design decision**
+
+- Brown, R. G. (1956). *Exponential Smoothing for Predicting Demand*. Arthur D. Little, Inc.
+- Holt, C. C. (1957). *Forecasting seasonals and trends by exponentially weighted moving averages*. Office of Naval Research, Memorandum No. 52.
+- J.P. Morgan / Reuters (1996). *RiskMetrics — Technical Document*.
+- McKinney, W., & others. (2010). *Data structures for statistical computing in python*.
+- Rutherford, E. (1907). Original work on radioactive decay and half-life intuition.
+- pandas `ewm` documentation for `halflife` parameterization.
+
 ---
 
 ### Step 2 — SSA Decomposition
@@ -485,6 +510,7 @@ When the application starts, it automatically loads this configuration into memo
 
 ```yaml
 file_upload:
+  min_sampling_frequency_minutes: 5  # Smallest accepted sampling interval
   max_file_lines: 2000  # Maximum rows allowed in uploaded CSV/Excel files
 ```
 
@@ -496,6 +522,7 @@ file_upload:
 
 ```yaml
 window_selection:
+  subhourly_cycle_minutes: 1440  # One diurnal cycle for 5-59 minute data
   hourly: 24    # One diurnal cycle
   daily: 5      # One business week
   weekly: 4     # Approximately one month
@@ -503,7 +530,10 @@ window_selection:
   quarterly: 4  # One full annual cycle (4 quarters)
 ```
 
-**Default values:** As listed above
+**Default values:** As listed above. For an accepted sub-hourly cadence, the
+initial window is ``ceil(subhourly_cycle_minutes / sampling_interval_minutes)``;
+for example, 5-minute, 15-minute, and 30-minute data use windows of 288, 96,
+and 48 respectively.
 **Purpose:** Provides initial SSA window sizes based on detected sampling frequency. Values represent one expected seasonal cycle at each cadence.
 
 #### 3. SSA Eigenvalue Grouping Heuristic

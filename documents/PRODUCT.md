@@ -21,3 +21,17 @@
 - Reduces manual SSA tuning by automating window selection and component grouping.
 - Helps identify whether data is structurally suitable for SSA before wasting effort on noisy series.
 - Produces export-ready artifacts and structured observations for downstream review and compliance.
+
+## Analysis procedure
+
+`tseda` now follows a segment-first analysis workflow. The full series remains visible as context in the exploratory plots, but the selected segment is the analytical target for decomposition, ACF/PACF diagnostics, and summary text. This makes the workflow consistent with the decomposition question the analyst is actually trying to answer: the behaviour of the current regime, not the full history in aggregate.
+
+When the final segment has too little history, `tseda` does not force an unstable estimate. Instead, it triggers a short-tail warning and applies a half-life-weighted lookback from the immediately preceding segment. The lookback uses the standard exponential-decay identity:
+
+$$
+\alpha = 1 - (1/2)^{1/h} \quad \text{and} \quad (1 - \alpha)^h = 0.5
+$$
+
+where $h$ is the effective half-life in observations. This makes the smoothing window interpretable in time units while preserving the recursive EWMA structure used in modern time-series software.
+
+The design is consistent with Brown (1956), Holt (1957), the physical half-life concept introduced by Rutherford (1907), and the modern practitioner usage reflected in RiskMetrics and pandas `ewm(..., halflife=...)`.

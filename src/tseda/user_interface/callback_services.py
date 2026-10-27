@@ -11,6 +11,8 @@ import dash_bootstrap_components as dbc
 from dash import html
 from scipy import stats
 
+from tseda.config.config_loader import ConfigurationManager
+
 
 def parse_uploaded_series(contents: str | None, filename: str, max_file_lines: int) -> pd.Series | None:
     """Parse and validate uploaded content.
@@ -84,10 +86,21 @@ def parse_uploaded_series(contents: str | None, filename: str, max_file_lines: i
     observed_deltas = timestamp_index.to_series().sort_values().diff().dropna()
     min_delta = observed_deltas.min() if not observed_deltas.empty else pd.Timedelta(0)
 
-    if min_delta < pd.Timedelta(hours=1):
+    min_sampling_interval_minutes = float(
+        ConfigurationManager.get("file_upload.min_sampling_frequency_minutes", 5)
+    )
+    min_sampling_interval = pd.Timedelta(minutes=min_sampling_interval_minutes)
+
+    if min_delta < min_sampling_interval:
+        unit_label = (
+            str(int(min_sampling_interval_minutes))
+            if float(min_sampling_interval_minutes).is_integer()
+            else str(min_sampling_interval_minutes)
+        )
         raise ValueError(
-            "This application requires a sampling frequency of one hour or higher. "
-            "Please upload data sampled hourly or less frequently."
+            "This application requires a sampling frequency of "
+            f"{unit_label} minutes or higher. "
+            f"Please upload data sampled every {unit_label} minutes or less frequently."
         )
 
     series = df.iloc[:, 1].copy()
@@ -102,27 +115,139 @@ def parse_uploaded_series(contents: str | None, filename: str, max_file_lines: i
     return series
 
 
-def compute_window_slider_config(current_step: int, series_length: int, default_window_size: int) -> tuple[dict[int, str], int, int, int, None]:
-    """Compute valid SSA window slider marks and limits.
+def _normalize_window_to_multiple(value: int | float, default_window_size: int, max_window: int) -> int:
+    """Round a candidate window to a valid integer multiple of the default window."""
+    default_window_size = int(default_window_size)
+    if default_window_size <= 0:
+        return 0
+    max_window = max(default_window_size, int(max_window))
+    candidate = int(round(float(value) / max(default_window_size, 1))) * default_window_size
+    return max(default_window_size, min(candidate, max_window))
 
-    Args:
-        current_step: Active step index in the workflow.
-        series_length: Number of observations in the loaded series.
-        default_window_size: Baseline frequency-derived SSA window.
 
-    Returns:
-        A tuple containing slider marks, value, min, max, and step.
+def _select_curve_points(
+    windows: list[int],
+    values: list[float],
+    method_key: str,
+    target_points: int,
+) -> tuple[list[int], list[float]]:
+    """Downsample a window-selection curve while preserving the ACF tail near zero.
+
+    The ACF heuristic is particularly sensitive to the region where the autocorrelation
+    fades toward zero; uniform thinning can skip the exact transition that decides the
+    plateau. For that method we therefore oversample the tail of the curve while still
+    keeping the broader early trend intact.
+    """
+    if len(windows) <= target_points:
+        return windows, values
+
+    target_points = max(3, int(target_points))
+    idx = np.linspace(0, len(windows) - 1, num=target_points, dtype=int)
+    return [windows[i] for i in idx], [values[i] for i in idx]
+
+
+def _estimate_variance_plateau_window(series: pd.Series, default_window_size: int) -> int:
+    """Choose the window at the end of the longest stable rolling-variance plateau."""
+    if series is None or len(series) < 12 or default_window_size <= 0:
+        return default_window_size
+
+    max_window = max(default_window_size, min(len(series) // 2, default_window_size * 8))
+    candidate_windows = [default_window_size * k for k in range(1, max_window // default_window_size + 1)]
+    if not candidate_windows:
+        return default_window_size
+
+    variance_levels = []
+    for window in candidate_windows:
+        if window >= len(series):
+            continue
+        rolling_var = series.rolling(window).var().dropna()
+        if rolling_var.empty:
+            continue
+        variance_levels.append((window, float(rolling_var.mean())))
+
+    if len(variance_levels) < 2:
+        return _normalize_window_to_multiple(candidate_windows[0], default_window_size, len(series) // 2)
+
+    plateau_run: list[int] = []
+    best_plateau: list[int] = []
+
+    for idx in range(1, len(variance_levels)):
+        prev_window, prev_var = variance_levels[idx - 1]
+        current_window, current_var = variance_levels[idx]
+        if prev_var <= 0 or not np.isfinite(prev_var):
+            plateau_run = []
+            continue
+
+        relative_change = abs(current_var - prev_var) / abs(prev_var)
+        if relative_change < 0.05:
+            plateau_run.append(current_window)
+            if len(plateau_run) > len(best_plateau):
+                best_plateau = plateau_run.copy()
+        else:
+            plateau_run = []
+
+    if best_plateau:
+        return _normalize_window_to_multiple(max(best_plateau), default_window_size, len(series) // 2)
+
+    min_change_idx = min(
+        range(1, len(variance_levels)),
+        key=lambda idx: abs(variance_levels[idx][1] - variance_levels[idx - 1][1]) / abs(variance_levels[idx - 1][1]) if variance_levels[idx - 1][1] != 0 else float("inf"),
+    )
+    return _normalize_window_to_multiple(variance_levels[min_change_idx][0], default_window_size, len(series) // 2)
+
+
+def choose_window_size_for_method(series: pd.Series | None, method: str | None, default_window_size: int) -> int:
+    """Return the recommended SSA window for the selected estimation strategy."""
+    method_name = (method or "adaptive-spectral-refinement").strip().lower()
+    if default_window_size <= 0:
+        return 0
+
+    if method_name in {"manual", "manual-slider", "slider"}:
+        return int(default_window_size)
+    if method_name == "variance-plateau":
+        return _estimate_variance_plateau_window(series, int(default_window_size))
+    return int(default_window_size)
+
+
+def compute_window_slider_config(
+    current_step: int,
+    series_length: int,
+    default_window_size: int,
+    method_name: str | None = None,
+    series: pd.Series | None = None,
+) -> tuple[dict[int, str], int, int, int, None]:
+    """Compute valid SSA slider marks and limits for the active selection method.
+
+    Each method recalculates the range from its own baseline so method switches do
+    not keep stale slider bounds from an earlier choice.
     """
     if current_step != 2 or series_length <= 0 or default_window_size <= 0:
         return {}, 0, 0, 0, None
 
-    max_k = (series_length + (4 * default_window_size) - 1) // (4 * default_window_size)
-    valid_windows = [k * default_window_size for k in range(1, max_k + 1)]
+    method_key = (method_name or "adaptive-spectral-refinement").strip().lower()
+    range_base = default_window_size
+    if method_key in {"manual", "manual-slider", "slider"}:
+        range_base = default_window_size
+    elif series is not None:
+        recommended = choose_window_size_for_method(series, method_key, default_window_size)
+        if recommended > 0:
+            range_base = recommended
 
+    max_multiple = max(1, (series_length // 2) // range_base)
+    valid_windows = [k * range_base for k in range(1, max_multiple + 1)]
     if not valid_windows:
-        return {}, 0, 0, 0, None
+        valid_windows = [range_base]
 
     marks = {val: str(val) for val in valid_windows}
+    if method_key in {"manual", "manual-slider", "slider"}:
+        value = default_window_size if default_window_size in valid_windows else valid_windows[0]
+        return marks, value, valid_windows[0], valid_windows[-1], None
+
+    recommended = choose_window_size_for_method(series, method_key, default_window_size) if series is not None else default_window_size
+    if recommended > 0:
+        value = min(valid_windows, key=lambda candidate: abs(candidate - recommended))
+        return marks, value, valid_windows[0], valid_windows[-1], None
+
     return marks, valid_windows[0], valid_windows[0], valid_windows[-1], None
 
 

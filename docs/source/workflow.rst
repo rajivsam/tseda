@@ -27,8 +27,53 @@ reviewing baseline diagnostics:
 - Correlation structure via ACF and PACF plots.
 
 This first pass provides a quick structural read on the data before decomposition.
-At present, the expected use case is regularly sampled data (hourly or lower
-frequency) with missing values handled before upload.
+The expected use case is regularly sampled data at intervals of five minutes or
+longer, with missing values handled before upload.
+
+Segment-first analysis and half-life fallback
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The app no longer treats the full series as the only analytic target. The full
+series remains visible for exploratory context, but the selected segment becomes
+the active analysis target for downstream decomposition, ACF/PACF diagnostics, and
+summary reporting. In other words, the user chooses the segment to analyze, and the
+rest of the app works from that regime instead of silently reusing the full series.
+
+When the final segment is too short to support a stable estimate, the UI triggers a
+short-tail warning and uses a half-life-weighted lookback from the preceding segment.
+This is a stability safeguard, not a model change: it keeps the estimate anchored to
+recent regime history without pretending the segment has enough points to stand on its
+own.
+
+The half-life mapping is the standard exponential-decay representation used in
+recursive smoothing:
+
+.. math::
+
+   \alpha = 1 - (1/2)^{1/h}
+
+and equivalently
+
+.. math::
+
+   (1 - \alpha)^h = 0.5
+
+where :math:`h` is the half-life in observation units and :math:`\alpha` is the
+EWMA smoothing factor. This is the same expression used when scaling a decay window to
+human-readable time units instead of the more abstract smoothing parameter.
+
+The design choice is consistent with the historical exponential smoothing literature
+(Brown, 1956; Holt, 1957), the earlier half-life concept introduced by Rutherford,
+and the modern practitioner standard popularized by RiskMetrics and by the explicit
+`halflife` parameter in pandas `ewm`.
+
+**References used for the lookback decision**
+
+- Brown, R. G. (1956). *Exponential Smoothing for Predicting Demand*.
+- Holt, C. C. (1957). *Forecasting seasonals and trends by exponentially weighted moving averages*.
+- J.P. Morgan / Reuters (1996). *RiskMetrics — Technical Document*.
+- McKinney, W., & others. (2010). *Data structures for statistical computing in python*.
+- Rutherford, E. (1907). Early work on exponential decay and half-life.
 
 Time Series Decomposition
 -------------------------
@@ -49,6 +94,12 @@ Cadence-to-window mapping:
 +----------+----------------+
 | Cadence  | Initial Window |
 +==========+================+
+| 5-minute | 288            |
++----------+----------------+
+| 15-minute| 96             |
++----------+----------------+
+| 30-minute| 48             |
++----------+----------------+
 | Hourly   | 24             |
 +----------+----------------+
 | Daily    | 5              |
@@ -68,22 +119,23 @@ The pseudocode below describes the full setup procedure:
     Params: min_tail_spread = 0.10
 
     --- Cadence-based initialization ---
-    1.  If c = hourly  -> w ← 24
-    2.  If c = daily   -> w ← 5
-    3.  If c = weekly  -> w ← 4
-    4.  If c = monthly -> w ← 12
-    5.  If cadence is unknown -> fail with "invalid window"
+    1.  If 5 minutes <= c < 1 hour -> w ← ceil(subhourly_cycle_minutes / c)
+    2.  If c = hourly  -> w ← 24
+    3.  If c = daily   -> w ← 5
+    4.  If c = weekly  -> w ← 4
+    5.  If c = monthly -> w ← 12
+    6.  If cadence is unknown -> fail with "invalid window"
 
     --- Spectrum-spread refinement ---
-    6.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
-    7.  tail_ratio ← λ_w / Σᵢ λᵢ
-    8.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
+    7.  Build SSA(x, w) and compute eigenvalues λ₁ ≥ ... ≥ λ_w
+    8.  tail_ratio ← λ_w / Σᵢ λᵢ
+    9.  While tail_ratio ≥ min_tail_spread and 2w ≤ floor(N/2):
           w ← 2w
           Rebuild SSA(x, w)
           tail_ratio ← λ_w / Σᵢ λᵢ
 
     --- Output ---
-    9.  Return final w as the decomposition default and slider value
+    10. Return final w as the decomposition default and slider value
 
 In the UI, this final value is surfaced as the Step-2 default and remains
 user-overridable via the window slider.

@@ -13,6 +13,7 @@ from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from tseda.series_stats.sampling_prop import SamplingProp
 from tseda.user_interface.components.initial_eval_components import create_summary_table, create_kde_plot, create_box_plot, create_scatter_plot, create_acf_plot, create_pacf_plot, create_ssa_decomposition_plot
@@ -28,15 +29,24 @@ from tseda.user_interface.callback_services import (
     build_noise_kde_figure,
     build_reconstruction_metadata,
     build_suggested_grouping_table,
+    choose_window_size_for_method,
     compute_window_slider_config,
     format_component_indices,
     matplotlib_figure_to_data_url,
     parse_reconstruction_groups,
     parse_uploaded_series,
+    _select_curve_points,
 )
 from tseda.decomposition.ssa_decomposition import SSADecomposition
 from tseda.decomposition.ssa_result_summary import SSAResultSummary
 from tseda.config.config_loader import ConfigurationManager
+from tseda.segmentation.pelt_segmentation import (
+    build_adjusted_analysis_segment,
+    get_short_segment_confirmation_message,
+    infer_cadence_from_series,
+    resolve_minimum_segment_points,
+    select_pelt_model,
+)
 from kmds.ontology.kmds_ontology import *
 from kmds.tagging.tag_types import ExploratoryTags
 from kmds.ontology.intent_types import IntentType
@@ -57,6 +67,8 @@ MAX_FILE_LINES = ConfigurationManager.get("file_upload.max_file_lines", 2000)
 series: pd.Series | None = None
 window_size: int = 0
 ssa_obj: SSADecomposition | None = None
+WINDOW_EXT_OPTIMAL = int(ConfigurationManager.get("window_selection.window_ext_optimal", 5))
+WINDOW_SELECTION_PLOT_POINTS = int(ConfigurationManager.get("window_selection.plot_points_per_curve", 12))
 
 # --- 1. Step Layouts ---
 
@@ -85,8 +97,11 @@ def navigate_steps(
     prev_clicks: int | None,
     analysis_complete: bool,
     current_step: int,
+    selected_segment_value: int | str | None,
 ) -> tuple[dict[str, str] | Any, dict[str, str] | Any, dict[str, str] | Any, int, bool, bool, int | Any, int | Any]:
     """Navigate the three-step workflow and update progress/navigation state."""
+    global series, window_size
+
     # Determine which button was clicked
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -94,16 +109,23 @@ def navigate_steps(
     else:
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    # When only the analysis-complete-store changed (Apply Grouping fired), only update
-    # button states — do not change which step is visible.
     if button_id == 'analysis-complete-store':
         prev_disabled = (current_step == 1)
         next_disabled = (current_step >= 3)
         return dash.no_update, dash.no_update, dash.no_update, current_step, prev_disabled, next_disabled, dash.no_update, dash.no_update
 
-    # Update step logic
     if button_id == 'next-btn' and current_step < 3:
-        # Step 3 is only allowed after analysis is completed via Apply Grouping.
+        if current_step == 1 and series is not None and len(series) > 0:
+            segment_index = coerce_segment_index(selected_segment_value, fallback=max(0, len(compute_segment_boundaries(len(series), max(1, min(5, len(series) // max(1, resolve_minimum_segment_points(cadence=infer_cadence_from_series(series))))))) - 1))
+            boundaries = compute_segment_boundaries(len(series), max(1, min(5, len(series) // max(1, resolve_minimum_segment_points(cadence=infer_cadence_from_series(series))))))
+            if segment_index < len(boundaries):
+                start, end = boundaries[segment_index]
+                active_segment = series.iloc[start:end]
+                series = active_segment
+                if len(series) > 0:
+                    sampling_props = SamplingProp(series)
+                    if sampling_props._freq_window is not None and sampling_props._freq_window > 0:
+                        window_size = int(sampling_props._freq_window)
         if current_step == 2 and not bool(analysis_complete):
             pass
         else:
@@ -182,6 +204,7 @@ def update_summary_table(
     uploaded_file: dict[str, str] | None,
     kde_toggle: list[str] | None,
     hist_bin_count: int | None,
+    selected_segment_value: int | str | None = None,
 ) -> tuple[Any, Any, Any, Any, Any, Any]:
     """Render summary table and exploratory plots for the uploaded series."""
     global series, window_size, ssa_obj
@@ -199,14 +222,38 @@ def update_summary_table(
         show_kde = bool(kde_toggle and 'show' in kde_toggle)
         bin_count = int(hist_bin_count) if hist_bin_count and int(hist_bin_count) > 0 else None
 
+        segment_series = series
+        if selected_segment_value is not None:
+            if isinstance(selected_segment_value, str):
+                try:
+                    selected_segment_value = int(selected_segment_value)
+                except (TypeError, ValueError):
+                    selected_segment_value = None
+            if selected_segment_value is not None:
+                segment_count = max(1, min(5, len(series) // max(1, resolve_minimum_segment_points(cadence=infer_cadence_from_series(series)))))
+                boundaries = compute_segment_boundaries(len(series), segment_count)
+                selected_index = coerce_segment_index(selected_segment_value, fallback=max(0, len(boundaries) - 1))
+                selected_index = min(max(selected_index, 0), len(boundaries) - 1 if boundaries else 0)
+                start, end = boundaries[selected_index]
+                segment_series = series.iloc[start:end]
+
         sampling_props = SamplingProp(series)
         window_size = sampling_props._freq_window if sampling_props._freq_window is not None else 0
         ssa_obj = None
         kde_fig = create_kde_plot(series, show_kde=show_kde, bin_count=bin_count)
         box_fig = create_box_plot(series)
         scatter_fig = create_scatter_plot(series)
-        acf_fig = create_acf_plot(series, lags=40)
-        pacf_fig = create_pacf_plot(series, lags=40)
+        acf_segment_label = None
+        pacf_segment_label = None
+        if selected_segment_value is not None:
+            segment_count = max(1, min(5, len(series) // max(1, resolve_minimum_segment_points(cadence=infer_cadence_from_series(series)))))
+            boundaries = compute_segment_boundaries(len(series), segment_count)
+            selected_index = coerce_segment_index(selected_segment_value, fallback=max(0, len(boundaries) - 1))
+            selected_index = min(max(selected_index, 0), len(boundaries) - 1 if boundaries else 0)
+            acf_segment_label = f"Segment {selected_index + 1}"
+            pacf_segment_label = f"Segment {selected_index + 1}"
+        acf_fig = create_acf_plot(segment_series, lags=40, segment_label=acf_segment_label)
+        pacf_fig = create_pacf_plot(segment_series, lags=40, segment_label=pacf_segment_label)
         
         return (
             create_summary_table(sampling_props),
@@ -224,27 +271,255 @@ def update_summary_table(
         return assessment_placeholders()
 
 
+def _window_method_metric_curve(series: pd.Series, method_key: str, default_window: int) -> tuple[list[int], list[float]]:
+    """Return a compact diagnostic curve for one window-selection heuristic."""
+    # The spectral heuristic compares coarse multiples of the starting window so the
+    # curve captures the broader window sweep. The variance plateau should remain at
+    # one-window resolution to show the local plateau structure without skipping over it.
+    step_size = max(1, default_window) if method_key == "adaptive-spectral-refinement" else 1
+    optimal_window = max(step_size, choose_window_size_for_method(series, method_key, default_window))
+    extension = WINDOW_EXT_OPTIMAL * step_size if method_key == "adaptive-spectral-refinement" else WINDOW_EXT_OPTIMAL
+    search_end = min(len(series) // 2, optimal_window + extension)
+    if search_end <= 0:
+        return [default_window], [0.0]
+
+    start_window = max(step_size, min(default_window, search_end))
+    windows = list(range(start_window, search_end + 1, step_size))
+    if not windows:
+        return [default_window], [0.0]
+
+    values: list[float] = []
+    for window in windows:
+        if window >= len(series):
+            continue
+        if method_key == "variance-plateau":
+            rolling_var = series.rolling(window).var().dropna()
+            value = float(rolling_var.mean()) if not rolling_var.empty else np.nan
+        else:
+            try:
+                ssa_obj = SSADecomposition(series, window)
+                eig = np.asarray(getattr(ssa_obj, "_eigenvalues", []), dtype=float)
+                total = float(np.sum(eig))
+                value = float(np.abs(eig[-1]) / total) if eig.size > 0 and total > 0 else np.nan
+            except Exception:
+                value = np.nan
+
+        values.append(float(value) if np.isfinite(value) else np.nan)
+
+    clean_windows = []
+    clean_values = []
+    for window, value in zip(windows, values):
+        if np.isfinite(value):
+            clean_windows.append(window)
+            clean_values.append(float(value))
+
+    if not clean_windows:
+        return [optimal_window], [0.0]
+
+    if method_key == "variance-plateau":
+        percent_changes: list[float] = []
+        percent_windows: list[int] = []
+        for idx, value in enumerate(clean_values):
+            if idx == 0:
+                continue
+            previous = clean_values[idx - 1]
+            if previous == 0:
+                percent_changes.append(0.0)
+            else:
+                percent_changes.append(((value - previous) / previous) * 100.0)
+            percent_windows.append(clean_windows[idx])
+        clean_windows = percent_windows
+        clean_values = percent_changes
+
+    max_points = max(3, min(int(WINDOW_SELECTION_PLOT_POINTS), len(clean_windows)))
+    clean_windows, clean_values = _select_curve_points(
+        windows=clean_windows,
+        values=clean_values,
+        method_key=method_key,
+        target_points=max_points,
+    )
+
+    return clean_windows, clean_values
+
+
+def build_window_selection_comparison_figure(
+    current_step: int,
+    uploaded_file: dict[str, str] | None,
+    refined_window: int | None,
+    slider_window_size: int | None,
+) -> go.Figure:
+    """Return the two-panel window-selection diagnostic chart for the active methods."""
+    if current_step != 2 or series is None or len(series) == 0:
+        return empty_figure("No data available")
+
+    base_window = int(refined_window) if refined_window and int(refined_window) > 0 else int(window_size or 0)
+    if base_window <= 0:
+        return empty_figure("No valid window available")
+
+    method_specs = {
+        "Adaptive spectral refinement": {
+            "key": "adaptive-spectral-refinement",
+            "metric": "Residual noise share",
+            "color": "#4c78a8",
+        },
+        "Variance plateau": {
+            "key": "variance-plateau",
+            "metric": "Variance change vs previous window (%)",
+            "color": "#f58518",
+        },
+    }
+
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=False,
+        shared_yaxes=False,
+        subplot_titles=[label for label in method_specs],
+        vertical_spacing=0.12,
+        row_heights=[0.5, 0.5],
+    )
+
+    for row_idx, (label, spec) in enumerate(method_specs.items(), start=1):
+        windows, values = _window_method_metric_curve(series, spec["key"], base_window)
+        if not windows:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=windows,
+                y=values,
+                mode="lines+markers",
+                name=label,
+                line={"color": spec["color"], "width": 2},
+                marker={"size": 5, "color": spec["color"]},
+                hovertemplate=f"{label}<br>Window size: %{{x}}<br>{spec['metric']}: %{{y:.4f}}<extra></extra>",
+            ),
+            row=row_idx,
+            col=1,
+        )
+        suggested_window = choose_window_size_for_method(series, spec["key"], base_window)
+        if windows and suggested_window in windows:
+            idx = windows.index(suggested_window)
+            fig.add_annotation(
+                x=suggested_window,
+                y=values[idx],
+                text=f"Suggested: {suggested_window}",
+                showarrow=True,
+                arrowhead=2,
+                yshift=10,
+                row=row_idx,
+                col=1,
+            )
+
+        fig.update_xaxes(title_text="Window size", row=row_idx, col=1)
+        fig.update_yaxes(title_text=spec["metric"], row=row_idx, col=1)
+
+        x_min, x_max = min(windows), max(windows)
+        y_min, y_max = min(values), max(values)
+        if y_min == y_max:
+            y_pad = max(1.0, abs(y_min) * 0.05)
+            y_min -= y_pad
+            y_max += y_pad
+        fig.update_xaxes(range=[x_min - 1, x_max + 1], row=row_idx, col=1)
+        fig.update_yaxes(range=[y_min, y_max], row=row_idx, col=1)
+
+    fig.update_layout(
+        title="Window selection diagnostics by method",
+        template="plotly_white",
+        width=1500,
+        height=1300,
+        margin={"l": 40, "r": 30, "t": 50, "b": 30},
+        showlegend=False,
+    )
+    return fig
+
+
+def update_window_selection_summary(
+    current_step: int,
+    uploaded_file: dict[str, str] | None,
+    slider_window_size: int | None,
+    window_selection_method: str | None,
+) -> str:
+    """Return a human-readable summary describing the method and recommended window."""
+    if current_step != 2 or series is None or len(series) == 0:
+        return "No series loaded."
+
+    effective_window = int(slider_window_size) if slider_window_size is not None and int(slider_window_size) > 0 else int(window_size or 0)
+    if effective_window <= 0:
+        return "No valid window size available."
+
+    if (window_selection_method or "manual").lower() in {"manual", "manual-slider", "slider"}:
+        return f"Manual selection: current window {effective_window}"
+
+    method_name = (window_selection_method or "adaptive-spectral-refinement").strip().lower()
+    method_labels = {
+        "adaptive-spectral-refinement": "Adaptive spectral refinement",
+        "variance-plateau": "Variance plateau",
+    }
+    recommended = choose_window_size_for_method(series, method_name, effective_window)
+    if recommended <= 0:
+        recommended = effective_window
+    return f"Current method: {method_labels.get(method_name, method_name)} — Suggested window: {recommended}"
+
+
 def configure_redo_slider(
     current_step: int,
     uploaded_file: dict[str, str] | None,
     refined_window: int | None,
+    window_selection_method: str | None = None,
 ) -> tuple[dict[int, str], int, int, int, None]:
     """Configure valid redo SSA window values as integer multiples of the default window.
 
     When the refinement loop in ``update_ssa_plots`` has doubled the initial
-    heuristic window to satisfy the <10 % smallest-eigenvalue invariant, it
-    writes the final value to ``refined-window-store``.  This callback re-fires
-    on that change and uses the refined value so the slider stays in sync.
+    adaptive spectral refinement window to satisfy the <10 % smallest-eigenvalue
+    invariant, it writes the final value to ``refined-window-store``. This callback
+    re-fires on that change and uses the refined value so the slider stays in sync.
     """
     global series, window_size
 
+    ctx = dash.callback_context
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+
     effective_window = int(refined_window) if refined_window and int(refined_window) > 0 else window_size
     series_length = len(series) if series is not None else 0
-    return compute_window_slider_config(
+    method_name = (window_selection_method or "adaptive-spectral-refinement").strip().lower()
+
+    if current_step != 2 or series_length <= 0 or effective_window <= 0:
+        return {}, 0, 0, 0, None
+
+    candidate_windows = [effective_window]
+    if series is not None:
+        for method_key in ("adaptive-spectral-refinement", "variance-plateau"):
+            recommended = choose_window_size_for_method(series, method_key, effective_window)
+            if recommended > 0:
+                candidate_windows.append(recommended)
+
+    low = min(candidate_windows)
+    high = max(candidate_windows)
+    step_base = max(1, effective_window)
+    valid_windows = [step_base * i for i in range((low + step_base - 1) // step_base, (high // step_base) + 1)]
+    if not valid_windows:
+        valid_windows = [effective_window]
+
+    marks = {val: str(val) for val in valid_windows}
+    value = effective_window if effective_window in valid_windows else valid_windows[0]
+    return marks, value, valid_windows[0], valid_windows[-1], None
+
+
+def configure_window_selection_dropdown(
+    current_step: int,
+    uploaded_file: dict[str, str] | None,
+    refined_window: int | None,
+    window_selection_method: str | None = None,
+) -> tuple[list[dict[str, int | str]], int | None]:
+    """Return a dropdown option list rebuilt when the method selection changes."""
+    marks, value, _, _, _ = configure_redo_slider(
         current_step=current_step,
-        series_length=series_length,
-        default_window_size=effective_window,
+        uploaded_file=uploaded_file,
+        refined_window=refined_window,
+        window_selection_method=window_selection_method,
     )
+    options = [{"label": str(window), "value": int(window)} for window in marks]
+    return options, value if value in marks else (list(marks)[0] if marks else None)
 
 
 def relay_apply_grouping(n_clicks: int | None) -> int:
@@ -262,6 +537,7 @@ def update_ssa_plots(
     analysis_complete: bool,
     uploaded_file: dict[str, str] | None,
     slider_window_size: int | None,
+    window_selection_method: str | None = None,
 ) -> tuple[go.Figure, str, bool, Any, bool, Any, str | Any, str | Any, str | Any, str | Any, str | Any, str | Any, int | Any]:
     """Generate SSA plots and series-suitability state for grouping actions."""
     global series, window_size, ssa_obj
@@ -277,7 +553,13 @@ def update_ssa_plots(
         return empty_fig, "", False, None, False, "", *empty_suggestions, dash.no_update
     
     try:
+        method_name = (window_selection_method or "adaptive-spectral-refinement").strip().lower()
         selected_window_size = int(slider_window_size) if slider_window_size is not None and int(slider_window_size) > 0 else window_size
+
+        if method_name not in {"manual", "manual-slider", "slider"} and trigger_id in {"window-selection-method", "uploaded-file-store", "step-tracker"}:
+            recommended_window = choose_window_size_for_method(series, method_name, selected_window_size)
+            if recommended_window > 0:
+                selected_window_size = recommended_window
 
         if ssa_obj is None or getattr(ssa_obj, "_window", None) != selected_window_size:
             ssa_obj = SSADecomposition(series, selected_window_size)
@@ -291,7 +573,7 @@ def update_ssa_plots(
         # holds or the window would exceed half the series length.
         min_tail_spread = ConfigurationManager.get("window_refinement.min_tail_spread", 0.10)
         
-        if trigger_id != 'ssa-window-slider':
+        if trigger_id != 'ssa-window-slider' and method_name in {"adaptive-spectral-refinement", "manual"}:
             _eigs = np.asarray(getattr(ssa_obj, "_eigenvalues", []), dtype=float)
             _total = float(np.sum(_eigs))
             while (
@@ -584,6 +866,197 @@ def populate_observation_text(
         return dash.no_update
 
 
+def update_segment_advice(
+    n_clicks: int | None,
+    series_value: pd.Series | None,
+    selected_model: str | None,
+) -> str:
+    """Recommend the PELT cost model and return the advice text."""
+    if series_value is None or len(series_value) == 0:
+        return "Upload a series to generate segmentation advice."
+
+    model = select_pelt_model(np.asarray(series_value, dtype=float), component_type="trend")
+    if selected_model == "rbf":
+        model = "rbf"
+    return (
+        f"Advisor recommendation: {model} (linear/l2 is the default for trend-dominant data; "
+        "RBF is used only when the seasonal signal shows non-normal, multimodal behavior or a strong variance shift)."
+    )
+
+
+def compute_segment_boundaries(total_points: int, segment_count: int) -> list[tuple[int, int]]:
+    """Return deterministic start/end ranges for the visualized segment choices."""
+    if total_points <= 0:
+        return []
+    if segment_count <= 1:
+        return [(0, total_points)]
+
+    boundaries: list[tuple[int, int]] = []
+    for idx in range(segment_count):
+        start = idx * (total_points // segment_count)
+        end = total_points if idx == segment_count - 1 else (idx + 1) * (total_points // segment_count)
+        boundaries.append((start, end))
+    return boundaries
+
+
+def sync_segment_dropdown(
+    uploaded_file: dict[str, str] | None,
+    selected_segment_value: int | str | None,
+) -> tuple[list[dict[str, str | int]], int | None, str | None]:
+    """Populate the selector with actual analysis segments and preserve the user's selected segment."""
+    active = series if series is not None and len(series) > 0 else None
+    if active is None:
+        return [], None, "Upload a series to segment."
+
+    num_points = len(active)
+    if num_points <= 1:
+        return [{"label": "segment-1", "value": 0}], 0, "Only one segment is available."
+
+    min_points = resolve_minimum_segment_points(cadence=infer_cadence_from_series(active))
+    segment_count = max(1, min(5, num_points // max(1, min_points)))
+    boundaries = compute_segment_boundaries(num_points, segment_count)
+    options: list[dict[str, str | int]] = []
+    for idx, (start, end) in enumerate(boundaries):
+        options.append({"label": f"segment-{idx + 1} ({start}:{end})", "value": idx})
+
+    default_value = len(options) - 1
+    if selected_segment_value is None:
+        selected_value = default_value
+    else:
+        selected_value = coerce_segment_index(selected_segment_value, fallback=default_value)
+        selected_value = min(max(selected_value, 0), len(options) - 1)
+
+    return options, selected_value, None
+
+
+def build_segment_view_figure(view_mode: str | None = "selected", selected_segment_value: int | str | None = None) -> go.Figure:
+    """Render the selected analysis segment; the full series is shown separately on the scatter plot."""
+    if series is None or len(series) == 0:
+        return empty_figure("Upload a series to inspect a segment")
+
+    segment_count = max(1, min(5, len(series) // max(1, resolve_minimum_segment_points(cadence=infer_cadence_from_series(series)))))
+    boundaries = compute_segment_boundaries(len(series), segment_count)
+    fallback_index = max(0, len(boundaries) - 1)
+    if selected_segment_value is None:
+        selected_segment_value = fallback_index
+    selected_index = coerce_segment_index(selected_segment_value, fallback=fallback_index)
+    selected_index = min(max(selected_index, 0), len(boundaries) - 1 if boundaries else 0)
+
+    segment_start, segment_end = boundaries[selected_index]
+    data = series.iloc[segment_start:segment_end]
+    x_values = data.index
+    y_values = data.to_numpy(dtype=float)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=x_values, y=y_values, mode="lines", line={"color": "#4c78a8", "width": 2}, hovertemplate="%{x}<br>Value: %{y}<extra></extra>"))
+
+    axis_min = x_values[0]
+    axis_max = x_values[-1]
+    if isinstance(x_values, pd.DatetimeIndex):
+        fig.update_xaxes(range=[axis_min.to_pydatetime(), axis_max.to_pydatetime()])
+    else:
+        fig.update_xaxes(range=[float(axis_min), float(axis_max)])
+    fig.update_layout(title=f"Segment view: {selected_index + 1}", xaxis_title="Time", yaxis_title="Value", template="plotly_white", margin={"l": 45, "r": 20, "t": 40, "b": 30})
+    return fig
+
+
+def coerce_segment_index(value: int | str | None, fallback: int = 0) -> int:
+    """Translate a dropdown value into a numeric segment index while treating the full-series option as a visualization-only choice."""
+    if value is None:
+        return fallback
+    if isinstance(value, str):
+        if value.lower() in {"full", "whole", "whole-series", "full-series"}:
+            return fallback
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return fallback
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def update_segment_view_plot(
+    selected_segment_value: int | str | None,
+    uploaded_file: dict[str, str] | None = None,
+    view_mode: str | None = None,
+) -> go.Figure:
+    """Refresh the segmentation preview plot using the actual dropdown selection.
+
+    Dash invokes this callback with ``(selected_segment_value, uploaded_file)``. A full-series
+    selection is rendered as a full-series visualization while the downstream analysis target
+    remains the chosen segment rather than the entire original series.
+    """
+    if view_mode is None and isinstance(uploaded_file, str):
+        view_mode = uploaded_file
+        uploaded_file = None
+    elif view_mode is None:
+        view_mode = "selected"
+    if isinstance(selected_segment_value, str) and selected_segment_value.lower() in {"full", "whole", "whole-series", "full-series"}:
+        view_mode = "full"
+    return build_segment_view_figure(view_mode=view_mode, selected_segment_value=selected_segment_value)
+
+
+def evaluate_segment_warning(
+    uploaded_file: dict[str, str] | None,
+    selected_segment_idx: int | str | None,
+    segment_options: list[dict[str, str | int]] | None,
+) -> tuple[bool, str]:
+    """Check whether the selected analysis segment should prompt a short-tail warning and adjustment."""
+    active = series if series is not None and len(series) > 0 else None
+    if active is None:
+        return False, ""
+
+    cadence = infer_cadence_from_series(active)
+    required_points = resolve_minimum_segment_points(cadence=cadence)
+    fallback_index = max(0, len(segment_options or []) - 1)
+    selected_segment_idx = coerce_segment_index(selected_segment_idx, fallback=fallback_index)
+
+    boundaries = compute_segment_boundaries(len(active), max(1, min(5, len(active) // max(1, required_points))))
+    if selected_segment_idx < 0 or selected_segment_idx >= len(boundaries):
+        selected_segment_idx = fallback_index
+    segment_start, segment_end = boundaries[selected_segment_idx]
+    final_len = max(0, segment_end - segment_start)
+    if final_len < required_points:
+        return True, get_short_segment_confirmation_message(cadence=cadence, required_points=required_points, final_len=final_len)
+    return False, ""
+
+
+def accept_adjusted_segment(
+    open_clicks: int | None,
+    cancel_clicks: int | None,
+    selected_segment_value: int | None,
+) -> tuple[bool, dict[str, object] | None]:
+    """Accept or cancel the segment-warning modal and return the adjusted selection state."""
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return False, None
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    if trigger == "segment-warning-cancel-btn":
+        return False, None
+    if trigger == "segment-warning-continue-btn":
+        if selected_segment_value is None:
+            return False, None
+        return False, {"accepted": True, "segment_index": coerce_segment_index(selected_segment_value)}
+    return False, None
+
+
+def toggle_segment_warning(
+    open_clicks: int | None,
+    close_clicks: int | None,
+    is_open: bool,
+) -> bool:
+    """Open or close the short-tail analysis warning modal."""
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return is_open
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    if trigger in ("segment-warning-continue-btn", "segment-warning-cancel-btn"):
+        return False
+    return is_open
+
+
 def toggle_save_kb_modal(
     save_clicks: int | None,
     cancel_clicks: int | None,
@@ -596,6 +1069,21 @@ def toggle_save_kb_modal(
         return is_open
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
     if trigger in ("save-to-kb-btn", "save-kb-cancel-btn", "save-kb-confirm-btn"):
+        return not is_open
+    return is_open
+
+
+def toggle_window_selection_modal(
+    open_clicks: int | None,
+    close_clicks: int | None,
+    is_open: bool,
+) -> bool:
+    """Open or close the detailed window-selection diagnostics modal."""
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return is_open
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    if trigger in ("window-selection-diagnostics-btn", "window-selection-modal-close-btn"):
         return not is_open
     return is_open
 
@@ -719,7 +1207,8 @@ def register_callbacks(dash_app: dash.Dash) -> None:
         [Input('next-btn', 'n_clicks'),
          Input('prev-btn', 'n_clicks'),
          Input('analysis-complete-store', 'data')],
-        [State('step-tracker', 'data')],
+        [State('step-tracker', 'data'),
+         State('selected-segment-dropdown', 'value')],
     )(navigate_steps)
 
     dash_app.callback(
@@ -746,8 +1235,51 @@ def register_callbacks(dash_app: dash.Dash) -> None:
             Input('uploaded-file-store', 'data'),
             Input('kde-overlay-toggle', 'value'),
             Input('hist-bin-count-slider', 'value'),
+            Input('selected-segment-dropdown', 'value'),
         ],
     )(update_summary_table)
+
+    dash_app.callback(
+        [Output('selected-segment-dropdown', 'options'),
+         Output('selected-segment-dropdown', 'value'),
+         Output('segment-warning-detail', 'children')],
+        [Input('uploaded-file-store', 'data'),
+         Input('selected-segment-dropdown', 'value')],
+    )(sync_segment_dropdown)
+
+    dash_app.callback(
+        Output('segment-advisor-output', 'children'),
+        [Input('segment-advisor-btn', 'n_clicks'),
+         Input('uploaded-file-store', 'data'),
+         Input('segment-model-dropdown', 'value')],
+    )(lambda n_clicks, uploaded_file, selected_model: update_segment_advice(n_clicks, series, selected_model))
+
+    dash_app.callback(
+        Output('segment-view-plot', 'figure'),
+        [Input('selected-segment-dropdown', 'value'),
+         Input('uploaded-file-store', 'data')],
+    )(update_segment_view_plot)
+
+    dash_app.callback(
+        Output('segment-warning-modal', 'is_open'),
+        [Input('segment-advisor-btn', 'n_clicks'),
+         Input('segment-warning-continue-btn', 'n_clicks'),
+         Input('segment-warning-cancel-btn', 'n_clicks')],
+        [State('selected-segment-dropdown', 'value'),
+         State('segment-warning-modal', 'is_open')],
+    )(lambda n_clicks, continue_clicks, cancel_clicks, selected_segment_value, is_open: bool(is_open) or (selected_segment_value is not None and bool(n_clicks)))
+
+    dash_app.callback(
+        [Output('segment-selection-store', 'data'),
+         Output('segment-warning-modal', 'is_open', allow_duplicate=True)],
+        [Input('segment-warning-continue-btn', 'n_clicks'),
+         Input('segment-warning-cancel-btn', 'n_clicks')],
+        [State('selected-segment-dropdown', 'value'),
+         State('segment-selection-store', 'data')],
+        prevent_initial_call=True,
+    )(lambda continue_clicks, cancel_clicks, selected_segment_value, current_store: (
+        {"segment_index": coerce_segment_index(selected_segment_value), "accepted": True}, False
+    ) if continue_clicks else ({"segment_index": coerce_segment_index(current_store.get("segment_index") if isinstance(current_store, dict) else None), "accepted": False}, False))
 
     dash_app.callback(
         [Output('ssa-window-slider', 'marks'),
@@ -757,8 +1289,32 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          Output('ssa-window-slider', 'step')],
         [Input('step-tracker', 'data'),
          Input('uploaded-file-store', 'data'),
-         Input('refined-window-store', 'data')],
+         Input('refined-window-store', 'data'),
+         Input('window-selection-method', 'value')],
     )(configure_redo_slider)
+
+    dash_app.callback(
+        Output('window-selection-comparison-plot', 'figure'),
+        [Input('step-tracker', 'data'),
+         Input('uploaded-file-store', 'data'),
+         Input('refined-window-store', 'data'),
+         Input('ssa-window-slider', 'value')],
+    )(build_window_selection_comparison_figure)
+
+    dash_app.callback(
+        Output('window-selection-modal', 'is_open'),
+        [Input('window-selection-diagnostics-btn', 'n_clicks'),
+         Input('window-selection-modal-close-btn', 'n_clicks')],
+        State('window-selection-modal', 'is_open'),
+    )(toggle_window_selection_modal)
+
+    dash_app.callback(
+        Output('window-selection-summary', 'children'),
+        [Input('step-tracker', 'data'),
+         Input('uploaded-file-store', 'data'),
+         Input('ssa-window-slider', 'value'),
+         Input('window-selection-method', 'value')],
+    )(update_window_selection_summary)
 
     dash_app.callback(
         Output('apply-grouping-trigger', 'data'),
@@ -789,7 +1345,8 @@ def register_callbacks(dash_app: dash.Dash) -> None:
         [Input('step-tracker', 'data'),
          Input('analysis-complete-store', 'data'),
          Input('uploaded-file-store', 'data'),
-         Input('ssa-window-slider', 'value')],
+         Input('ssa-window-slider', 'value'),
+         Input('window-selection-method', 'value')],
         prevent_initial_call=True,
     )(update_ssa_plots)
 

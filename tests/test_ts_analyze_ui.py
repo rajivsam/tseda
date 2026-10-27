@@ -251,6 +251,251 @@ def test_update_ssa_plots_preserves_suggestions_after_apply_grouping(monkeypatch
     assert all(v is dash.no_update for v in result[6:12])
 
 
+def test_segment_selection_advice_and_default_segment_are_configured():
+    ui.series = pd.Series(np.linspace(0, 10, 200))
+
+    options, selected, warning = ui.sync_segment_dropdown(None, "l2")
+    advice = ui.update_segment_advice(1, ui.series, "l2")
+
+    assert all(option["value"] != "full" for option in options)
+    assert len(options) >= 2
+    assert selected == len(options) - 1
+    assert "Advisor recommendation" in advice
+    assert warning is None
+
+
+def test_segment_view_plot_uses_selected_segment_and_scatter_plot_keeps_full_series():
+    ui.series = pd.Series(np.linspace(0, 10, 120))
+
+    options, selected, warning = ui.sync_segment_dropdown(None, "l2")
+    scatter_fig = ui.create_scatter_plot(ui.series)
+    selected_fig = ui.build_segment_view_figure("selected", 0)
+
+    assert all(option["value"] != "full" for option in options)
+    assert selected == len(options) - 1
+    assert warning is None
+    assert len(scatter_fig.data) >= 3
+    assert len(scatter_fig.data[0].x) == len(ui.series)
+    segment_total = sum(len(trace.x) for trace in scatter_fig.data[1:-1])
+    assert segment_total == len(ui.series)
+    assert len(selected_fig.data[0].x) <= len(ui.series)
+
+
+def test_sync_segment_dropdown_preserves_user_selection():
+    ui.series = pd.Series(np.linspace(0, 10, 2000))
+
+    options, selected, warning = ui.sync_segment_dropdown(None, 2)
+
+    assert warning is None
+    assert selected == 2
+    assert options[2]["value"] == 2
+    assert options[2]["label"].startswith("segment-3")
+
+
+def test_summary_table_uses_selected_segment_for_acf_and_pacf_titles():
+    ui.series = pd.Series(
+        np.linspace(0, 10, 120),
+        index=pd.date_range("2021-01-01", periods=120, freq="D"),
+    )
+
+    selected_index = 0
+    summary = ui.update_summary_table(
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        kde_toggle=["show"],
+        hist_bin_count=0,
+        selected_segment_value=selected_index,
+    )
+
+    acf_fig = summary[4].figure
+    pacf_fig = summary[5].figure
+
+    assert "Segment 1" in acf_fig.layout.title.text
+    assert "Segment 1" in pacf_fig.layout.title.text
+    assert len(acf_fig.data[0].y) <= len(ui.series)
+    assert len(pacf_fig.data[0].y) <= len(ui.series)
+
+
+def test_window_selection_helper_returns_candidate_window_for_variance_and_spectral_methods():
+    series = pd.Series(np.sin(np.linspace(0, 20, 200)))
+
+    variance_window = callback_services.choose_window_size_for_method(series, "variance-plateau", default_window_size=12)
+    adaptive_window = callback_services.choose_window_size_for_method(series, "adaptive-spectral-refinement", default_window_size=12)
+
+    assert isinstance(variance_window, int)
+    assert isinstance(adaptive_window, int)
+    assert variance_window > 0
+    assert adaptive_window > 0
+
+
+def test_variance_plateau_prefers_the_end_of_the_stable_plateau():
+    rng = np.random.default_rng(0)
+    signal = rng.normal(0.0, 1.0, size=200)
+    signal *= np.where(np.linspace(0.0, 1.0, 200) < 0.5, 1.0, 2.0)
+    series = pd.Series(signal)
+
+    selected = callback_services._estimate_variance_plateau_window(series, default_window_size=12)
+
+    assert selected == 96
+
+
+def test_compute_window_slider_config_creates_full_valid_range_for_manual_method():
+    marks, value, min_value, max_value, step = callback_services.compute_window_slider_config(
+        current_step=2,
+        series_length=768,
+        default_window_size=192,
+    )
+
+    assert list(marks) == [192, 384]
+    assert value == 192
+    assert min_value == 192
+    assert max_value == 384
+    assert step is None
+
+
+def test_configure_window_selection_dropdown_rebuilds_full_manual_range(monkeypatch):
+    ui.series = pd.Series(np.sin(np.linspace(0, 12, 768)))
+    ui.window_size = 192
+
+    class MethodChangeContext:
+        triggered = [{"prop_id": "window-selection-method.value"}]
+
+    monkeypatch.setattr(ui.dash, "callback_context", MethodChangeContext())
+
+    options, selected = ui.configure_window_selection_dropdown(
+        current_step=2,
+        uploaded_file=None,
+        refined_window=192,
+        window_selection_method="manual",
+    )
+
+    assert len(options) >= 2
+    assert selected == 192
+    assert [item["value"] for item in options] == [192, 384]
+
+
+def test_configure_redo_slider_resets_to_method_recommendation_when_method_changes(monkeypatch):
+    ui.series = pd.Series(np.sin(np.linspace(0, 12, 120)))
+    ui.window_size = 12
+
+    class MethodChangeContext:
+        triggered = [{"prop_id": "window-selection-method.value"}]
+
+    monkeypatch.setattr(ui.dash, "callback_context", MethodChangeContext())
+
+    marks, value, min_value, max_value, step = ui.configure_redo_slider(
+        current_step=2,
+        uploaded_file=None,
+        refined_window=12,
+        window_selection_method="variance-plateau",
+    )
+
+    recommended = callback_services.choose_window_size_for_method(ui.series, "variance-plateau", 12)
+
+    assert value == 12
+    assert recommended > 0
+    assert min_value == min(marks)
+    assert max_value == max(marks)
+    assert step is None
+
+
+def test_update_window_selection_summary_reports_method_and_recommendation():
+    ui.series = pd.Series(np.sin(np.linspace(0, 12, 120)))
+    ui.window_size = 12
+
+    summary = ui.update_window_selection_summary(
+        current_step=2,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        slider_window_size=12,
+        window_selection_method="variance-plateau",
+    )
+    recommended = callback_services.choose_window_size_for_method(ui.series, "variance-plateau", 12)
+
+    assert "Variance plateau" in summary
+    assert "Suggested window" in summary
+    assert str(recommended) in summary
+
+
+def test_window_selection_comparison_figure_uses_metric_curves_for_each_method():
+    ui.series = pd.Series(np.sin(np.linspace(0, 8, 240)))
+    ui.window_size = 12
+
+    fig = ui.build_window_selection_comparison_figure(
+        current_step=2,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        refined_window=12,
+        slider_window_size=12,
+    )
+
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 2
+    assert {trace.name for trace in fig.data} == {"Variance plateau", "Adaptive spectral refinement"}
+    assert fig.layout.xaxis.title.text == "Window size"
+    assert "Variance" in fig.layout.yaxis.title.text or "Residual noise" in fig.layout.yaxis.title.text
+
+
+def test_adaptive_spectral_curve_uses_base_window_multiples():
+    ui.series = pd.Series(np.sin(np.linspace(0, 8, 240)))
+    ui.window_size = 12
+
+    fig = ui.build_window_selection_comparison_figure(
+        current_step=2,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        refined_window=12,
+        slider_window_size=12,
+    )
+
+    spectral_trace = next(trace for trace in fig.data if trace.name == "Adaptive spectral refinement")
+    assert spectral_trace.x is not None
+    assert all(int(x) % 12 == 0 for x in spectral_trace.x)
+    assert 12 in spectral_trace.x
+
+
+def test_variance_curve_uses_one_window_step_resolution():
+    ui.series = pd.Series(np.sin(np.linspace(0, 8, 240)))
+    ui.window_size = 12
+
+    fig = ui.build_window_selection_comparison_figure(
+        current_step=2,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        refined_window=12,
+        slider_window_size=12,
+    )
+
+    variance_trace = next(trace for trace in fig.data if trace.name == "Variance plateau")
+    x_values = sorted(int(x) for x in variance_trace.x)
+    diffs = np.diff(x_values)
+    assert diffs.size > 0
+    assert all(diff <= 2 for diff in diffs)
+    assert not any(diff >= 12 for diff in diffs)
+
+    y_values = [float(value) for value in variance_trace.y]
+    assert all(np.isfinite(value) for value in y_values)
+    assert len(y_values) > 0
+    assert y_values[0] != 0.0
+
+
+def test_configure_redo_slider_keeps_manual_window_on_method_change(monkeypatch):
+    ui.series = pd.Series(np.sin(np.linspace(0, 12, 120)))
+    ui.window_size = 12
+
+    class MethodChangeContext:
+        triggered = [{"prop_id": "window-selection-method.value"}]
+
+    monkeypatch.setattr(ui.dash, "callback_context", MethodChangeContext())
+
+    marks, value, min_value, max_value, step = ui.configure_redo_slider(
+        current_step=2,
+        uploaded_file=None,
+        refined_window=12,
+        window_selection_method="manual",
+    )
+
+    assert value == 12
+    assert min_value == min(marks)
+    assert max_value == max(marks)
+    assert step is None
+
+
 def test_logging_rank_diagnostics_uses_fresh_ssa_instance(monkeypatch):
     ui.series = pd.Series(
         [1.0, 2.0, 3.0, 4.0],
@@ -303,21 +548,21 @@ def test_logging_rank_diagnostics_requires_analysis_completion(monkeypatch):
     assert isinstance(result[2], go.Figure)
 
 
-def test_parse_upload_rejects_sub_hour_frequency():
+def test_parse_upload_rejects_sub_five_minute_frequency():
     csv_text = (
         "timestamp,value\n"
         "2024-01-01 00:00:00,1\n"
-        "2024-01-01 00:30:00,2\n"
-        "2024-01-01 01:00:00,3\n"
+        "2024-01-01 00:02:00,2\n"
+        "2024-01-01 00:04:00,3\n"
     )
 
     payload = _csv_upload_payload(csv_text)
 
     try:
-        ui.parse_upload(payload, "sub_hour.csv")
-        assert False, "Expected ValueError for sub-hour sampling frequency"
+        ui.parse_upload(payload, "sub_5_min.csv")
+        assert False, "Expected ValueError for sub-five-minute sampling frequency"
     except ValueError as exc:
-        assert "sampling frequency of one hour or higher" in str(exc)
+        assert "sampling frequency of 5 minutes or higher" in str(exc)
 
 
 def test_parse_upload_rejects_missing_values_any_column():

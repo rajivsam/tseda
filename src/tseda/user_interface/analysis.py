@@ -102,6 +102,30 @@ def build_initial_assessment_layout() -> html.Div:
         ], className="mt-4"),
         dbc.Row([
             dbc.Col(dbc.Card([
+                dbc.CardHeader(html.H5("Segmentation and analysis segment", className="mb-0")),
+                dbc.CardBody([
+                    html.Div([
+                        dbc.Label("PELT model", html_for="segment-model-dropdown"),
+                        dcc.Dropdown(
+                            id="segment-model-dropdown",
+                            options=[{"label": "Linear (l2)", "value": "l2"}, {"label": "RBF", "value": "rbf"}],
+                            value="l2",
+                            clearable=False,
+                        ),
+                        dbc.Button("Advisor", id="segment-advisor-btn", color="info", className="mt-3"),
+                        html.Div(id="segment-advisor-output", className="mt-3 text-muted"),
+                        dbc.Label("Selected segment", html_for="selected-segment-dropdown", className="mt-3"),
+                        dcc.Dropdown(id="selected-segment-dropdown", options=[], value=None, clearable=False),
+                        html.Div(className="mt-3", children=[
+                            dcc.Graph(id="segment-view-plot", config={"displayModeBar": False}, style={"height": "260px"}),
+                        ]),
+                        html.Small("The last segment is used by default; a short tail segment triggers a confirmation before applying a half-life-adjusted look-back.", className="text-muted d-block mt-2"),
+                    ])
+                ]),
+            ]), width=12),
+        ], className="mt-4"),
+        dbc.Row([
+            dbc.Col(dbc.Card([
                 dbc.CardHeader(html.H5("Series Scatter Plot", className="mb-0")),
                 dbc.CardBody(html.Div(PLACEHOLDER_TEXT["scatter"], id="scatter-plot-container", className="p-3 bg-light")),
             ]), width=12),
@@ -116,6 +140,21 @@ def build_initial_assessment_layout() -> html.Div:
                 dbc.CardBody(html.Div(PLACEHOLDER_TEXT["pacf"], id="pacf-plot-container", className="p-3 bg-light")),
             ]), width=6),
         ], className="mt-4"),
+        dbc.Modal([
+            dbc.ModalHeader(dbc.ModalTitle("Short final segment detected")),
+            dbc.ModalBody([
+                html.P(
+                    "The final segment is shorter than the minimum analysis window for this cadence. "
+                    "To keep the analysis statistically stable, tseda will blend in a half-life-weighted look-back from the preceding segment. "
+                    "Please acknowledge this adjustment to continue with the adjusted segment for analysis."
+                ),
+                html.Div(id="segment-warning-detail", className="text-muted"),
+            ]),
+            dbc.ModalFooter([
+                dbc.Button("Continue", id="segment-warning-continue-btn", color="primary"),
+                dbc.Button("Cancel", id="segment-warning-cancel-btn", color="secondary"),
+            ]),
+        ], id="segment-warning-modal", is_open=False),
     ])
 
 
@@ -160,6 +199,8 @@ def build_main_layout(assessment_layout: html.Div, decomposition_layout: html.Di
         dcc.Store(id="analysis-complete-store", data=False),
         dcc.Store(id="dw-valid-store", data=False),
         dcc.Store(id="uploaded-file-store", storage_type="memory", data=None),
+        dcc.Store(id="segment-selection-store", storage_type="memory", data=None),
+        dcc.Store(id="segment-warning-state", storage_type="memory", data={"open": False, "detail": ""}),
         dcc.Store(id="kb-save-dir-store", storage_type="memory", data=None),
         dcc.Store(id="kb-save-filename-store", storage_type="memory", data=None),
         dcc.Store(id="apply-grouping-trigger", data=0),

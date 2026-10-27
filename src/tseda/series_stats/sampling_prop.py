@@ -2,6 +2,7 @@
 
 from typing import Any
 import re
+import math
 import pandas as pd
 from tseda.config.config_loader import ConfigurationManager
 
@@ -83,6 +84,13 @@ class SamplingProp:
         Returns:
             Human-readable frequency label.
         """
+        cadence_minutes = self._get_cadence_minutes(series.index)
+        minimum_minutes = float(
+            ConfigurationManager.get("file_upload.min_sampling_frequency_minutes", 5)
+        )
+        if cadence_minutes is not None and minimum_minutes <= cadence_minutes < 60:
+            return f"{cadence_minutes:g}-minute"
+
         base = self._infer_base_alias(series.index)
         if not base:
             return "Unknown"
@@ -136,6 +144,24 @@ class SamplingProp:
 
         return None
 
+    @staticmethod
+    def _get_cadence_minutes(index: pd.Index) -> float | None:
+        """Return the inferred or median sampling interval in minutes."""
+        datetime_index = pd.DatetimeIndex(index)
+        freq_str = pd.infer_freq(datetime_index)
+        if freq_str:
+            try:
+                offset = pd.tseries.frequencies.to_offset(freq_str)
+                return float(offset.nanos / pd.Timedelta(minutes=1).value)
+            except ValueError:
+                pass
+
+        deltas = datetime_index.to_series().sort_values().diff().dropna()
+        if deltas.empty:
+            return None
+
+        return float(deltas.median() / pd.Timedelta(minutes=1))
+
     def get_freq_window(self, index: pd.Index) -> int | None:
         """Map pandas inferred frequency to a default SSA window size.
 
@@ -150,6 +176,8 @@ class SamplingProp:
         +-----------+--------+----------------------------------------------+
         | Cadence   | Window | Rationale                                    |
         +===========+========+==============================================+
+        | 5-59 min  | derived| One configurable diurnal cycle             |
+        +-----------+--------+----------------------------------------------+
         | Hourly    | 24     | One diurnal (24-hour) cycle                  |
         +-----------+--------+----------------------------------------------+
         | Daily     | 5      | One business week (5 trading/working days)   |
@@ -178,29 +206,37 @@ class SamplingProp:
             Initial candidate SSA window size for the inferred frequency, or
             ``None`` when the frequency cannot be determined.
         """
-        # 1. Infer the base alias (e.g., 'H', 'D', 'W', 'ME', 'QS')
+        cadence_minutes = self._get_cadence_minutes(index)
+        minimum_minutes = float(
+            ConfigurationManager.get("file_upload.min_sampling_frequency_minutes", 5)
+        )
+        window_config = ConfigurationManager.get_section("window_selection")
+
+        if cadence_minutes is not None and minimum_minutes <= cadence_minutes < 60:
+            cycle_minutes = float(window_config.get("subhourly_cycle_minutes", 24 * 60))
+            return max(2, int(math.ceil(cycle_minutes / cadence_minutes)))
+
+        # Infer the base alias (e.g., 'H', 'D', 'W', 'ME', 'QS').
         base = self._infer_base_alias(index)
         if not base:
             return None
 
-        # 2. Load mapping from configuration
-        window_config = ConfigurationManager.get_section("window_selection")
-        mapping = {
-            "h": window_config.get("hourly", 24),
-            "H": window_config.get("hourly", 24),
-            "D": window_config.get("daily", 5),
-            "d": window_config.get("daily", 5),
-            "B": window_config.get("daily", 5),
-            "b": window_config.get("daily", 5),
-            "W": window_config.get("weekly", 4),
-            "w": window_config.get("weekly", 4),
-            "M": window_config.get("monthly", 12),
-            "ME": window_config.get("monthly", 12),
-            "MS": window_config.get("monthly", 12),
-            "Q": window_config.get("quarterly", 4),
-            "QE": window_config.get("quarterly", 4),
-            "QS": window_config.get("quarterly", 4),
+        cadence_keys = {
+            "h": "hourly",
+            "H": "hourly",
+            "D": "daily",
+            "d": "daily",
+            "B": "daily",
+            "b": "daily",
+            "W": "weekly",
+            "w": "weekly",
+            "M": "monthly",
+            "ME": "monthly",
+            "MS": "monthly",
+            "Q": "quarterly",
+            "QE": "quarterly",
+            "QS": "quarterly",
         }
 
-        return mapping.get(base)
-
+        config_key = cadence_keys.get(base)
+        return int(window_config[config_key]) if config_key in window_config else None

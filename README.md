@@ -1,440 +1,73 @@
-# tseda: Enterprise-Grade Time Series Signal Decomposition & Automated Diagnostics
+# tseda
 
-<p align="center">
-	<a href="#non-developer-quick-start">
-		<img src="assets/images/tseda_logo.png" alt="tseda banner" width="820">
-	</a>
-</p>
+`tseda` is a Python package for automated time-series decomposition, diagnostics, and signal validation.
 
-<p align="center">
-	<strong>Automated signal decomposition and diagnostic engine for high-fidelity time series preprocessing.</strong>
-</p>
+It helps analysts work with regularly sampled operational data by turning raw measurement streams into interpretable components such as trend, seasonality, and noise, while making the underlying analysis steps explicit, repeatable, and reviewable.
 
-<p align="center">
-	<a href="https://pypi.org/project/tseda/"><img src="https://img.shields.io/pypi/v/tseda" alt="PyPI"></a>
-	<a href="https://pypi.org/project/tseda/"><img src="https://img.shields.io/pypi/pyversions/tseda" alt="Python"></a>
-	<a href="https://tseda.readthedocs.io/en/latest/"><img src="https://readthedocs.org/projects/tseda/badge/?version=latest" alt="Read the Docs"></a>
-	<img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0">
-</p>
+For the fuller product story, design rationale, and detailed explanation of the workflow, see [about_tseda.md](about_tseda.md).
 
-<p align="center">
-	<a href="https://tseda.readthedocs.io/en/latest/"><strong>Read the Docs</strong></a>
-</p>
+## What it helps with
 
-## Overview
+- understanding whether a signal has meaningful structure,
+- separating trend and recurring seasonal behavior from residual noise,
+- identifying regime changes and shifts in operating behavior,
+- deciding whether a series is suitable for decomposition and modeling,
+- preserving earlier analytical decisions so they can be revisited and repeated.
 
-`tseda` is a high-fidelity Python framework designed to automate the preprocessing, 
-signal decomposition, and structural validation of regularly sampled time-series data. 
+## Why it exists
 
-By automating Singular Spectrum Analysis (SSA) parameter selection, `tseda` eliminates 
-the manual guesswork that traditionally introduces bias into production analytical pipelines. 
-It bridges the gap between raw data ingestion and model-ready signals by providing 
-deterministic heuristics for window selection and component grouping.
+The hard part in practice is not a single plot or statistic. It is the sequence of choices needed to get from raw data to a defensible decomposition: selecting a sensible window, identifying regime boundaries, choosing groups of components, checking whether the result is structurally meaningful, and documenting the reasoning for later reuse.
 
-For a short guided tour of `tseda`, watch the overview video on YouTube: [https://www.youtube.com/watch?v=baoJrIpSTE8](https://www.youtube.com/watch?v=baoJrIpSTE8).
+`tseda` brings those steps together in one workflow.
 
-## Core Systematic Capabilities
+## How it is used
 
-* **Automated SSA Window Calibration:** Automates optimal window selections derived directly from sampling frequencies and eigen-spectrum spread, preventing the distortion of latent signals.
-* **Deterministic Component Grouping:** Implements a robust variance-and-correlation heuristic (leveraging the Kneedle algorithm) to mathematically isolate trend and seasonality from ambient noise.
-* **Bi-Directional Interface Flex:** Seamlessly transition between a **headless Notebook SDK** for automated CI/CD batch pipelines and an **interactive Plotly Observability Dashboard** for expert human-in-the-loop validation.
-* **KMDS Lineage Persistence:** Serializes pipeline decisions, reconstruction metadata, and analytical summaries directly into an ontology-backed KMDS knowledge graph for compliance auditing and data lineage tracking.
-* **Structural Suitability Validation:** A built-in gate that quantifies whether a dataset possesses enough internal structure for meaningful decomposition, preventing the "garbage-in, garbage-out" failure mode common in automated SSA.
+`tseda` supports a three-step workflow:
 
-## Production Deployment Workflow
+1. initial assessment of the signal,
+2. decomposition and grouping of the signal components,
+3. validation and observation logging.
 
-`tseda` is designed to fit into standard enterprise version-control and deployment lifecycles:
+The package is designed to work both in a browser-based UI and in Python notebooks, with the same core workflow exposed in both environments.
 
-1. **Pull:** Checkout the project branch within your enterprise version-control environment.
-2. **Execute:** Run `tseda` headlessly via the Notebook SDK to compute baseline signal profiles and export components.
-3. **Verify:** Launch the interactive dashboard to audit edge cases or manually override heuristics for complex signals.
-4. **Commit:** Persist the final analytical state and observations directly to the metadata repository via the KMDS integration.
-
----
-
-## Three-Step Validation Workflow
-
-`tseda` organizes time series analysis into a structured three-phase process to ensure methodological consistency.
-
-### (a) Initial Assessment
-
-Evaluate the raw signal's statistical properties before decomposition.
-
-* **Distribution Analysis:** Utilize Kernel Density Estimates (KDE) and box plots to identify multi-modality or outliers.
-* **Autocorrelation Profiling:** ACF and PACF plots provide immediate indicators of seasonal structure and autoregressive components.
-
-### (b) Automated Decomposition & Heuristics
-
-**Window selection and component grouping are the two hardest engineering bottlenecks when applying SSA.** Choosing the wrong window distorts the eigen spectrum; grouping the wrong components conflates trend with noise. `tseda` automates both.
-
-The app first computes an initial SSA window from the detected cadence, then validates whether the eigen spectrum has enough spread. If the smallest eigenvalue still explains too much variance, the window is doubled and SSA is recomputed until the criterion is satisfied.
-
-#### Structural Suitability Check
-Before grouping, `tseda` checks if variance is concentrated in a small number of leading eigenvectors. A flat eigenspectrum is the signature of white noise; applying SSA to such a series is mathematically valid but practically meaningless.
-
-#### Deterministic Change Point Detection
-Change point detection is executed automatically post-grouping, covering two structural shifts:
-
-- **Trend shifts** — detects permanent changes in the long-run mean level (PELT on the normalised Trend component).
-- **Seasonal amplitude shifts** — detects points where the seasonal pattern becomes noticeably stronger or weaker (PELT on the rolling-RMS envelope of the Seasonality component).
-
-### (c) Lineage Logging & Model Order
-
-Use the Akaike Information Criterion (AIC) as a function of model rank to provide a principled guide for model order selection. Finalize the analysis by saving structured findings to the KMDS knowledge base.
-
-## Notebook Interface
-
-The package also provides a notebook interface to these features. If you have a new dataset that you want to analyze, look at the data loader directory for examples. Download your dataset, clean it, produce your time series, and analyze it with `tseda`.
-
-## Agent Instructions Included with the Package
-
-The repository ships the agent guidance file as package data so it is available to anyone who installs `tseda`.
-
-After installing the package, you can access the agent documentation directly from Python:
-
-```python
-import tseda
-print(tseda.get_agent_instructions())
-```
-
-This returns the full `AGENTS.md` content as a string, including package interfaces, documentation sources, design principles, and test-suite organization.
-
-### Design Philosophy
-
-- **UI and notebook parity**: Anything you can do in the UI should be scriptable in notebooks.
-- **Configuration-first behavior**: Runtime thresholds and heuristics are externalized in `src/tseda/config/tseda_config.yaml`.
-- **Explicit controls for decomposition**: Window size and component grouping are treated as first-class controls in both UI and Python API.
-- **Composable feature calls**: Plotting, decomposition, diagnostics, and reporting are exposed as separate methods so users can build custom analysis flows.
-
-### Developer Notebook API
-
-Use `NotebookThreeStepAPI` for the same three-step workflow directly in Python:
-
-See the full notebook tutorial at `docs/tutorial.md`.
-
-```python
-from tseda.notebook_api import NotebookThreeStepAPI, load_series_from_csv
-
-series = load_series_from_csv("data/coffee_prices.csv")
-api = NotebookThreeStepAPI(series)
-
-# Step 1: initial assessment
-fig_kde = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
-fig_acf = api.get_acf_plot(lags=40)
-
-# Step 2: decomposition with explicit window and grouping control
-current_window = api.get_window()
-api.set_window(current_window, apply_window_refinement=True)
-grouping, dw_ok = api.suggest_grouping()
-api.set_grouping(grouping=grouping)
-fig_recon = api.get_reconstruction_plot()
-
-# Step 3: observation logging outputs
-fig_var = api.get_variance_explained_plot()
-report_text = api.generate_observation_text()
-```
-
-Key notebook API capabilities:
-
-- `get_kde_plot(..., bin_algorithm="scott")` with configurable histogram bin algorithms (`auto`, `fd`, `doane`, `scott`, `stone`, `rice`, `sturges`, `sqrt`).
-- `get_window()` / `set_window(...)` for explicit SSA window control.
-- `suggest_grouping(grouping_config=...)` / `set_grouping(...)` / `get_grouping()` for explicit component assignment control, including kneedle/noise-floor overrides.
-- `suggest_grouping_with_window_autotune(...)` to retry grouping with automatic window reassignment until DW is in range or the window limit is reached.
-- `get_grouping_heuristic_configuration()` to inspect active grouping-heuristic config values.
-- `get_noise_kde_plot(...)`, `get_reconstruction_metadata()`, and `get_noise_variance_plot()` for noise diagnostics and reconstruction metrics.
-- `get_suitability_result(...)` for the same top-k eigenvalue suitability gate used by the UI.
-
-#### End-to-End Script Example (Copy/Paste)
-
-```python
-from pathlib import Path
-
-from tseda.notebook_api import NotebookThreeStepAPI, load_example_series
-
-# Assumes this script runs from the repository root.
-workspace_root = Path.cwd()
-
-# Load an example dataset.
-series = load_example_series("coffee_prices", workspace_root=workspace_root)
-api = NotebookThreeStepAPI(series)
-
-# -------------------------
-# Step 1: Initial Assessment
-# -------------------------
-sampling_df = api.get_sampling_properties()
-stats_df = api.get_summary_statistics()
-kde_fig = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
-acf_fig = api.get_acf_plot(lags=30)
-pacf_fig = api.get_pacf_plot(lags=30, method="yw")
-
-# -------------------------
-# Step 2: Decomposition
-# -------------------------
-window_before = api.get_window()
-window_after = api.set_window(window_before, apply_window_refinement=True)
-
-suitability = api.get_suitability_result()
-if not suitability.is_suitable:
-    raise RuntimeError(
-        f"Dataset not suitable for SSA: top-{suitability.top_k} ratio "
-        f"{suitability.top_k_ratio:.3f} < threshold {suitability.threshold:.3f}"
-    )
-
-grouping, dw_ok = api.suggest_grouping()
-api.set_grouping(grouping=grouping)
-
-eigen_fig = api.get_eigen_plot()
-reconstruction_fig = api.get_reconstruction_plot()
-change_point_fig = api.get_change_point_plot()
-loess_fig = api.get_loess_plot(fraction=0.10)
-noise_kde_fig = api.get_noise_kde_plot(bandwidth="silverman")
-recon_meta = api.get_reconstruction_metadata()
-
-# -------------------------
-# Step 3: Observation Logging
-# -------------------------
-variance_fig = api.get_variance_explained_plot()
-noise_variance_fig = api.get_noise_variance_plot()
-observation_text = api.generate_observation_text()
-components_df = api.export_components_dataframe()
-
-print("Window:", window_before, "->", window_after)
-print("DW in suggested grouping:", dw_ok)
-print("Reconstruction metadata:", recon_meta)
-print("Observation preview:\n", observation_text[:500])
-print("Components head:\n", components_df.head())
-```
-
-#### End-to-End Script Example (Your Own CSV)
-
-```python
-from pathlib import Path
-
-from tseda.notebook_api import NotebookThreeStepAPI, load_series_from_csv
-
-# Replace with your own CSV path.
-csv_path = Path("/absolute/path/to/your_time_series.csv")
-
-# Default expects: column 0 = timestamp, column 1 = numeric value.
-# If your schema is different, pass timestamp_col/value_col as names or indices.
-series = load_series_from_csv(csv_path, timestamp_col=0, value_col=1)
-
-api = NotebookThreeStepAPI(series)
-
-# Optional: inspect and adjust decomposition control points.
-print("Initial window:", api.get_window())
-api.set_window(api.get_window(), apply_window_refinement=True)
-
-grouping, dw_ok = api.suggest_grouping()
-api.set_grouping(grouping=grouping)
-
-# Generate core artifacts.
-kde_fig = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
-reconstruction_fig = api.get_reconstruction_plot()
-variance_fig = api.get_variance_explained_plot()
-observation_text = api.generate_observation_text()
-components_df = api.export_components_dataframe()
-
-print("DW status:", dw_ok)
-print(observation_text[:400])
-print(components_df.head())
-```
-
-## Requirements
-
-**Python 3.12 or higher** is required to run this package.
-
-Before starting the installation, verify your Python version:
-
-```bash
-python --version
-```
-
-Ensure the output shows Python 3.12 or higher. If not, please upgrade Python before proceeding.
-
-## Install And Run From PyPI
-
-### Recommended: Using Conda
-
-Conda is the recommended package manager for development and installation (development was done with conda):
-
-```bash
-conda create -n tseda python=3.12
-conda activate tseda
-pip install tseda
-```
-
-Then run the app:
-
-```bash
-tseda
-```
-
-## Non-Developer Quick Start
-
-If you just want to run the app with minimal setup:
-
-1. Install with `pipx`:
-
-```bash
-pipx install tseda
-```
-
-2. Launch the app:
-
-```bash
-tseda
-```
-
-3. Open your browser at `http://127.0.0.1:8050`.
-
-If `pipx` is not available, use the standard Python install instructions below.
-
-### 1. Install
-
-Verify you have Python 3.12 or higher installed:
-
-```bash
-python --version
-```
-
-Create and activate a virtual environment, then install from PyPI:
+## Installation
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install tseda
 ```
 
-### 2. Run The Dash App
+Then run:
 
 ```bash
 tseda
 ```
 
-You can also launch with Python module execution:
+## Quick start
 
-```bash
-python -m tseda
+```python
+from tseda.notebook_api import NotebookThreeStepAPI, load_example_series
+
+series = load_example_series("coffee_prices")
+api = NotebookThreeStepAPI(series)
+
+kde_fig = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
+acf_fig = api.get_acf_plot(lags=30)
+
+api.set_window(api.get_window(), apply_window_refinement=True)
+grouping, dw_ok = api.suggest_grouping()
+api.set_grouping(grouping)
+recon_fig = api.get_reconstruction_plot()
+
+summary = api.generate_observation_text()
+print(summary[:500])
 ```
 
-Note: `python tseda` is not a valid way to run an installed package because Python treats `tseda` as a local script path.
+## More information
 
-By default, the app starts at `http://127.0.0.1:8050`.
-
-Optional runtime overrides:
-
-```bash
-TSEDA_HOST=0.0.0.0 TSEDA_PORT=8050 TSEDA_DEBUG=false tseda
-```
-
-### 3. Upload Your Data
-
-- Click **"Drag and Drop or Select Files"** in the Initial Assessment panel.
-- Your file must be a **CSV or Excel** file with at least two columns: a **timestamp** column (first) and a **numeric value** column (second).
-- The data must be **regularly sampled at hourly or lower frequency** (e.g., hourly, daily, monthly).
-- The dataset must contain **no missing values** (NA / NaN). Clean your data before uploading.
-- Files are limited to **2,000 rows** (configurable via `file_upload.max_file_lines` in `src/tseda/config/tseda_config.yaml`).
-
-#### Example Datasets (Repository)
-
-Example datasets are available directly in the repository under [data](data). They are intentionally **not bundled** inside wheel/sdist package builds to keep distribution artifacts lean.
-
-Hyndman-based example files:
-- [data/hyndman_arrivals_quarterly_japan.csv](data/hyndman_arrivals_quarterly_japan.csv)
-- [data/hyndman_goog_daily_close.csv](data/hyndman_goog_daily_close.csv)
-- [data/hyndman_hyndsight_daily_pageviews.csv](data/hyndman_hyndsight_daily_pageviews.csv)
-- [data/hyndman_sunspot_monthly_area.csv](data/hyndman_sunspot_monthly_area.csv)
-- [data/hyndman_usconsumption_quarterly_consumption.csv](data/hyndman_usconsumption_quarterly_consumption.csv)
-
-Additional example files:
-- [data/coffee_prices.csv](data/coffee_prices.csv)
-- [data/monthly-car-sales.csv](data/monthly-car-sales.csv)
-- [data/trimmed_biomass - generated_biomass_MW_series.csv](data/trimmed_biomass%20-%20generated_biomass_MW_series.csv)
-- [data/uci_air_quality_hourly_co.csv](data/uci_air_quality_hourly_co.csv)
-- [data/ticket_resolution_hourly_nyc311.csv](data/ticket_resolution_hourly_nyc311.csv)
-- [data/white_noise_data.csv](data/white_noise_data.csv) — negative example; expected to fail the dataset suitability check
-
-If you install from source (clone the repo), these files are available immediately. If you install from PyPI/package artifacts, download the examples from the repository paths above.
-
-### 4. Explore In Three Steps
-
-| Step | Panel | What to do |
-|------|-------|------------|
-| 1 | **Initial Assessment of Time Series** | Review distribution plots (KDE, box plot) and the ACF / PACF for autocorrelation patterns. |
-| 2 | **Time Series Decomposition** | Review the suggested grouping table, adjust the prepopulated Trend, Seasonality, and Noise inputs if needed, then click **Apply Grouping**. When Durbin-Watson is in range [1.5, 2.5], the **Export Components** button is enabled to download Trend/Seasonality/Noise as CSV. |
-| 3 | **Observation Logging** | Review the AIC rank diagnostics, read the auto-generated summary, and add your own observations before saving the report. |
-
-## Development Install (From Source)
-
-If you are developing locally from source:
-
-```bash
-pip install -e .
-tseda
-```
-
-## Build With uv
-
-1. Build source and wheel distributions:
-
-```bash
-uv build
-```
-
-2. Validate distributions before upload:
-
-```bash
-uvx twine check dist/*
-```
-
-## Documentation (Sphinx)
-
-### Build locally
-
-```bash
-pip install -r docs/requirements.txt
-sphinx-build -b html docs/source docs/_build/html
-```
-
-You can also use the Makefile:
-
-```bash
-make -C docs html
-```
-
-The generated site will be available in `docs/_build/html`.
-
-### Publish on Read the Docs
-
-This repository includes `.readthedocs.yaml` configured to build docs from `docs/source/conf.py`.
-
-1. Push the repository to GitHub (or another supported provider).
-2. Sign in to Read the Docs and import the project.
-3. In Read the Docs project settings:
-	- Set the default branch.
-	- Confirm the config file path is `.readthedocs.yaml`.
-4. Trigger a build from the Read the Docs dashboard.
-5. Optionally enable a custom domain and versioned docs.
-
-If the build fails, inspect the Read the Docs build logs and replicate locally using:
-
-```bash
-make -C docs html
-```
-
-## User Guide
-
-A detailed user guide is available at [`docs/user_guide.md`](docs/user_guide.md). A video version of the user guide is also available on [YouTube](https://youtu.be/baoJrIpSTE8). The written guide covers:
-
-- Data requirements and input format
-- Step-by-step walkthrough of all three workflow phases
-- Interpreting SSA decomposition outputs (eigenvalue profile, component groupings, Durbin-Watson test)
-- Change point detection (trend shifts and seasonal amplitude shifts — see [Change Point Detection](docs/user_guide.md#change-point-detection))
-- AIC-based model order selection
-- Exporting reports and knowledge base entries
-- Configuration guide
-
-## Contributing & Feature Requests
-
-If you'd like to request a feature or report an issue, please [open an issue](https://github.com/rajivsam/tseda/issues) on GitHub. You're also welcome to reach out to me directly.
+- [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
+- [documents/PRODUCT.md](documents/PRODUCT.md) — product and user-value context
+- [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md) — system architecture
+- [docs/tutorial.md](docs/tutorial.md) — guided walkthroughs
+- [docs/user_guide.md](docs/user_guide.md) — detailed usage guidance

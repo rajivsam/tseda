@@ -13,11 +13,17 @@
 # Section 1: File Upload Limits
 # ============================================================================
 file_upload:
+  # Minimum allowed sampling interval for uploaded time series data.
+  # Lower values imply sub-5-minute sampling, which is too granular for this SSA workflow.
+  # Default: 5
+  # Suggested range: 5 - 60
+  min_sampling_frequency_minutes: 5
+
   # Maximum number of rows allowed in uploaded CSV/Excel files.
   # Higher values require more memory and may impact UI responsiveness.
-  # Default: 2000
+  # Default: 5000
   # Suggested range: 1000 - 5000
-  max_file_lines: 2000
+  max_file_lines: 5000
 
 # ============================================================================
 # Section 2: Window Selection (Cadence-to-Window Mapping)
@@ -27,6 +33,12 @@ file_upload:
 # These are starting points; windows may be doubled during refinement if
 # the eigenvalue spectrum is too flat.
 window_selection:
+  # Duration of the default seasonal cycle for data sampled more frequently
+  # than hourly. The effective SSA window is this value divided by the
+  # observed sampling interval (for example, 15-minute data uses 96).
+  # Default: 1440 (one day)
+  subhourly_cycle_minutes: 1440
+
   # One diurnal (24-hour) cycle
   # Default: 24
   hourly: 24
@@ -46,6 +58,19 @@ window_selection:
   # One full annual cycle (4 quarters)
   # Default: 4
   quarterly: 4
+
+  # How many additional window values to keep beyond the method-optimal point
+  # when drawing the diagnostic curves. This keeps the elbow/plateau visible in
+  # the comparison plot and gives enough headroom for all three subplots.
+  # Default: 5
+  window_ext_optimal: 5
+
+  # Maximum number of sampling points to draw for each window-selection curve.
+  # In the stacked single-column dialog view, each panel gets substantially more
+  # vertical space, so we can increase the point density and make the elbow or
+  # plateau more obvious without crowding the figure.
+  # Default: 53 (five more points beyond the prior stacked-dialog setting)
+  plot_points_per_curve: 53
 
 # ============================================================================
 # Section 3: SSA Eigenvalue Grouping Heuristic

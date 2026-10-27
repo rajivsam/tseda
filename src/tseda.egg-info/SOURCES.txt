@@ -28,6 +28,8 @@ src/tseda/decomposition/ssa_decomposition.py
 src/tseda/decomposition/ssa_result_summary.py
 src/tseda/images/tseda_workflow.png
 src/tseda/periodicity/fft_analyzer.py
+src/tseda/segmentation/__init__.py
+src/tseda/segmentation/pelt_segmentation.py
 src/tseda/series_stats/sampling_prop.py
 src/tseda/series_stats/summary_statistics.py
 src/tseda/user_interface/analysis.py
@@ -55,6 +57,7 @@ tests/test_notebook_api.py
 tests/test_notebook_api_additional.py
 tests/test_pelt_change_point_estimator.py
 tests/test_sampling_prop.py
+tests/test_segment_selection.py
 tests/test_series_histogram_visualizer.py
 tests/test_series_kde_visualizer.py
 tests/test_ssa_decomposition.py
