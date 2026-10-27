@@ -1,4 +1,4 @@
-# What is `tseda` ?
+# Summary of `tseda` - Features and Use
 
 
 ## About tseda
