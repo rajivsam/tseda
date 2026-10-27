@@ -4,9 +4,8 @@ bibliography: "references.bib"
 link-citations: true
 ---
 
-# README rewrite brief for tseda
+# What is `tseda` ?
 
-This document includes references to the foundational SSA literature, such as @golyandina2001ssa.
 
 ## About tseda
 `tseda` is a tool for analyzing operational data from real-world datasets. Its primary goal is to support model development using that data. Forecasting is one example of an application that can benefit from `tseda` analysis. `tseda` can help teams understand how business processes behave so they can be monitored and managed by technical operations personnel.
