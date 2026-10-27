@@ -1,9 +1,3 @@
----
-title: "README rewrite brief for tseda"
-bibliography: "references.bib"
-link-citations: true
----
-
 # What is `tseda` ?
 
 
@@ -35,7 +29,7 @@ The goal of this stage is to understand the signal before applying decomposition
 1. Signal histogram and kernel density estimate: the histogram summarizes where the signal is concentrated, with bin selection defaulting to Scott's rule unless the user explicitly chooses another rule in the notebook interface.
 2. Signal box plot: this provides a compact five-number summary of the distribution over the observation window.
 3. Raw signal plot: this gives a visual overview of the time series itself and highlights the variation we ultimately want to decompose into a small number of interpretable components.
-4. Signal segmentation: the timeline is partitioned into contiguous segments with broadly similar statistical behavior. `tseda` uses change-point detection based on PELT to identify structural changes, such as shifts in level, volatility, or seasonality [@killick2012pelt]. Broader context on offline change-point methods is provided by the review of Truong et al. [@truong2020ruptures]. Each segment represents a distinct operating regime and helps distinguish stable periods from changes that warrant closer attention.
+4. Signal segmentation: the timeline is partitioned into contiguous segments with broadly similar statistical behavior. `tseda` uses change-point detection based on the PELT method to identify structural changes, such as shifts in level, volatility, or seasonality ([Killick, Fearnhead, and Eckley, 2012](https://doi.org/10.1080/01621459.2012.737745)). Broader context on offline change-point methods is provided by the review of [Truong, Oudre, and Vayatis (2020)](https://doi.org/10.1016/j.sigpro.2019.107299). Each segment represents a distinct operating regime and helps distinguish stable periods from changes that warrant closer attention.
 
    The segmentation step is not just descriptive; it shapes the rest of the analysis. For each segment, the system recommends a modeling approach based on the segment’s statistical profile: the linear `l2` model is preferred for trend-dominant or long, stable signals, while the kernelized RBF option is reserved for cases where the seasonal behavior is strongly non-normal, multimodal, or otherwise more complex. This recommendation logic follows the project’s literature review and established modeling guidance, and an advisor feature can explain the rationale in plain language.
 
@@ -85,3 +79,8 @@ Yes. A more detailed, end-to-end example showing how `tseda` analysis is perform
 In the meantime, a worked example of time-series analysis in practice is available in this blog post: [Markov analysis of coffee prices](https://rajivsam.github.io/r2ds-blog/posts/markov_analysis_coffee_prices/). It provides a concrete example of how a series is inspected, segmented, and interpreted in context, which is a useful companion to the `tseda` workflow.
 
 Notebook parity is effectively 100 percent: everything that can be done in the UI can also be done in the notebook workflow. The notebook API supports the same decomposition, validation, plotting, and reporting steps, so users can reproduce the UI-driven analysis and extend it with custom code. Stay tuned for updated documentation that brings together installation guidance, notebook walkthroughs, and the full UI-to-notebook parity story.
+
+## References
+
+- Killick, R., Fearnhead, P., & Eckley, I. A. (2012). Optimal detection of changepoints with a linear computational cost. Journal of the American Statistical Association, 107(500), 1590-1598. https://doi.org/10.1080/01621459.2012.737745
+- Truong, C., Oudre, L., & Vayatis, N. (2020). Selective review of offline change point detection methods. Signal Processing, 167, 107299. https://doi.org/10.1016/j.sigpro.2019.107299
