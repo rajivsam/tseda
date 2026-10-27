@@ -8,7 +8,7 @@ link-citations: true
 
 
 ## About tseda
-`tseda` is a tool for analyzing operational data from real-world datasets. Its primary goal is to support model development using that data. Forecasting is one example of an application that can benefit from `tseda` analysis. `tseda` can help teams understand how business processes behave so they can be monitored and managed by technical operations personnel.
+`tseda` is a tool for analyzing operational data from real-world datasets. Its primary goal is to support model development and control (as in operational monitoring and planning) with that data. Forecasting is one example of an application that can benefit from `tseda` analysis. `tseda` can also help teams understand how business processes behave so they can be monitored and managed by technical operations personnel.
 
 For example, an online store may want to understand how customers use the storefront or a specific service, such as the customer address locator. This can be translated into a metric that is sampled, tracked, and analyzed by `tseda`. This helps an operations team understand when particular services are used, when traffic is high and reliable service and a quick response to outages are critical, and when traffic is low enough for maintenance to be scheduled. If the business wants to, it can use this data to build a forecasting model.
 
