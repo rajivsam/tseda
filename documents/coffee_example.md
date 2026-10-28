@@ -25,7 +25,6 @@ The next stage in the workflow is segmentation. `tseda` applies change-point det
 
 ![Short final-segment adjustment alert](../assets/images/coffee_short_final_segment_alert.png)
 
-![Trend change-point summary for the selected final segment](../assets/images/coffee_trend_change_point_final_segment.png)
 
 ![Adjusted final segment used for analysis](../assets/images/coffee_final_segment_adjustment.png)
 
