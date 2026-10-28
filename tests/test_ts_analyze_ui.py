@@ -261,7 +261,8 @@ def test_segment_selection_advice_and_default_segment_are_configured():
     assert len(options) >= 2
     assert selected == len(options) - 1
     assert "Advisor recommendation" in advice
-    assert warning is None
+    assert warning is not None
+    assert "minimum stable window" in warning.lower()
 
 
 def test_segment_view_plot_uses_selected_segment_and_scatter_plot_keeps_full_series():
@@ -273,7 +274,8 @@ def test_segment_view_plot_uses_selected_segment_and_scatter_plot_keeps_full_ser
 
     assert all(option["value"] != "full" for option in options)
     assert selected == len(options) - 1
-    assert warning is None
+    assert warning is not None
+    assert "minimum stable window" in warning.lower()
     assert len(scatter_fig.data) >= 3
     assert len(scatter_fig.data[0].x) == len(ui.series)
     segment_total = sum(len(trace.x) for trace in scatter_fig.data[1:-1])
@@ -313,6 +315,42 @@ def test_summary_table_uses_selected_segment_for_acf_and_pacf_titles():
     assert "Segment 1" in pacf_fig.layout.title.text
     assert len(acf_fig.data[0].y) <= len(ui.series)
     assert len(pacf_fig.data[0].y) <= len(ui.series)
+
+
+def test_summary_table_uses_adjusted_final_segment_for_pacf_and_acf(monkeypatch):
+    ui.series = pd.Series(np.arange(100, dtype=float), index=pd.date_range("2024-01-01", periods=100, freq="D"))
+    monkeypatch.setattr(ui, "compute_segment_boundaries", lambda total_points, segment_count: [(0, 70), (70, 92), (92, 100)])
+
+    summary = ui.update_summary_table(
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        kde_toggle=["show"],
+        hist_bin_count=0,
+        selected_segment_value=2,
+    )
+
+    acf_fig = summary[4].figure
+    pacf_fig = summary[5].figure
+
+    assert "adjusted" in acf_fig.layout.title.text.lower()
+    assert "adjusted" in pacf_fig.layout.title.text.lower()
+    assert len(acf_fig.data[0].y) > 8
+    assert len(pacf_fig.data[0].y) > 8
+
+
+def test_sync_segment_dropdown_caps_detected_pelt_boundaries_to_ui_limit():
+    ui.series = pd.Series(np.r_[np.zeros(80), np.ones(80)])
+
+    boundaries = ui.compute_segment_boundaries(len(ui.series), 5)
+    options, selected, warning = ui.sync_segment_dropdown(None, None)
+
+    assert warning is not None
+    assert "minimum stable window" in warning.lower()
+    assert len(boundaries) <= 5
+    assert len(options) <= 5
+    assert len(options) == len(boundaries)
+    assert selected == len(options) - 1
+    assert options[0]["label"].startswith("segment-1")
+    assert "adjusted" in options[-1]["label"].lower()
 
 
 def test_window_selection_helper_returns_candidate_window_for_variance_and_spectral_methods():

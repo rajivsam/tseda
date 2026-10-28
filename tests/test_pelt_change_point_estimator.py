@@ -23,6 +23,17 @@ def test_pelt_predict_series_has_expected_labels():
     assert len(predicted.unique()) == 1
 
 
+def test_pelt_tail_breaks_are_merged_when_final_segment_is_too_short():
+    estimator = PELT_ChangePointEstimator.__new__(PELT_ChangePointEstimator)
+    estimator._n = 100
+    estimator._min_segment_points = 12
+    adjusted = estimator._apply_minimum_segment_rule([20, 50, 92])
+
+    assert adjusted[-1] < 92
+    assert 100 - adjusted[-1] >= 12
+    assert all(a < b for a, b in zip(adjusted, adjusted[1:]))
+
+
 def test_legacy_change_point_estimator_rejects_invalid_series():
     with pytest.raises(ValueError, match="non-empty pandas Series"):
         ChangePointEstimator(pd.Series(dtype=float)).estimate_change_points()

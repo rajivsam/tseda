@@ -177,7 +177,30 @@ periodicity:
   num_frequencies: 1000
 
 # ============================================================================
-# Section 8: LOESS Smoothing
+# Section 8: Segmentation and Final-Window Safety
+# ============================================================================
+# Parameters controlling the minimum admissible size for the working segment and
+# the half-life look-back used when the final PELT regime is too short.
+segmentation:
+  # Minimum admissible points for a final selected analysis segment. When set to
+  # null, tseda falls back to the cadence-specific default in
+  # resolve_minimum_segment_points(). The sub-hourly default uses one day of
+  # observations at the observed sampling interval (for example: 5 min -> 288,
+  # 15 min -> 96). Default: null
+  minimum_final_segment_points: null
+
+  # Half-life used in the weighted look-back when the final segment is too short.
+  # Larger values make the fallback more conservative and spread the look-back
+  # over more preceding observations. Default: 30.0
+  final_segment_half_life: 30.0
+
+  # Cumulative weight threshold used to determine how far back the final segment
+  # should be expanded. A value near 1.0 means "use enough preceding points to
+  # cover most of the half-life mass". Default: 0.95
+  final_segment_weight_threshold: 0.95
+
+# ============================================================================
+# Section 9: LOESS Smoothing
 # ============================================================================
 # Parameters for LOESS (Locally Estimated Scatterplot Smoothing) verification plot.
 # The LOESS smoother uses a sliding-window local regression; the fraction

@@ -39,6 +39,7 @@ from tseda.user_interface.callback_services import (
 )
 from tseda.decomposition.ssa_decomposition import SSADecomposition
 from tseda.decomposition.ssa_result_summary import SSAResultSummary
+from tseda.change_point.change_point_estimator import PELT_ChangePointEstimator
 from tseda.config.config_loader import ConfigurationManager
 from tseda.segmentation.pelt_segmentation import (
     build_adjusted_analysis_segment,
@@ -116,11 +117,16 @@ def navigate_steps(
 
     if button_id == 'next-btn' and current_step < 3:
         if current_step == 1 and series is not None and len(series) > 0:
-            segment_index = coerce_segment_index(selected_segment_value, fallback=max(0, len(compute_segment_boundaries(len(series), max(1, min(5, len(series) // max(1, resolve_minimum_segment_points(cadence=infer_cadence_from_series(series))))))) - 1))
-            boundaries = compute_segment_boundaries(len(series), max(1, min(5, len(series) // max(1, resolve_minimum_segment_points(cadence=infer_cadence_from_series(series))))))
+            required_points = resolve_minimum_segment_points(cadence=infer_cadence_from_series(series))
+            boundaries = compute_segment_boundaries(len(series), max(1, min(5, len(series) // max(1, required_points))))
+            segment_index = coerce_segment_index(selected_segment_value, fallback=max(0, len(boundaries) - 1))
             if segment_index < len(boundaries):
-                start, end = boundaries[segment_index]
-                active_segment = series.iloc[start:end]
+                segment_start, segment_end = boundaries[segment_index]
+                if segment_index == len(boundaries) - 1:
+                    adjusted_segment, adjustment = _resolve_segment_adjustment(series, boundaries, segment_index)
+                    if adjustment.get("is_adjusted"):
+                        segment_start, segment_end = adjusted_segment
+                active_segment = series.iloc[segment_start:segment_end]
                 series = active_segment
                 if len(series) > 0:
                     sampling_props = SamplingProp(series)
@@ -223,6 +229,8 @@ def update_summary_table(
         bin_count = int(hist_bin_count) if hist_bin_count and int(hist_bin_count) > 0 else None
 
         segment_series = series
+        acf_segment_label = None
+        pacf_segment_label = None
         if selected_segment_value is not None:
             if isinstance(selected_segment_value, str):
                 try:
@@ -234,7 +242,15 @@ def update_summary_table(
                 boundaries = compute_segment_boundaries(len(series), segment_count)
                 selected_index = coerce_segment_index(selected_segment_value, fallback=max(0, len(boundaries) - 1))
                 selected_index = min(max(selected_index, 0), len(boundaries) - 1 if boundaries else 0)
-                start, end = boundaries[selected_index]
+                adjusted_segment, adjustment = _resolve_segment_adjustment(series, boundaries, selected_index)
+                if adjustment.get("is_adjusted") and selected_index == len(boundaries) - 1:
+                    start, end = adjusted_segment
+                    acf_segment_label = f"Segment {selected_index + 1} (adjusted)"
+                    pacf_segment_label = f"Segment {selected_index + 1} (adjusted)"
+                else:
+                    start, end = boundaries[selected_index]
+                    acf_segment_label = f"Segment {selected_index + 1}"
+                    pacf_segment_label = f"Segment {selected_index + 1}"
                 segment_series = series.iloc[start:end]
 
         sampling_props = SamplingProp(series)
@@ -243,15 +259,6 @@ def update_summary_table(
         kde_fig = create_kde_plot(series, show_kde=show_kde, bin_count=bin_count)
         box_fig = create_box_plot(series)
         scatter_fig = create_scatter_plot(series)
-        acf_segment_label = None
-        pacf_segment_label = None
-        if selected_segment_value is not None:
-            segment_count = max(1, min(5, len(series) // max(1, resolve_minimum_segment_points(cadence=infer_cadence_from_series(series)))))
-            boundaries = compute_segment_boundaries(len(series), segment_count)
-            selected_index = coerce_segment_index(selected_segment_value, fallback=max(0, len(boundaries) - 1))
-            selected_index = min(max(selected_index, 0), len(boundaries) - 1 if boundaries else 0)
-            acf_segment_label = f"Segment {selected_index + 1}"
-            pacf_segment_label = f"Segment {selected_index + 1}"
         acf_fig = create_acf_plot(segment_series, lags=40, segment_label=acf_segment_label)
         pacf_fig = create_pacf_plot(segment_series, lags=40, segment_label=pacf_segment_label)
         
@@ -884,17 +891,84 @@ def update_segment_advice(
     )
 
 
+def _resolve_segment_adjustment(active_series: pd.Series, boundaries: list[tuple[int, int]], selected_index: int | None = None) -> tuple[tuple[int, int], dict[str, Any]]:
+    """Return the actual working segment and any adjustment metadata for the final regime."""
+    selected_index = max(0, int(selected_index)) if selected_index is not None else len(boundaries) - 1
+    selected_index = min(selected_index, max(0, len(boundaries) - 1))
+    segment_start, segment_end = boundaries[selected_index]
+    cadence = infer_cadence_from_series(active_series)
+    required_points = resolve_minimum_segment_points(cadence=cadence)
+    half_life = float(ConfigurationManager.get("segmentation.final_segment_half_life", 30.0))
+    threshold = float(ConfigurationManager.get("segmentation.final_segment_weight_threshold", 0.95))
+    adjustment = build_adjusted_analysis_segment(
+        active_series.to_numpy(),
+        segments=boundaries,
+        min_points=required_points,
+        half_life=half_life,
+        threshold=threshold,
+        cadence=cadence,
+    )
+    if adjustment.get("is_adjusted") and selected_index == len(boundaries) - 1:
+        return tuple(adjustment["selected_segment"]), adjustment
+    return (segment_start, segment_end), adjustment
+
+
 def compute_segment_boundaries(total_points: int, segment_count: int) -> list[tuple[int, int]]:
-    """Return deterministic start/end ranges for the visualized segment choices."""
+    """Return segment ranges for the UI.
+
+    Prefer the actual PELT-detected regime boundaries when available, but never
+    expose more than the requested segment cap. This keeps the selector readable
+    while still honoring the genuine first-stage segmentation signal when the
+    series has a small number of meaningful regime changes.
+    """
     if total_points <= 0:
         return []
-    if segment_count <= 1:
+
+    cap = max(1, int(segment_count))
+    cap = min(cap, 5)
+
+    active_series = globals().get("series")
+    if isinstance(active_series, pd.Series) and len(active_series) == total_points and total_points > 1:
+        try:
+            estimator = PELT_ChangePointEstimator(active_series, model="l2")
+            labels = estimator.predict_series()
+            if len(labels) == total_points and labels.nunique() > 1:
+                raw_breaks: list[int] = []
+                start_idx = 0
+                current_label = labels.iloc[0]
+                for idx in range(1, total_points):
+                    if labels.iloc[idx] != current_label:
+                        raw_breaks.append(idx)
+                        start_idx = idx
+                        current_label = labels.iloc[idx]
+                if raw_breaks:
+                    if len(raw_breaks) > cap - 1:
+                        step = max(1, len(raw_breaks) // max(1, cap - 1))
+                        selected_breaks = raw_breaks[::step]
+                        if selected_breaks[-1] != raw_breaks[-1]:
+                            selected_breaks.append(raw_breaks[-1])
+                        selected_breaks = sorted(set(selected_breaks))
+                    else:
+                        selected_breaks = raw_breaks
+
+                    boundaries: list[tuple[int, int]] = []
+                    prev = 0
+                    for break_idx in selected_breaks:
+                        boundaries.append((prev, int(break_idx)))
+                        prev = int(break_idx)
+                    boundaries.append((prev, total_points))
+                    if len(boundaries) > 1:
+                        return boundaries
+        except Exception:
+            pass
+
+    if cap <= 1:
         return [(0, total_points)]
 
-    boundaries: list[tuple[int, int]] = []
-    for idx in range(segment_count):
-        start = idx * (total_points // segment_count)
-        end = total_points if idx == segment_count - 1 else (idx + 1) * (total_points // segment_count)
+    boundaries = []
+    for idx in range(cap):
+        start = idx * (total_points // cap)
+        end = total_points if idx == cap - 1 else (idx + 1) * (total_points // cap)
         boundaries.append((start, end))
     return boundaries
 
@@ -915,8 +989,19 @@ def sync_segment_dropdown(
     min_points = resolve_minimum_segment_points(cadence=infer_cadence_from_series(active))
     segment_count = max(1, min(5, num_points // max(1, min_points)))
     boundaries = compute_segment_boundaries(num_points, segment_count)
+    display_boundaries = list(boundaries)
+    if boundaries:
+        adjusted_segment, adjustment = _resolve_segment_adjustment(active, boundaries, len(boundaries) - 1)
+        if adjustment.get("is_adjusted"):
+            display_boundaries[-1] = tuple(adjusted_segment)
+
     options: list[dict[str, str | int]] = []
-    for idx, (start, end) in enumerate(boundaries):
+    for idx, (start, end) in enumerate(display_boundaries):
+        if idx == len(display_boundaries) - 1:
+            adjustment = _resolve_segment_adjustment(active, boundaries, idx)[1]
+            if adjustment.get("is_adjusted"):
+                options.append({"label": f"segment-{idx + 1} (adjusted: {start}:{end})", "value": idx})
+                continue
         options.append({"label": f"segment-{idx + 1} ({start}:{end})", "value": idx})
 
     default_value = len(options) - 1
@@ -926,7 +1011,10 @@ def sync_segment_dropdown(
         selected_value = coerce_segment_index(selected_segment_value, fallback=default_value)
         selected_value = min(max(selected_value, 0), len(options) - 1)
 
-    return options, selected_value, None
+    warning_detail = ""
+    if selected_value == default_value:
+        warning_detail, _, _ = describe_segment_adjustment(active, boundaries, selected_value)
+    return options, selected_value, warning_detail or None
 
 
 def build_segment_view_figure(view_mode: str | None = "selected", selected_segment_value: int | str | None = None) -> go.Figure:
@@ -943,12 +1031,18 @@ def build_segment_view_figure(view_mode: str | None = "selected", selected_segme
     selected_index = min(max(selected_index, 0), len(boundaries) - 1 if boundaries else 0)
 
     segment_start, segment_end = boundaries[selected_index]
+    adjusted_segment, adjustment = _resolve_segment_adjustment(series, boundaries, selected_index)
+    if adjustment.get("is_adjusted") and selected_index == len(boundaries) - 1:
+        segment_start, segment_end = adjusted_segment
     data = series.iloc[segment_start:segment_end]
     x_values = data.index
     y_values = data.to_numpy(dtype=float)
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=x_values, y=y_values, mode="lines", line={"color": "#4c78a8", "width": 2}, hovertemplate="%{x}<br>Value: %{y}<extra></extra>"))
+    if adjustment.get("is_adjusted") and selected_index == len(boundaries) - 1:
+        fig.update_layout(title=f"Segment view: {selected_index + 1} (adjusted final segment)", xaxis_title="Time", yaxis_title="Value", template="plotly_white", margin={"l": 45, "r": 20, "t": 40, "b": 30})
+        return fig
 
     axis_min = x_values[0]
     axis_max = x_values[-1]
@@ -975,6 +1069,32 @@ def coerce_segment_index(value: int | str | None, fallback: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return fallback
+
+
+def describe_segment_adjustment(active_series: pd.Series, boundaries: list[tuple[int, int]], selected_segment_value: int | str | None) -> tuple[str, tuple[int, int], dict[str, Any]]:
+    """Describe the effective final-segment adjustment and return the adjusted working segment."""
+    if active_series is None or len(active_series) == 0:
+        return "Upload a series to inspect segmentation.", (0, 0), {}
+
+    cadence = infer_cadence_from_series(active_series)
+    required_points = resolve_minimum_segment_points(cadence=cadence)
+    fallback_index = max(0, len(boundaries) - 1)
+    selected_index = coerce_segment_index(selected_segment_value, fallback=fallback_index)
+    selected_index = min(max(selected_index, 0), max(0, len(boundaries) - 1))
+    adjusted_segment, adjustment = _resolve_segment_adjustment(active_series, boundaries, selected_index)
+    if not adjustment.get("is_adjusted"):
+        return "", adjusted_segment, adjustment
+
+    final_segment = adjustment.get("final_segment", (0, len(active_series)))
+    selected_start, selected_end = adjusted_segment
+    final_start, final_end = final_segment
+    detail = (
+        f"PELT created a final segment of {max(0, final_end - final_start)} points, below the minimum stable window "
+        f"for {cadence} data ({required_points} points). tseda applied a half-life look-back from the previous regime "
+        f"to expand the working segment from ({final_start}:{final_end}) to ({selected_start}:{selected_end}) using a "
+        f"half-life of {adjustment.get('half_life', 30.0)} and weight threshold {adjustment.get('threshold', 0.95)}."
+    )
+    return detail, adjusted_segment, adjustment
 
 
 def update_segment_view_plot(
@@ -1016,9 +1136,16 @@ def evaluate_segment_warning(
     boundaries = compute_segment_boundaries(len(active), max(1, min(5, len(active) // max(1, required_points))))
     if selected_segment_idx < 0 or selected_segment_idx >= len(boundaries):
         selected_segment_idx = fallback_index
+
     segment_start, segment_end = boundaries[selected_segment_idx]
     final_len = max(0, segment_end - segment_start)
     if final_len < required_points:
+        adjusted_segment, adjustment = _resolve_segment_adjustment(active, boundaries, selected_segment_idx)[0], _resolve_segment_adjustment(active, boundaries, selected_segment_idx)[1]
+        if adjustment.get("is_adjusted"):
+            return True, (
+                f"PELT created a final segment of {final_len} points, below the minimum stable window for {cadence} data ({required_points} points). "
+                f"The working series will be adjusted to {adjusted_segment[0]}:{adjusted_segment[1]} using a half-life look-back of {adjustment.get('half_life', 30.0)}."
+            )
         return True, get_short_segment_confirmation_message(cadence=cadence, required_points=required_points, final_len=final_len)
     return False, ""
 

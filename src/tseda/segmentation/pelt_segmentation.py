@@ -9,11 +9,37 @@ import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis
 
+from tseda.config.config_loader import ConfigurationManager
+
 DEFAULT_MIN_SEGMENT_POINTS: dict[str, int] = {
-    "weekly": 12,
-    "daily": 90,
+    "subhourly": 24,
     "hourly": 24 * 7 * 3,
+    "daily": 90,
+    "weekly": 12,
+    "monthly": 12,
 }
+
+
+def _subhourly_minimum_points(series: pd.Series) -> int:
+    """Use one day of observations at the observed cadence as the sub-hourly stability floor."""
+    index = series.index if isinstance(series, pd.Series) else None
+    if not isinstance(index, pd.DatetimeIndex) or len(index) < 2:
+        return DEFAULT_MIN_SEGMENT_POINTS["subhourly"]
+
+    deltas = pd.Series(index).diff().dropna()
+    if deltas.empty:
+        return DEFAULT_MIN_SEGMENT_POINTS["subhourly"]
+
+    median_delta = deltas.median()
+    if pd.isna(median_delta):
+        return DEFAULT_MIN_SEGMENT_POINTS["subhourly"]
+
+    delta_minutes = float(median_delta.total_seconds() / 60.0)
+    if delta_minutes <= 0:
+        return DEFAULT_MIN_SEGMENT_POINTS["subhourly"]
+
+    points_per_day = max(1, int(round(24 * 60 / delta_minutes)))
+    return max(DEFAULT_MIN_SEGMENT_POINTS["subhourly"], points_per_day)
 
 
 def infer_cadence_from_series(series: pd.Series) -> str:
@@ -27,10 +53,14 @@ def infer_cadence_from_series(series: pd.Series) -> str:
 
     if hasattr(index, "inferred_freq") and index.inferred_freq is not None:
         freq = str(index.inferred_freq).lower()
+        if "min" in freq or freq in {"s", "sec", "second", "seconds"} or ("t" in freq and "min" not in freq):
+            return "subhourly"
         if "h" in freq:
             return "hourly"
         if "w" in freq:
             return "weekly"
+        if "m" in freq:
+            return "monthly"
         if "d" in freq or "b" in freq:
             return "daily"
 
@@ -40,24 +70,41 @@ def infer_cadence_from_series(series: pd.Series) -> str:
             median_delta = deltas.median()
             if pd.notna(median_delta):
                 hours = median_delta.total_seconds() / 3600.0
-                if hours <= 24:
-                    return "hourly" if hours < 24 else "daily"
+                if hours < 1.0:
+                    return "subhourly"
+                if hours < 24:
+                    return "hourly"
                 if hours <= 168:
                     return "weekly"
+                if hours <= 720:
+                    return "monthly"
 
     return "daily"
 
 
 def resolve_minimum_segment_points(cadence: str | None = None, series: pd.Series | None = None) -> int:
     """Resolve the minimum number of observations required for a stable final analysis segment."""
+    configured = ConfigurationManager.get("segmentation.minimum_final_segment_points", None)
+    if configured is not None:
+        try:
+            return max(1, int(configured))
+        except (TypeError, ValueError):
+            pass
+
     if cadence is None and series is not None:
         cadence = infer_cadence_from_series(series)
 
     key = str(cadence or "daily").lower()
+    if key.startswith("sub") or key.startswith("minute") or key.startswith("min"):
+        if series is not None:
+            return _subhourly_minimum_points(series)
+        return DEFAULT_MIN_SEGMENT_POINTS["subhourly"]
     if key.startswith("hour"):
         return DEFAULT_MIN_SEGMENT_POINTS["hourly"]
     if key.startswith("week"):
         return DEFAULT_MIN_SEGMENT_POINTS["weekly"]
+    if key.startswith("month"):
+        return DEFAULT_MIN_SEGMENT_POINTS["monthly"]
     if key.startswith("day"):
         return DEFAULT_MIN_SEGMENT_POINTS["daily"]
     return DEFAULT_MIN_SEGMENT_POINTS["daily"]

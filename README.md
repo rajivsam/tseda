@@ -68,9 +68,11 @@ summary = api.generate_observation_text()
 print(summary[:500])
 ```
 
+Please see [the coffee prices example](documents/coffee_example.md) for an overview of using the UI to do the analysis.
 ## More information
 
 - [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
+- [documents/coffee_example.md](documents/coffee_example.md) — worked coffee-prices example showing the segment-first workflow, preliminary diagnostics, and final-segment adjustment
 - [documents/PRODUCT.md](documents/PRODUCT.md) — product and user-value context
 - [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md) — system architecture
 - [docs/tutorial.md](docs/tutorial.md) — guided walkthroughs

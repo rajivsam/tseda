@@ -49,108 +49,41 @@ Requires-Dist: sphinx-copybutton>=0.5; extra == "docs"
 
 # tseda
 
-`tseda` is a Python package for automated time series decomposition, diagnostics, and signal validation. It is designed for regularly sampled operational data where analysts need to separate trend, seasonality, and noise, understand regime changes, and decide whether a series is structurally suitable for meaningful modeling.
+<p align="center">
+  <img src="assets/images/tseda_logo.png" alt="tseda logo" width="820">
+</p>
 
-Think of it as a practical workflow for turning raw time-series data into interpretable signal components and auditable analytical decisions.
+`tseda` is a Python package for automated time-series decomposition, diagnostics, and signal validation.
 
-## What tseda is for
+It helps analysts work with regularly sampled operational data by turning raw measurement streams into interpretable components such as trend, seasonality, and noise, while making the underlying analysis steps explicit, repeatable, and reviewable.
 
-`tseda` is useful when you have a metric that changes over time and need to answer questions like:
+For the fuller product story, design rationale, and detailed explanation of the workflow, see [about_tseda.md](about_tseda.md).
 
-- Is there a meaningful trend?
-- Is the signal seasonal or dominated by noise?
-- Has the underlying process changed over time?
-- Is the data stable enough to model or forecast?
-- Which components explain the variance in the current operating regime?
+## What it helps with
 
-This is common in operations, forecasting, monitoring, demand analysis, and business analytics. `tseda` helps teams inspect these questions with a repeatable, configuration-driven workflow instead of ad hoc plotting and manual tuning.
+- understanding whether a signal has meaningful structure,
+- separating trend and recurring seasonal behavior from residual noise,
+- identifying regime changes and shifts in operating behavior,
+- deciding whether a series is suitable for decomposition and modeling,
+- preserving earlier analytical decisions so they can be revisited and repeated.
 
 ## Why it exists
 
-Many time-series workflows fail before modeling even starts because the signal is not decomposed or validated properly. The hardest parts are usually not the charts themselves—they are the decisions about:
+The hard part in practice is not a single plot or statistic. It is the sequence of choices needed (and this is not a few; see [about_tseda.md](about_tseda.md) for the details) to get from raw data to a defensible decomposition: selecting a sensible window, identifying regime boundaries, choosing groups of components, checking whether the result is structurally meaningful, and documenting the reasoning for later reuse.
 
-- which window size to use,
-- how to group components,
-- whether there is enough signal structure to trust the decomposition,
-- and how to preserve the rationale behind those choices for later review.
+`tseda` brings those steps together in one workflow.
 
-`tseda` addresses those problems with an SSA-based workflow that automates the heavy lifting while keeping the analysis transparent and inspectable.
+## How it is used
 
-## What the software does
+`tseda` supports a three-step workflow:
 
-At a high level, `tseda` can:
+1. initial assessment of the signal,
+2. decomposition and grouping of the signal components,
+3. validation and observation logging.
 
-- load a timestamp-indexed time series from CSV or a built-in example dataset,
-- infer cadence and initial analysis settings,
-- generate diagnostic plots such as KDE, ACF/PACF, box plots, and raw signal views,
-- apply Singular Spectrum Analysis (SSA) with automated window selection,
-- suggest component groupings for trend, seasonality, and noise,
-- evaluate the decomposition with statistical checks,
-- detect structural changes such as trend shifts and seasonal amplitude changes,
-- export component tables and observation summaries for downstream use,
-- preserve analytical decisions in a way that can be reviewed later.
-
-## The workflow
-
-`tseda` organizes analysis into a simple, repeatable three-step flow.
-
-### 1. Initial assessment
-
-Before decomposition, the tool helps you inspect the signal itself.
-
-This includes:
-
-- histogram and KDE behavior,
-- box-plot summaries,
-- raw signal plots,
-- ACF/PACF diagnostics,
-- regime segmentation and change-point review.
-
-The goal is to understand whether the series has enough structure to justify decomposition and what kind of behavior is currently active.
-
-### 2. Decomposition and grouping
-
-`tseda` then performs decomposition using SSA, with automated or user-controlled window and component grouping.
-
-Key ideas:
-
-- the analysis is done over the selected segment, not always the entire historical history,
-- window selection is tuned to the signal and cadence,
-- component grouping separates dominant structure from residual noise,
-- the process is designed to be interpretable and auditable.
-
-### 3. Validation and observation logging
-
-After decomposition, the system checks whether the apparent structure is statistically reasonable and records the analytical decisions.
-
-This includes:
-
-- suitability checks for whether the series has enough internal structure,
-- model comparison signals such as AIC/BIC-like evaluation context,
-- observation logging for reproducibility,
-- narrative summaries that explain what was found.
-
-## Notebook and UI parity
-
-`tseda` is designed to work in both the browser-based UI and Python notebooks.
-
-Notebook parity is effectively 100 percent: everything done through the UI can also be done through the notebook workflow. The notebook API exposes the same decomposition, validation, plotting, and reporting steps so users can reproduce a dashboard workflow in Python and integrate it into analysis scripts or notebooks.
-
-## Is there an example showing how to do this?
-
-Yes. A more detailed, end-to-end example showing how `tseda` analysis is performed from data upload through preliminary diagnostics, segment decomposition, validation, and interpretation is currently being expanded in the documentation. Detailed installation instructions and notebook-based examples are also coming soon, so readers can follow the same workflow in a reproducible Python environment.
-
-In the meantime, a worked example of time-series analysis in practice is available here: [Markov analysis of coffee prices](https://rajivsam.github.io/r2ds-blog/posts/markov_analysis_coffee_prices/). It provides a concrete example of how a series is inspected, segmented, and interpreted in context, which is a useful companion to the `tseda` workflow.
-
-Stay tuned for updated documentation that brings together installation guidance, notebook walkthroughs, and the full UI-to-notebook parity story.
+The package is designed to work both in a browser-based UI and in Python notebooks, with the same core workflow exposed in both environments.
 
 ## Installation
-
-Requirements:
-
-- Python 3.12+
-
-Install from PyPI:
 
 ```bash
 python -m venv .venv
@@ -158,21 +91,13 @@ source .venv/bin/activate
 pip install tseda
 ```
 
-Or with `pipx`:
-
-```bash
-pipx install tseda
-```
-
-Run the UI:
+Then run:
 
 ```bash
 tseda
 ```
 
-Then open the app in your browser at `http://127.0.0.1:8050`.
-
-## Quick start in Python
+## Quick start
 
 ```python
 from tseda.notebook_api import NotebookThreeStepAPI, load_example_series
@@ -180,39 +105,22 @@ from tseda.notebook_api import NotebookThreeStepAPI, load_example_series
 series = load_example_series("coffee_prices")
 api = NotebookThreeStepAPI(series)
 
-# Step 1: inspect the series
 kde_fig = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
 acf_fig = api.get_acf_plot(lags=30)
 
-# Step 2: decompose the signal
 api.set_window(api.get_window(), apply_window_refinement=True)
 grouping, dw_ok = api.suggest_grouping()
 api.set_grouping(grouping)
 recon_fig = api.get_reconstruction_plot()
 
-# Step 3: review diagnostics and export results
-variance_fig = api.get_variance_explained_plot()
 summary = api.generate_observation_text()
 print(summary[:500])
 ```
 
-## Project structure
+## More information
 
-- `src/tseda/` — package implementation
-- `src/tseda/notebook_api.py` — notebook-oriented analysis API
-- `src/tseda/user_interface/` — Dash application and interactive workflow
-- `tests/` — test suite covering behavior and regressions
-- `docs/` — documentation and user guidance
-
-## Documentation and references
-
-- [README.md](README.md)
-- [documents/PRODUCT.md](documents/PRODUCT.md)
-- [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md)
-- [documents/CONTRIBUTING.md](documents/CONTRIBUTING.md)
-- [docs/tutorial.md](docs/tutorial.md)
-- [docs/user_guide.md](docs/user_guide.md)
-
-## Why teams use tseda
-
-`tseda` is built for analysts and technical teams who want to move from operational data to reliable analytical judgment without losing transparency. It is a practical bridge between exploratory signal analysis and model-ready decomposition, especially in settings where the series is not just a dataset, but part of a real operational process that needs to be understood and monitored over time.
+- [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
+- [documents/PRODUCT.md](documents/PRODUCT.md) — product and user-value context
+- [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md) — system architecture
+- [docs/tutorial.md](docs/tutorial.md) — guided walkthroughs
+- [docs/user_guide.md](docs/user_guide.md) — detailed usage guidance
