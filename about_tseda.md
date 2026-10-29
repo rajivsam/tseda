@@ -14,7 +14,7 @@ Because this type of analysis is often repeated on a regular schedule, it can be
 
 `tseda` brings these activities together in a single application interface. In short, it is one tool in your time series toolbox to support your preferred time series analysis, data modeling, and operational monitoring workflows.
 
-## Why is `tseda` useful to operations teams?
+## Why is `tseda` useful?
 
 The value of identifying variance components is clear for model development: it tells modelers which behaviors need to be represented explicitly and provides extracted signals that can be used to develop a model. The operational value is equally important, although it may be less obvious. Operations teams need to configure alerts and establish guidelines for the range of behavior that should be expected from a particular signal.
 
