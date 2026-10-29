@@ -81,6 +81,7 @@ print(summary[:500])
 For examples of using tseda with the UI, please see the following links:
 
 - [Coffee prices example](documents/coffee_example.md)
+- [Car sales example](documents/car_sales_example.md)
 - [White noise example](documents/white_noise_example.md)
 
 ## More information
