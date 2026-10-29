@@ -14,6 +14,14 @@ Because this type of analysis is often repeated on a regular schedule, it can be
 
 `tseda` brings these activities together in a single application interface. In short, it is one tool in your time series toolbox to support your preferred time series analysis, data modeling, and operational monitoring workflows.
 
+## Why is `tseda` useful to operations teams?
+
+The value of identifying variance components is clear for model development: it tells modelers which behaviors need to be represented explicitly and provides extracted signals that can be used to develop a model. The operational value is equally important, although it may be less obvious. Operations teams need to configure alerts and establish guidelines for the range of behavior that should be expected from a particular signal.
+
+Segmentation and variance decomposition provide evidence for those operational decisions. For a given signal, the historical record shows how often the behavior changed and how much variation is attributable to residual noise. Segmentation identifies the current operating regime and makes changes in behavior visible, while decomposition distinguishes systematic behavior such as trend and seasonality from the noise that remains after those effects are accounted for. This helps monitoring teams distinguish expected variation from a meaningful change that warrants investigation.
+
+For bounded random variables, where observations fall within a known range `[a, b]`, concentration inequalities can be used to bound unusually high values within a regime. Maximum-value bounding based on this approach is an upcoming feature for `tseda`; it is not yet part of the current workflow. Even before that feature is available, the segmentation and decomposition outputs give operations teams a practical historical baseline for alert thresholds, expected-range guidance, and detecting changes in the current regime.
+
 The hard part in practice is not any one chart or statistic by itself. It is the fact that getting to a useful decomposition usually requires many steps, many tuning choices, and a careful stitching together of methods: selecting a sampling-aware window, identifying regime boundaries, testing candidate groupings, checking whether the decomposition is structurally meaningful, and then validating the result against the data. These are not isolated decisions; they are part of one analytical workflow. `tseda` is designed to make those choices more explicit, more literature- and practice-grounded, and easier to revisit later. It also makes it possible to log earlier analyses, query them, and repeat or compare them when the same problem reappears with new data.
 
 ## How does an analyst use `tseda`?
