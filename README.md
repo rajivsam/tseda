@@ -24,7 +24,7 @@ The hard part in practice is not a single plot or statistic. It is the sequence 
 
 `tseda` brings those steps together in one workflow.
 
-## Why it is useful to operations teams
+## Why it is useful?
 
 Variance decomposition is useful not only to modelers, but also to the teams responsible for monitoring and operating systems. Modelers use the extracted behaviors to decide which patterns a forecasting or anomaly-detection model must represent explicitly. Operations teams can use the same information to define alerts and establish guidelines for what behavior is expected from a signal.
 
