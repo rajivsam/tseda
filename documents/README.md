@@ -15,3 +15,17 @@ Files:
 - `CONTRIBUTING.md` — developer conventions, testing expectations, and contribution workflow.
 - `plan-template.md` — template for implementation planning and feature breakdowns.
 - `CONTEXT_ENGINEERING.md` — guide for using the project’s VS Code agent context files.
+
+## Examples
+
+The project includes a small set of focused worked examples that show how the tool behaves in representative scenarios. These examples are kept in a dedicated section so they can grow over time without crowding the core narrative.
+
+### White-noise example
+
+- [White-noise example](./white_noise_example.md) — demonstrates the guardrail behavior when a series is dominated by diffuse, noise-like spectrum and is not suitable for SSA decomposition. The example explains why `tseda` warns the user and recommends a stochastic/noise-based model instead.
+
+Planned additions to this section:
+
+- coffee-prices workflow example
+- seasonal/periodic decomposition example
+- change-point and validation example

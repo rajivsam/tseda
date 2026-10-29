@@ -86,7 +86,8 @@ In short, this stage is not just a final check; it is a record of analytical jud
 
 Yes. A worked example of the full workflow is available in [documents/coffee_example.md](documents/coffee_example.md). It walks through the coffee-prices series from data loading and preliminary diagnostics, through segmentation and final-segment adjustment, to SSA decomposition, validation, and operational interpretation.
 
-A more detailed, end-to-end example showing how `tseda` analysis is performed from data upload through preliminary diagnostics, segment decomposition, validation, and interpretation is also described in this blog post: [Markov analysis of coffee prices](https://rajivsam.github.io/r2ds-blog/posts/markov_analysis_coffee_prices/). It provides a concrete example of how a series is inspected, segmented, and interpreted in context, which is a useful companion to the `tseda` workflow.
+The [white-noise example](documents/white_noise_example.md) illustrates the complementary case: when the eigenspectrum is diffuse and the variance is spread broadly across the spectrum, SSA is not the right tool for the signal. In this situation, `tseda` warns the user that the decomposition is not suitable and recommends switching to a stochastic/noise-based model such as a random-walk/Brownian-motion style approach or an ARIMA/SARIMA workflow.
+
 
 Notebook parity is effectively 100 percent: everything that can be done in the UI can also be done in the notebook workflow. The notebook API supports the same decomposition, validation, plotting, and reporting steps, so users can reproduce the UI-driven analysis and extend it with custom code. Stay tuned for updated documentation that brings together installation guidance, notebook walkthroughs, and the full UI-to-notebook parity story.
 

@@ -76,7 +76,13 @@ summary = api.generate_observation_text()
 print(summary[:500])
 ```
 
-Please see [the coffee prices example](documents/coffee_example.md) for an overview of using the UI to do the analysis.
+## UI Example Illustrations
+
+For examples of using tseda with the UI, please see the following links:
+
+- [Coffee prices example](documents/coffee_example.md)
+- [White noise example](documents/white_noise_example.md)
+
 ## More information
 
 - [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
