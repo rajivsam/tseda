@@ -32,7 +32,7 @@ Segmentation shows how often a signal changes behavior and identifies the curren
 
 For bounded random variables, whose values lie within a known range `[a, b]`, concentration inequalities can provide bounds on unusually large observations within a regime. Support for bounding the maximum value of a signal in this way is an upcoming `tseda` feature. Until then, segmentation and variance decomposition still provide practical inputs for monitoring: they make regime changes, changing component behavior, and the level of background noise visible and reviewable.
 
-## How it is used
+## How is it used?
 
 `tseda` supports a three-step workflow:
 
