@@ -14,6 +14,12 @@ Because this type of analysis is often repeated on a regular schedule, it can be
 
 `tseda` brings these activities together in a single application interface. In short, it is one tool in your time series toolbox to support your preferred time series analysis, data modeling, and operational monitoring workflows.
 
+## Testing
+
+`tseda` has been evaluated on a range of real-world and benchmark datasets to confirm that the decomposition workflow remains useful outside of a single synthetic example. The tested series show a broad spread in explained variance and noise: some datasets, such as coffee prices, have a clear signal and a strong decomposition, while others are more weakly structured and are dominated by residual variation. This is exactly the behavior we would expect from a method designed to separate meaningful structure from noise, and it is a useful validation that the analysis is sensitive to the underlying signal rather than forcing a fixed decomposition onto every dataset.
+
+The Durbin-Watson values for the evaluated datasets remain in the healthy range of approximately 1.5 to 2.5, which supports the view that the residuals are not strongly autocorrelated and that the overall model fit remains stable. To see the full test setup, running instructions, and the complete benchmark summary table, refer to [documents/test_datasets_report.md](documents/test_datasets_report.md). This document provides the detailed record of the test suite and the results used to assess the method across the benchmark set.
+
 ## Why is `tseda` useful?
 
 The value of identifying variance components is clear for model development: it tells modelers which behaviors need to be represented explicitly and provides extracted signals that can be used to develop a model. The operational value is equally important, although it may be less obvious. Operations teams need to configure alerts and establish guidelines for the range of behavior that should be expected from a particular signal.
@@ -81,6 +87,12 @@ This is also where observation logging becomes essential. Because the decomposit
 The project therefore includes a structured observation framework that supports later review and retrieval through natural-language search. KMDS makes this possible by preserving the rationale and supporting evidence in a searchable form, so future analysts can revisit the decision process quickly and understand not only the final decomposition but also the reasoning behind it. This is especially important in operational settings, where long-lived monitoring pipelines and repeated analyses need an auditable trail of decisions.
 
 In short, this stage is not just a final check; it is a record of analytical judgment. It ensures that the decomposition is not only interpretable, but also defensible, comparable across windows, and easy to revisit later when the underlying process or team context changes.
+
+## Testing and evaluation across real-world datasets
+
+`tseda` has been evaluated on a range of real-world and benchmark datasets to confirm that the decomposition workflow remains useful outside of a single synthetic example. The tested series show a broad spread in explained variance and noise: some datasets, such as coffee prices, have a clear signal and a strong decomposition, while others are more weakly structured and are dominated by residual variation. This is exactly the behavior we would expect from a method designed to separate meaningful structure from noise, and it is a useful validation that the analysis is sensitive to the underlying signal rather than forcing a fixed decomposition onto every dataset.
+
+The Durbin-Watson values for the evaluated datasets remain in the healthy range of approximately 1.5 to 2.5, which supports the view that the residuals are not strongly autocorrelated and that the overall model fit remains stable. To see the full test setup, running instructions, and the complete benchmark summary table, refer to [documents/test_datasets_report.md](documents/test_datasets_report.md). This document provides the detailed record of the test suite and the results used to assess the method across the benchmark set.
 
 ## Is there an example showing how to do this?
 

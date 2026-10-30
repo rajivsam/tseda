@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from tseda.notebook_api import NotebookThreeStepAPI, load_series_from_csv
+from tseda.notebook_api import NotebookThreeStepAPI, generate_test_dataset_report, load_series_from_csv
 
 DATASETS = [
     ("coffee_prices", "data/coffee_prices.csv"),
@@ -180,3 +180,18 @@ def test_comprehensive_dataset_test(tmp_path: Path):
     assert output_csv.exists()
     assert output_markdown.exists()
     assert output_metadata.exists()
+
+
+def test_generate_test_dataset_report(tmp_path: Path):
+    output_file = tmp_path / "dataset_report.md"
+    generated = generate_test_dataset_report(output_file)
+
+    assert generated == output_file
+    assert output_file.exists()
+
+    content = output_file.read_text(encoding="utf-8")
+    assert "# Test dataset report" in content
+    assert "## Dataset summary" in content
+    assert "coffee_prices" in content
+    assert "hyndman_goog_daily_close" in content
+    assert "| Dataset | Trend | Seasonality | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |" in content

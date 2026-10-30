@@ -1,6 +1,6 @@
 dataset,samples,window,suitability_passed,top_k_ratio,top_k,threshold,trend,seasonality,signal_explained,noise_explained,durbin_watson,change_points,component_rows
 coffee_prices,426,12,True,0.9941945743755296,5,0.4,✔,–,98.45350157785025,1.5464984221497577,1.7065303752398788,trend,426
-white_noise_data,720,24,False,0.2504465268136848,5,0.4,rejected,rejected,0.0,0.0,,rejected,720
+white_noise_data,720,24,False,0.25044652681368523,5,0.4,rejected,rejected,0.0,0.0,,rejected,720
 trimmed_biomass,1998,24,True,0.9486269011277519,5,0.4,✔,–,93.79452928064708,6.205470719352922,1.7201571160561697,trend,1998
 monthly_car_sales,108,12,True,0.93909351456972,5,0.4,✔,✔,90.14391796365796,9.856082036342043,2.414672929676177,"trend, amplitude",108
 uci_air_quality_hourly_co,2000,24,True,0.7883696397157091,5,0.4,✔,✔,83.0615858603895,16.938414139610508,1.5677727965182653,"trend, amplitude, phase",2000

@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: tseda
 Version: 3.3
 Summary: A package for exploration of regularly sampled time series.
-License-Expression: LicenseRef-Proprietary
+License-Expression: MIT
 Keywords: time-series,ssa,dash,analytics,decomposition
 Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3 :: Only
@@ -11,6 +11,7 @@ Classifier: Intended Audience :: Science/Research
 Classifier: Topic :: Scientific/Engineering :: Information Analysis
 Requires-Python: >=3.12
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: dash>=4.1.0
 Requires-Dist: dash-ag-grid>=31.3.1
 Requires-Dist: dash-bootstrap-components>=2.0.4
@@ -34,6 +35,7 @@ Requires-Dist: sphinx>=8.0; extra == "docs"
 Requires-Dist: furo>=2024.8.6; extra == "docs"
 Requires-Dist: myst-parser>=3.0; extra == "docs"
 Requires-Dist: sphinx-copybutton>=0.5; extra == "docs"
+Dynamic: license-file
 
 # tseda
 
@@ -41,7 +43,7 @@ Requires-Dist: sphinx-copybutton>=0.5; extra == "docs"
   <img src="assets/images/tseda_logo.png" alt="tseda logo" width="820">
 </p>
 
-`tseda` is a Python package for automated time-series decomposition, diagnostics, and signal validation.
+`tseda` is a Python package for analyst-guided time-series decomposition, diagnostics, and signal validation.
 
 It helps analysts work with regularly sampled operational data by turning raw measurement streams into interpretable components such as trend, seasonality, and noise, while making the underlying analysis steps explicit, repeatable, and reviewable.
 
@@ -119,12 +121,15 @@ For examples of using tseda with the UI, please see the following links:
 
 - [Coffee prices example](documents/coffee_example.md)
 - [Car sales example](documents/car_sales_example.md)
+- [Biomass power generation example](documents/biomass_power_gen_example.md)
 - [White noise example](documents/white_noise_example.md)
 
 ## More information
 
 - [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
 - [documents/coffee_example.md](documents/coffee_example.md) — worked coffee-prices example showing the segment-first workflow, preliminary diagnostics, and final-segment adjustment
+- [documents/car_sales_example.md](documents/car_sales_example.md) — trend-cycle example with evolving operating behavior and no fixed seasonal rhythm
+- [documents/biomass_power_gen_example.md](documents/biomass_power_gen_example.md) — renewable generation example highlighting non-seasonal trend-driven change
 - [documents/PRODUCT.md](documents/PRODUCT.md) — product and user-value context
 - [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md) — system architecture
 - [docs/tutorial.md](docs/tutorial.md) — guided walkthroughs

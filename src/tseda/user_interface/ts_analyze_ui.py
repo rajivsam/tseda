@@ -1,8 +1,10 @@
 """Dash application entrypoint, layouts, and callback orchestration for TSEDA."""
 
+import argparse
 import base64
 import io
 import os
+import sys
 import tempfile
 from typing import Any
 
@@ -1620,7 +1622,29 @@ app = create_app()
 
 
 def main() -> None:
-    """Run the installed Dash application via the console script entrypoint."""
+    """Run the installed Dash application or generate a dataset report from the CLI."""
+    parser = argparse.ArgumentParser(description="TSEDA CLI")
+    parser.add_argument(
+        "--generate-test-dataset-report",
+        "--dataset-report",
+        dest="generate_test_dataset_report",
+        action="store_true",
+        help="Generate a markdown summary for the bundled benchmark datasets and exit.",
+    )
+    parser.add_argument(
+        "--report-output",
+        default="data/comprehensive_test/comprehensive_dataset_results.md",
+        help="Destination for the generated markdown report.",
+    )
+    args, _ = parser.parse_known_args(sys.argv[1:])
+
+    if args.generate_test_dataset_report:
+        from tseda.notebook_api import generate_test_dataset_report
+
+        output_file = generate_test_dataset_report(args.report_output)
+        print(f"Dataset report written to {output_file}")
+        return
+
     host = os.getenv("TSEDA_HOST", "127.0.0.1")
     port = int(os.getenv("TSEDA_PORT", "8050"))
     debug = os.getenv("TSEDA_DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}

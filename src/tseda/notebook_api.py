@@ -208,6 +208,121 @@ def load_example_series(
     return load_series_from_csv(csv_path, timestamp_col=timestamp_col, value_col=value_col)
 
 
+def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
+    """Generate a markdown summary table for the repository's bundled benchmark datasets.
+
+    The output mirrors the comprehensive dataset validation used in
+    ``tests/test_comprehensive_dataset.py`` and is suitable for documentation or
+    manual inspection from the CLI.
+    """
+    project_root = Path(__file__).resolve().parents[2]
+    dataset_paths = [
+        ("coffee_prices", "data/coffee_prices.csv"),
+        ("white_noise_data", "data/white_noise_data.csv"),
+        ("trimmed_biomass", "data/trimmed_biomass - generated_biomass_MW_series.csv"),
+        ("monthly_car_sales", "data/monthly-car-sales.csv"),
+        ("uci_air_quality_hourly_co", "data/uci_air_quality_hourly_co.csv"),
+        ("ticket_resolution_hourly_nyc311", "data/ticket_resolution_hourly_nyc311.csv"),
+        ("hyndman_arrivals_quarterly_japan", "data/hyndman_arrivals_quarterly_japan.csv"),
+        ("hyndman_goog_daily_close", "data/hyndman_goog_daily_close.csv"),
+        ("hyndman_hyndsight_daily_pageviews", "data/hyndman_hyndsight_daily_pageviews.csv"),
+        ("hyndman_sunspot_monthly_area", "data/hyndman_sunspot_monthly_area.csv"),
+        ("hyndman_usconsumption_quarterly_consumption", "data/hyndman_usconsumption_quarterly_consumption.csv"),
+    ]
+
+    def _has_component(explained_variance: dict[str, float], component_name: str) -> bool:
+        return float(explained_variance.get(component_name, 0.0)) > 0.0
+
+    rows: list[dict[str, object]] = []
+    for dataset_name, relative_path in dataset_paths:
+        series = load_series_from_csv(project_root / relative_path)
+        api = NotebookThreeStepAPI(series)
+        suitability = api.get_suitability_result()
+        row: dict[str, object] = {
+            "Dataset": dataset_name,
+            "Trend": "—",
+            "Seasonality": "—",
+            "Variance Explained (%)": 0.0,
+            "Noise Variance (%)": 0.0,
+            "Durbin-Watson": "n/a",
+        }
+
+        if not suitability.is_suitable:
+            row["Trend"] = "rejected"
+            row["Seasonality"] = "rejected"
+            rows.append(row)
+            continue
+
+        grouping = api.suggest_grouping_with_window_autotune()
+        if not grouping.grouping:
+            row["Trend"] = "n/a"
+            row["Seasonality"] = "n/a"
+            rows.append(row)
+            continue
+
+        reconstructed = api.get_reconstruction_metadata(auto_suggest_if_missing=False)
+        explained_variance = reconstructed.get("explained_variance_percent", {})
+        if not isinstance(explained_variance, dict):
+            explained_variance = {}
+
+        variance_explained = float(
+            sum(
+                value
+                for name, value in explained_variance.items()
+                if str(name).casefold() != "noise"
+            )
+        )
+        noise_variance = float(explained_variance.get("Noise", 0.0))
+        durbin_watson = reconstructed.get("durbin_watson")
+
+        row["Trend"] = "✓" if _has_component(explained_variance, "Trend") else "—"
+        row["Seasonality"] = "✓" if _has_component(explained_variance, "Seasonality") else "—"
+        row["Variance Explained (%)"] = variance_explained
+        row["Noise Variance (%)"] = noise_variance
+        row["Durbin-Watson"] = float(durbin_watson) if durbin_watson is not None else "n/a"
+        rows.append(row)
+
+    output_file = Path(output_path) if output_path is not None else project_root / "data" / "comprehensive_test" / "comprehensive_dataset_results.md"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    lines = [
+        "# Test dataset report",
+        "",
+        "This report exercises the comprehensive dataset validation workflow implemented in `tests/test_comprehensive_dataset.py`.",
+        "Each built-in time series is loaded, evaluated by `NotebookThreeStepAPI`, and summarized for trend/seasonality presence, variance explained, noise variance, and Durbin-Watson behavior.",
+        "",
+        "## How to run",
+        "",
+        "```bash",
+        "PYTHONPATH=src python -m tseda --generate-test-dataset-report --report-output documents/test_datasets_report.md",
+        "# or, when installed as a console script",
+        "tseda --generate-test-dataset-report --report-output documents/test_datasets_report.md",
+        "```",
+        "",
+        "The command generates a Markdown summary and exits without starting the Dash UI.",
+        "",
+        "## Dataset summary",
+        "",
+        "| Dataset | Trend | Seasonality | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |",
+        "|---|---|---|---:|---:|---:|",
+    ]
+
+    for row in rows:
+        lines.append(
+            "| {dataset} | {trend} | {seasonality} | {variance:.2f} | {noise:.2f} | {dw} |".format(
+                dataset=row["Dataset"],
+                trend=row["Trend"],
+                seasonality=row["Seasonality"],
+                variance=float(row["Variance Explained (%)"]),
+                noise=float(row["Noise Variance (%)"]),
+                dw=row["Durbin-Watson"] if row["Durbin-Watson"] != "n/a" else "n/a",
+            )
+        )
+
+    output_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return output_file
+
+
 class NotebookThreeStepAPI:
     """Notebook-first wrapper exposing the same three-step workflow as the UI.
 

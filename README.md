@@ -30,6 +30,10 @@ Variance decomposition is useful not only to modelers, but also to the teams res
 
 Segmentation shows how often a signal changes behavior and identifies the current operating regime. Decomposition then describes that regime in terms of components such as trend, seasonality, and residual noise. Together, these results give an operations team historical evidence about how frequently changes occur, how much variation is normal, and when a signal has moved into a behavior that deserves investigation.
 
+`tseda` has also been evaluated across a range of real-world and benchmark datasets, and the results are encouraging. The proportion of explained variance differs substantially between signals, which is expected given the diversity of operational data being tested. In clearly structured examples such as coffee prices, the decomposition captures a large share of the signal with a strong trend and/or seasonal component. In noisier or more weakly structured cases, the residual noise makes up a much larger share of the series, and the decomposition correctly reflects that difference. This demonstrates that the method is not blindly forcing structure onto every dataset; instead, it identifies the degree to which a signal is informative and interpretable.
+
+The purpose of this evaluation is to show that the approach works across a range of real datasets and produces useful, stable diagnostics rather than a single tuned result. Across the tested benchmark set, the Durbin-Watson statistic remains within the acceptable 1.5 to 2.5 range, indicating that the residuals do not show strong autocorrelation and that the decomposition remains statistically reasonable. Taken together, these checks suggest that `tseda` performs satisfactorily in real-world operational settings and is well suited to structured exploratory analysis, model development, and monitoring workflows.
+
 For bounded random variables, whose values lie within a known range `[a, b]`, concentration inequalities can provide bounds on unusually large observations within a regime. Support for bounding the maximum value of a signal in this way is an upcoming `tseda` feature. Until then, segmentation and variance decomposition still provide practical inputs for monitoring: they make regime changes, changing component behavior, and the level of background noise visible and reviewable.
 
 ## How is it used?
@@ -84,6 +88,12 @@ For examples of using tseda with the UI, please see the following links:
 - [Car sales example](documents/car_sales_example.md)
 - [Biomass power generation example](documents/biomass_power_gen_example.md)
 - [White noise example](documents/white_noise_example.md)
+
+## Testing
+
+`tseda` has been evaluated across a range of real-world and benchmark datasets, and the results indicate that the workflow performs satisfactorily across heterogeneous time-series conditions. The proportion of explained variance varies considerably between datasets, which is expected when signals differ in their clarity and structure: clearly patterned data such as coffee prices show a strong decomposition, while more irregular or noisy series retain a larger residual component. The objective of this testing is to show that the method works across a range of realistic operating cases and provides actionable diagnostics rather than a single narrowly tuned result.
+
+The Durbin-Watson statistic remains within the healthy 1.5 to 2.5 range across the evaluated datasets, indicating that the residuals do not show strong autocorrelation and that the decomposition remains statistically stable. For the detailed test setup, the generated report, and the full results table, see [documents/test_datasets_report.md](documents/test_datasets_report.md). Interested readers can refer to that document for the exact running instructions and the complete results from the test suite.
 
 ## More information
 
