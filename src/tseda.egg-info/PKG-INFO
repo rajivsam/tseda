@@ -14,12 +14,6 @@ Description-Content-Type: text/markdown
 Requires-Dist: dash>=4.1.0
 Requires-Dist: dash-ag-grid>=31.3.1
 Requires-Dist: dash-bootstrap-components>=2.0.4
-Requires-Dist: google-genai>=1.56.0
-Requires-Dist: importlib-resources>=6.5.2
-Requires-Dist: ipython>=9.8.0
-Requires-Dist: jupyter>=1.1.1
-Requires-Dist: jupyter-ai>=2.31.7
-Requires-Dist: jupyter-dash>=0.4.2
 Requires-Dist: kaggle>=2.0.0
 Requires-Dist: kdepy>=1.1.12
 Requires-Dist: kmds>=0.3.1
@@ -27,17 +21,11 @@ Requires-Dist: matplotlib>=3.10.8
 Requires-Dist: numpy>=2.4.0
 Requires-Dist: pandas>=2.3.3
 Requires-Dist: plotly>=6.5.0
-Requires-Dist: pytest-cov>=7.0.0
 Requires-Dist: python-dotenv>=1.2.1
-Requires-Dist: req>=1.0.0
 Requires-Dist: ruptures>=1.1.10
-Requires-Dist: scikit-learn>=1.8.0
 Requires-Dist: scipy<1.16.0
-Requires-Dist: seaborn>=0.13.2
-Requires-Dist: skrub>=0.7.2
 Requires-Dist: ssalib>=0.1.3
 Requires-Dist: statsmodels>=0.14.6
-Requires-Dist: streamlit>=1.52.2
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0; extra == "dev"
 Requires-Dist: pytest-cov>=7.0.0; extra == "dev"
@@ -73,7 +61,15 @@ The hard part in practice is not a single plot or statistic. It is the sequence 
 
 `tseda` brings those steps together in one workflow.
 
-## How it is used
+## Why it is useful?
+
+Variance decomposition is useful not only to modelers, but also to the teams responsible for monitoring and operating systems. Modelers use the extracted behaviors to decide which patterns a forecasting or anomaly-detection model must represent explicitly. Operations teams can use the same information to define alerts and establish guidelines for what behavior is expected from a signal.
+
+Segmentation shows how often a signal changes behavior and identifies the current operating regime. Decomposition then describes that regime in terms of components such as trend, seasonality, and residual noise. Together, these results give an operations team historical evidence about how frequently changes occur, how much variation is normal, and when a signal has moved into a behavior that deserves investigation.
+
+For bounded random variables, whose values lie within a known range `[a, b]`, concentration inequalities can provide bounds on unusually large observations within a regime. Support for bounding the maximum value of a signal in this way is an upcoming `tseda` feature. Until then, segmentation and variance decomposition still provide practical inputs for monitoring: they make regime changes, changing component behavior, and the level of background noise visible and reviewable.
+
+## How is it used?
 
 `tseda` supports a three-step workflow:
 
@@ -117,9 +113,18 @@ summary = api.generate_observation_text()
 print(summary[:500])
 ```
 
+## UI Example Illustrations
+
+For examples of using tseda with the UI, please see the following links:
+
+- [Coffee prices example](documents/coffee_example.md)
+- [Car sales example](documents/car_sales_example.md)
+- [White noise example](documents/white_noise_example.md)
+
 ## More information
 
 - [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
+- [documents/coffee_example.md](documents/coffee_example.md) — worked coffee-prices example showing the segment-first workflow, preliminary diagnostics, and final-segment adjustment
 - [documents/PRODUCT.md](documents/PRODUCT.md) — product and user-value context
 - [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md) — system architecture
 - [docs/tutorial.md](docs/tutorial.md) — guided walkthroughs

@@ -82,12 +82,15 @@ For examples of using tseda with the UI, please see the following links:
 
 - [Coffee prices example](documents/coffee_example.md)
 - [Car sales example](documents/car_sales_example.md)
+- [Biomass power generation example](documents/biomass_power_gen_example,md)
 - [White noise example](documents/white_noise_example.md)
 
 ## More information
 
 - [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
 - [documents/coffee_example.md](documents/coffee_example.md) — worked coffee-prices example showing the segment-first workflow, preliminary diagnostics, and final-segment adjustment
+- [documents/car_sales_example.md](documents/car_sales_example.md) — trend-cycle example with evolving operating behavior and no fixed seasonal rhythm
+- [documents/biomass_power_gen_example,md](documents/biomass_power_gen_example,md) — renewable generation example highlighting non-seasonal trend-driven change
 - [documents/PRODUCT.md](documents/PRODUCT.md) — product and user-value context
 - [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md) — system architecture
 - [docs/tutorial.md](docs/tutorial.md) — guided walkthroughs

@@ -1,6 +1,13 @@
 """Streamlit knowledge-management capture UI for KMDS ontology workflows."""
 
-import streamlit as st
+try:
+    import streamlit as st
+except ImportError as exc:  # pragma: no cover - optional legacy module
+    raise RuntimeError(
+        "The legacy Streamlit KMDS capture module is unavailable because Streamlit is not installed. "
+        "Use the Dash-based tseda workflow instead."
+    ) from exc
+
 from enum import Enum
 
 import kmds

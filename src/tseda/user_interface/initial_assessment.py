@@ -1,6 +1,13 @@
 """Streamlit page for the initial time-series screening step."""
 
-import streamlit as st
+try:
+    import streamlit as st
+except ImportError as exc:  # pragma: no cover - optional legacy module
+    raise RuntimeError(
+        "The legacy Streamlit initial-assessment module is unavailable because Streamlit is not installed. "
+        "Use the Dash-based tseda workflow instead."
+    ) from exc
+
 import pandas as pd
 
 st.title("Initial Screening", anchor="initial-screening")

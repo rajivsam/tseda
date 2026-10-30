@@ -88,6 +88,8 @@ Yes. A worked example of the full workflow is available in [documents/coffee_exa
 
 A complementary example is [documents/car_sales_example.md](documents/car_sales_example.md). It focuses on a monthly car sales series that displays clear cyclical movement without a fixed seasonal rhythm, which makes it a useful case for understanding trend-cycle behavior and how `tseda` validates the decomposition when the signal is not dominated by a regular seasonal component.
 
+A further example is [documents/biomass_power_gen_example,md](documents/biomass_power_gen_example,md). It examines biomass power generation from the European electricity dataset and shows how a signal can be dominated by evolving trend behavior rather than stable seasonality. This is a useful case for analysts working with renewable-generation data, where structural change and regime shifts can be more informative than a recurring seasonal cycle.
+
 The [white-noise example](documents/white_noise_example.md) illustrates the complementary case: when the eigenspectrum is diffuse and the variance is spread broadly across the spectrum, SSA is not the right tool for the signal. In this situation, `tseda` warns the user that the decomposition is not suitable and recommends switching to a stochastic/noise-based model such as a random-walk/Brownian-motion style approach or an ARIMA/SARIMA workflow.
 
 
