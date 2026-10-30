@@ -4,6 +4,12 @@ Overview
 ``tseda`` is designed for fast exploratory analysis of regularly sampled time series
 (hourly or lower cadence) with Singular Spectrum Analysis (SSA).
 
+The current design emphasizes a segment-first workflow: the full series remains in
+view as context, while the selected segment becomes the active analytic target for
+component grouping, reconstruction, and residual diagnostics. This keeps the
+analysis grounded in the regime the analyst actually wants to study and reduces the
+risk of mixing distinct operating states into one decomposition.
+
 Why SSA-first time series analysis
 ----------------------------------
 

@@ -53,7 +53,7 @@ Use the repository docs as primary context before editing code. For feature work
 
 ## Documentation task status
 
-Current status: README rewrite work is in progress, with the model-validation and observation-logging section now drafted.
+Current status: README rewrite work is in progress, and a separate enterprise-readiness backlog is now tracked in [to_do.md](/home/rajiv/programming/tseda/to_do.md).
 
 - A rewrite brief was created at [README_rewrite_points.md](/home/rajiv/programming/tseda/README_rewrite_points.md) and used to shape the documentation direction.
 - The project introduction language was refined, including a clearer framing for the "About tseda" narrative.
@@ -63,4 +63,5 @@ Current status: README rewrite work is in progress, with the model-validation an
   - the need to preserve analytical decisions for reproducibility,
   - and the value of KMDS for natural-language review and historical retrieval.
 - The next iteration should continue from this draft and turn the rewrite brief into a clean README-style narrative, with emphasis on: what tseda does, why it matters, who it is for, quick-start usage, and the three-step workflow.
-- This file is ready for the next session to resume from the agreed documentation direction.
+- The repo now has a broader enterprise-readiness backlog to maintain in [to_do.md](/home/rajiv/programming/tseda/to_do.md), covering release/versioning, dependency security, governance, deployment documentation, onboarding, and documentation maturity.
+- This file is ready for the next session to resume from the agreed documentation direction while keeping the repo's maturity work tracked separately.

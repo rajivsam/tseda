@@ -1,12 +1,22 @@
 # tseda
 
-<p align="center">
+<div align="center">
   <img src="assets/images/tseda_logo.png" alt="tseda logo" width="820">
+</div>
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.12%2B-3776AB.svg">
+  <img alt="License" src="https://img.shields.io/badge/License-MIT-green.svg">
+  <img alt="Status" src="https://img.shields.io/badge/Status-Active-success.svg">
 </p>
+
+---
 
 `tseda` is a Python package for analyst-guided time-series decomposition, diagnostics, and signal validation.
 
 It helps analysts work with regularly sampled operational data by turning raw measurement streams into interpretable components such as trend, seasonality, and noise, while making the underlying analysis steps explicit, repeatable, and reviewable.
+
+Built for enterprise analytics, monitoring, and model-development workflows, `tseda` gives teams a practical way to separate signal from noise and make those decisions auditable.
 
 For the fuller product story, design rationale, and detailed explanation of the workflow, see [about_tseda.md](about_tseda.md).
 
@@ -24,7 +34,7 @@ The hard part in practice is not a single plot or statistic. It is the sequence 
 
 `tseda` brings those steps together in one workflow.
 
-## Why it is useful?
+## Why it matters
 
 Variance decomposition is useful not only to modelers, but also to the teams responsible for monitoring and operating systems. Modelers use the extracted behaviors to decide which patterns a forecasting or anomaly-detection model must represent explicitly. Operations teams can use the same information to define alerts and establish guidelines for what behavior is expected from a signal.
 
@@ -91,9 +101,9 @@ For examples of using tseda with the UI, please see the following links:
 
 ## Testing
 
-`tseda` has been evaluated across a range of real-world and benchmark datasets, and the results indicate that the workflow performs satisfactorily across heterogeneous time-series conditions. The proportion of explained variance varies considerably between datasets, which is expected when signals differ in their clarity and structure: clearly patterned data such as coffee prices show a strong decomposition, while more irregular or noisy series retain a larger residual component. The objective of this testing is to show that the method works across a range of realistic operating cases and provides actionable diagnostics rather than a single narrowly tuned result.
+`tseda` has been evaluated across a range of real-world and benchmark datasets, and the results indicate that the workflow performs reliably across heterogeneous time-series conditions. The proportion of explained variance varies considerably between datasets, which is expected when signals differ in clarity and structure: clearly patterned data such as coffee prices show a strong decomposition, while more irregular or noisy series retain a larger residual component. The objective of this testing is to demonstrate that the method works across realistic operating cases and produces actionable diagnostics rather than a single narrow, tuned outcome.
 
-The Durbin-Watson statistic remains within the healthy 1.5 to 2.5 range across the evaluated datasets, indicating that the residuals do not show strong autocorrelation and that the decomposition remains statistically stable. For the detailed test setup, the generated report, and the full results table, see [documents/test_datasets_report.md](documents/test_datasets_report.md). Interested readers can refer to that document for the exact running instructions and the complete results from the test suite.
+The Durbin-Watson statistic remains within the healthy 1.5 to 2.5 range across the evaluated datasets, indicating that the residuals do not show strong autocorrelation and that the decomposition remains statistically stable. For the detailed test setup, generated report, and full results table, see [documents/test_datasets_report.md](documents/test_datasets_report.md). Interested readers can refer to that document for the exact running instructions and the complete test outcomes.
 
 ## More information
 

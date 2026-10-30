@@ -2,6 +2,8 @@
 
 `tseda` is structured as a modular Python package with separate layers for data ingestion, SSA decomposition, diagnostics, notebook/API interfaces, and visualization.
 
+The current implementation follows a segment-first analysis design: the full time series remains available as contextual context in the exploratory plots, while the selected segment becomes the active analytical target for decomposition, ACF/PACF diagnostics, and summary reporting. This keeps the workflow aligned with the actual modeling question—understanding the current regime rather than mixing multiple operating states into a single decomposition.
+
 ## Core layers
 
 - `src/tseda/dataloader`: Data loading helpers for example datasets, Kaggle-style imports, and local CSV files.
