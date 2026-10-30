@@ -35,10 +35,15 @@ def parse_uploaded_series(contents: str | None, filename: str, max_file_lines: i
     _, content_string = contents.split(",", 1)
     decoded = base64.b64decode(content_string)
 
+    def _read_source_csv() -> pd.DataFrame:
+        with pd.option_context("mode.string_storage", "python"):
+            return pd.read_csv(io.StringIO(decoded.decode("utf-8-sig")))
+
     if filename.lower().endswith(".csv"):
-        df = pd.read_csv(io.StringIO(decoded.decode("utf-8-sig")))
+        df = _read_source_csv()
     elif filename.lower().endswith((".xls", ".xlsx")):
-        df = pd.read_excel(io.BytesIO(decoded))
+        with pd.option_context("mode.string_storage", "python"):
+            df = pd.read_excel(io.BytesIO(decoded))
     else:
         raise ValueError("Unsupported file format. Please upload a CSV or Excel file.")
 

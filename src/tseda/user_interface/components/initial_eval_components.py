@@ -5,8 +5,8 @@ from dash import Dash, html, dcc
 from dash_ag_grid import AgGrid
 import pandas as pd
 import numpy as np
-import plotly.figure_factory as ff
 import plotly.graph_objects as go
+from scipy.stats import gaussian_kde
 from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from tseda.decomposition.ssa_decomposition import SSADecomposition
@@ -67,7 +67,7 @@ def create_kde_plot(series: pd.Series, show_kde: bool = True, bin_count: int | N
     if clean_series.empty:
         raise ValueError('Series contains no numeric values for KDE/histogram plotting.')
 
-    values = clean_series.values
+    values = clean_series.values.astype(float)
     if bin_count is None or bin_count <= 0:
         q75, q25 = np.percentile(values, [75, 25])
         iqr = q75 - q25
@@ -76,19 +76,35 @@ def create_kde_plot(series: pd.Series, show_kde: bool = True, bin_count: int | N
         bin_width = 2 * iqr * np.power(len(values), -1/3)
         if bin_width <= 0:
             bin_width = np.ptp(values) / 10 if np.ptp(values) > 0 else 1.0
-        bin_size = float(bin_width)
+        bin_count = max(1, int(np.ceil(np.ptp(values) / bin_width))) if np.ptp(values) > 0 else 10
     else:
-        data_range = np.ptp(values)
-        bin_size = float(data_range / bin_count) if data_range > 0 else 1.0
+        bin_count = max(1, int(bin_count))
 
-    fig = ff.create_distplot(
-        [values],
-        ['Value'],
-        show_hist=True,
-        show_rug=False,
-        show_curve=show_kde,
-        bin_size=bin_size
+    fig = go.Figure()
+    fig.add_trace(
+        go.Histogram(
+            x=values,
+            nbinsx=bin_count,
+            histnorm='probability density',
+            name='Value',
+            marker_color='#7aa2f7',
+            opacity=0.7,
+        )
     )
+
+    if show_kde:
+        x_grid = np.linspace(float(values.min()), float(values.max()), 400)
+        kde = gaussian_kde(values)
+        fig.add_trace(
+            go.Scatter(
+                x=x_grid,
+                y=kde(x_grid),
+                mode='lines',
+                name='KDE',
+                line=dict(color='#0f4c81', width=2),
+            )
+        )
+
     fig.update_layout(
         title={"text": "Value Distribution with KDE", "x": 0.5, "xanchor": "center"},
         template="plotly_white",

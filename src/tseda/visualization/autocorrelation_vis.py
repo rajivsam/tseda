@@ -34,8 +34,10 @@ class ACFPlotter:
         plt.grid(True)
         plt.title("PACF Plot")
         pacf_values, conf_int = sm.tsa.stattools.pacf(self._df["signal"], alpha=0.05)
-        self._pacf_df["pacf"] = pacf_values
-        self._pacf_df["CI"] = conf_int
+        self._pacf_df = pd.DataFrame({
+            "pacf": pacf_values,
+            "CI": [tuple(bounds) for bounds in conf_int],
+        })
 
         return plt
     

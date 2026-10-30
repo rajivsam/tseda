@@ -51,6 +51,8 @@ htmlcov/
 rajiv_github_key
 rajiv_github_key.pub
 *.pdf
+app_output.log
+=*
 
 # Prompt-related files
 prompts/
