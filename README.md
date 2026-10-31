@@ -20,6 +20,8 @@ Built for enterprise analytics, monitoring, and model-development workflows, `ts
 
 For the fuller product story, design rationale, and detailed explanation of the workflow, see [about_tseda.md](about_tseda.md).
 
+`tseda` is designed to help analysts move from raw time-series data to a defensible decomposition quickly, without sacrificing transparency. It supports both exploratory analysis and deeper model-development work by surfacing the variance structure of a signal, highlighting regime changes, and making the analytical choices visible enough to revisit and refine.
+
 ## What it helps with
 
 - understanding whether a signal has meaningful structure,
@@ -33,6 +35,12 @@ For the fuller product story, design rationale, and detailed explanation of the 
 The hard part in practice is not a single plot or statistic. It is the sequence of choices needed (and this is not a few; see [about_tseda.md](about_tseda.md) for the details) to get from raw data to a defensible decomposition: selecting a sensible window, identifying regime boundaries, choosing groups of components, checking whether the result is structurally meaningful, and documenting the reasoning for later reuse.
 
 `tseda` brings those steps together in one workflow.
+
+### Key considerations
+
+- `tseda` is an **exploratory** tool. Its goal is to provide a quick baseline for understanding a dataset's variance components and overall characteristics. It gives analysts a starting point for deeper tuning and refinement, and for modelers it provides a clear picture of the variance structure already present in the signal. That context can help prime a model-building pipeline. In many situations, such as quick checks of operating conditions or a first-pass read on a series, this initial analysis is already sufficient.
+- The window size and other analysis parameters can be manually set by the expert user in the UI. All algorithmic parameters are configurable, and by inspecting the repository you can understand the specific methods used in the software and tune them for your context.
+- There is **full notebook parity**: expert users can investigate finer-grained analytical nuances directly in a notebook.
 
 ## Why it matters
 
