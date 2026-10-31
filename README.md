@@ -12,15 +12,11 @@
 
 ---
 
-`tseda` is a Python package for analyst-guided time-series decomposition, diagnostics, and signal validation.
-
-It helps analysts work with regularly sampled operational data by turning raw measurement streams into interpretable components such as trend, seasonality, and noise, while making the underlying analysis steps explicit, repeatable, and reviewable.
-
-Built for enterprise analytics, monitoring, and model-development workflows, `tseda` gives teams a practical way to separate signal from noise and make those decisions auditable.
+`tseda` is a Python package for analyst-guided time-series decomposition, diagnostics, and signal validation. It helps analysts turn regularly sampled operational data into interpretable components such as trend, seasonality, and noise while keeping the analysis explicit, repeatable, reviewable, and auditable.
 
 For the fuller product story, design rationale, and detailed explanation of the workflow, see [about_tseda.md](about_tseda.md).
 
-`tseda` is designed to help analysts move from raw time-series data to a defensible decomposition quickly, without sacrificing transparency. It supports both exploratory analysis and deeper model-development work by surfacing the variance structure of a signal, highlighting regime changes, and making the analytical choices visible enough to revisit and refine.
+`tseda` helps analysts move from raw data to a defensible decomposition without sacrificing transparency. It supports exploratory analysis and model development by surfacing a signal's variance structure, highlighting regime changes, and making analytical choices easy to revisit and refine.
 
 ## What it helps with
 
@@ -32,13 +28,13 @@ For the fuller product story, design rationale, and detailed explanation of the 
 
 ## Why it exists
 
-The hard part in practice is not a single plot or statistic. It is the sequence of choices needed (and this is not a few; see [about_tseda.md](about_tseda.md) for the details) to get from raw data to a defensible decomposition: selecting a sensible window, identifying regime boundaries, choosing groups of components, checking whether the result is structurally meaningful, and documenting the reasoning for later reuse.
+The hard part is not a single plot or statistic, but the sequence of choices needed to reach a defensible decomposition: selecting a sensible window, identifying regime boundaries, choosing component groups, checking whether the result is structurally meaningful, and documenting the reasoning for later reuse. See [about_tseda.md](about_tseda.md) for details.
 
 `tseda` brings those steps together in one workflow.
 
 ### Key considerations
 
-- `tseda` is an **exploratory** tool. Its goal is to provide a quick baseline for understanding a dataset's variance components and overall characteristics. It gives analysts a starting point for deeper tuning and refinement, and for modelers it provides a clear picture of the variance structure already present in the signal. That context can help prime a model-building pipeline. In many situations, such as quick checks of operating conditions or a first-pass read on a series, this initial analysis is already sufficient.
+- `tseda` is an **exploratory** tool that provides a quick baseline for understanding a dataset's variance components and overall characteristics. It gives analysts a starting point for deeper tuning and refinement, helps modelers understand the variance structure before building a pipeline, and may be sufficient for quick operating-condition checks or a first-pass read of a series.
 - The window size and other analysis parameters can be manually set by the expert user in the UI. All algorithmic parameters are configurable, and by inspecting the repository you can understand the specific methods used in the software and tune them for your context.
 - There is **full notebook parity**: expert users can investigate finer-grained analytical nuances directly in a notebook.
 
@@ -48,9 +44,9 @@ Variance decomposition is useful not only to modelers, but also to the teams res
 
 Segmentation shows how often a signal changes behavior and identifies the current operating regime. Decomposition then describes that regime in terms of components such as trend, seasonality, and residual noise. Together, these results give an operations team historical evidence about how frequently changes occur, how much variation is normal, and when a signal has moved into a behavior that deserves investigation.
 
-`tseda` has also been evaluated across a range of real-world and benchmark datasets, and the results are encouraging. The proportion of explained variance differs substantially between signals, which is expected given the diversity of operational data being tested. In clearly structured examples such as coffee prices, the decomposition captures a large share of the signal with a strong trend and/or seasonal component. In noisier or more weakly structured cases, the residual noise makes up a much larger share of the series, and the decomposition correctly reflects that difference. This demonstrates that the method is not blindly forcing structure onto every dataset; instead, it identifies the degree to which a signal is informative and interpretable.
+Evaluation across real-world and benchmark datasets shows that explained variance differs substantially by signal, as expected from the diversity of operational data. Structured examples such as coffee prices capture a large share of the signal through trend and/or seasonality, while noisier or weakly structured series retain more residual noise. The method therefore reflects how informative and interpretable a signal is rather than forcing structure onto every dataset.
 
-The purpose of this evaluation is to show that the approach works across a range of real datasets and produces useful, stable diagnostics rather than a single tuned result. Across the tested benchmark set, the Durbin-Watson statistic remains within the acceptable 1.5 to 2.5 range, indicating that the residuals do not show strong autocorrelation and that the decomposition remains statistically reasonable. Taken together, these checks suggest that `tseda` performs satisfactorily in real-world operational settings and is well suited to structured exploratory analysis, model development, and monitoring workflows.
+The evaluation is intended to show that the approach produces useful, stable diagnostics across real datasets rather than a single tuned result. Across the tested benchmark set, the Durbin-Watson statistic remains within the acceptable 1.5 to 2.5 range, indicating limited residual autocorrelation and a statistically reasonable decomposition. These results suggest that `tseda` is suitable for structured exploratory analysis, model development, and monitoring workflows.
 
 For bounded random variables, whose values lie within a known range `[a, b]`, concentration inequalities can provide bounds on unusually large observations within a regime. Support for bounding the maximum value of a signal in this way is an upcoming `tseda` feature. Until then, segmentation and variance decomposition still provide practical inputs for monitoring: they make regime changes, changing component behavior, and the level of background noise visible and reviewable.
 
@@ -63,6 +59,20 @@ For bounded random variables, whose values lie within a known range `[a, b]`, co
 3. validation and observation logging.
 
 The package is designed to work both in a browser-based UI and in Python notebooks, with the same core workflow exposed in both environments.
+
+### From raw series to reviewable analysis
+
+A typical analysis moves from identifying meaningful segments, through decomposition and
+grouping, to validation and recorded observations. The same workflow can be explored in
+the UI or reproduced through the notebook API.
+
+<p align="center">
+  <img src="assets/images/tseda_workflow_walkthrough.png" alt="Three-step tseda workflow showing signal assessment, decomposition and grouping, and validation with observation logging" width="900">
+</p>
+
+This progression makes the analytical decisions visible: first define the regime being
+studied, then identify its components, and finally check whether the result is
+statistically reasonable and worth preserving.
 
 ## Installation
 
@@ -109,9 +119,7 @@ For examples of using tseda with the UI, please see the following links:
 
 ## Testing
 
-`tseda` has been evaluated across a range of real-world and benchmark datasets, and the results indicate that the workflow performs reliably across heterogeneous time-series conditions. The proportion of explained variance varies considerably between datasets, which is expected when signals differ in clarity and structure: clearly patterned data such as coffee prices show a strong decomposition, while more irregular or noisy series retain a larger residual component. The objective of this testing is to demonstrate that the method works across realistic operating cases and produces actionable diagnostics rather than a single narrow, tuned outcome.
-
-The Durbin-Watson statistic remains within the healthy 1.5 to 2.5 range across the evaluated datasets, indicating that the residuals do not show strong autocorrelation and that the decomposition remains statistically stable. For the detailed test setup, generated report, and full results table, see [documents/test_datasets_report.md](documents/test_datasets_report.md). Interested readers can refer to that document for the exact running instructions and the complete test outcomes.
+Testing covers heterogeneous real-world and benchmark conditions to verify that the workflow produces actionable diagnostics rather than a single narrow, tuned outcome. As described above, clearly patterned data such as coffee prices show stronger decomposition, while irregular or noisy series retain more residual variation. The Durbin-Watson statistic remains within the healthy 1.5 to 2.5 range across the evaluated datasets, indicating limited residual autocorrelation and statistically stable results. For the detailed test setup, generated report, full results table, exact running instructions, and complete outcomes, see [documents/test_datasets_report.md](documents/test_datasets_report.md).
 
 ## More information
 
