@@ -24,6 +24,7 @@ from tseda.series_stats.summary_statistics import SummaryStatistics
 from tseda.segmentation.pelt_segmentation import (
     build_adjusted_analysis_segment,
     get_short_segment_confirmation_message,
+    infer_cadence_from_series,
     resolve_minimum_segment_points,
     select_pelt_model,
 )
@@ -55,6 +56,49 @@ EXAMPLE_DATASETS: dict[str, str] = {
     "uci_air_quality_hourly_co": "data/uci_air_quality_hourly_co.csv",
     "ticket_resolution_hourly_nyc311": "data/ticket_resolution_hourly_nyc311.csv",
 }
+
+
+def _compute_ui_segment_boundaries(total_points: int, segment_count: int) -> list[tuple[int, int]]:
+    """Mirror the UI boundary selection logic for the selected analysis segment."""
+    if total_points <= 0:
+        return []
+
+    cap = max(1, int(segment_count))
+    cap = min(cap, 5)
+    if cap <= 1:
+        return [(0, total_points)]
+
+    boundaries: list[tuple[int, int]] = []
+    for idx in range(cap):
+        start = idx * (total_points // cap)
+        end = total_points if idx == cap - 1 else (idx + 1) * (total_points // cap)
+        boundaries.append((start, end))
+    return boundaries
+
+
+def _resolve_ui_analysis_segment(series: pd.Series) -> pd.Series:
+    """Return the same final-regime segment the UI analyzes for decomposition."""
+    cadence = infer_cadence_from_series(series)
+    min_points = resolve_minimum_segment_points(cadence=cadence)
+    segment_count = max(1, min(5, len(series) // max(1, min_points)))
+    boundaries = _compute_ui_segment_boundaries(len(series), segment_count)
+    if not boundaries:
+        return series
+
+    last_index = len(boundaries) - 1
+    selected_start, selected_end = boundaries[last_index]
+    adjustment = build_adjusted_analysis_segment(
+        series.to_numpy(),
+        segments=boundaries,
+        min_points=min_points,
+        half_life=float(ConfigurationManager.get("segmentation.final_segment_half_life", 30.0)),
+        threshold=float(ConfigurationManager.get("segmentation.final_segment_weight_threshold", 0.95)),
+        cadence=cadence,
+    )
+    if adjustment.get("is_adjusted") and last_index == len(boundaries) - 1:
+        selected_start, selected_end = adjustment["selected_segment"]
+
+    return series.iloc[selected_start:selected_end]
 
 
 @dataclass(slots=True)
@@ -236,7 +280,8 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
     rows: list[dict[str, object]] = []
     for dataset_name, relative_path in dataset_paths:
         series = load_series_from_csv(project_root / relative_path)
-        api = NotebookThreeStepAPI(series)
+        analysis_series = _resolve_ui_analysis_segment(series)
+        api = NotebookThreeStepAPI(analysis_series)
         suitability = api.get_suitability_result()
         row: dict[str, object] = {
             "Dataset": dataset_name,
@@ -308,6 +353,8 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
     ]
 
     for row in rows:
+        dw_value = row["Durbin-Watson"]
+        formatted_dw = f"{float(dw_value):.2f}" if dw_value != "n/a" and dw_value is not None else "n/a"
         lines.append(
             "| {dataset} | {trend} | {seasonality} | {variance:.2f} | {noise:.2f} | {dw} |".format(
                 dataset=row["Dataset"],
@@ -315,7 +362,7 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
                 seasonality=row["Seasonality"],
                 variance=float(row["Variance Explained (%)"]),
                 noise=float(row["Noise Variance (%)"]),
-                dw=row["Durbin-Watson"] if row["Durbin-Watson"] != "n/a" else "n/a",
+                dw=formatted_dw,
             )
         )
 

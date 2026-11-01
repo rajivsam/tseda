@@ -1,9 +1,16 @@
 import os
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
+from tseda.config.config_loader import ConfigurationManager
 from tseda.notebook_api import NotebookThreeStepAPI, generate_test_dataset_report, load_series_from_csv
+from tseda.segmentation.pelt_segmentation import (
+    build_adjusted_analysis_segment,
+    infer_cadence_from_series,
+    resolve_minimum_segment_points,
+)
 
 DATASETS = [
     ("coffee_prices", "data/coffee_prices.csv"),
@@ -18,6 +25,51 @@ DATASETS = [
     ("hyndman_sunspot_monthly_area", "data/hyndman_sunspot_monthly_area.csv"),
     ("hyndman_usconsumption_quarterly_consumption", "data/hyndman_usconsumption_quarterly_consumption.csv"),
 ]
+
+
+def _compute_ui_segment_boundaries(total_points: int, segment_count: int) -> list[tuple[int, int]]:
+    """Mirror the UI's boundary logic for the selected analysis segment."""
+    if total_points <= 0:
+        return []
+
+    cap = max(1, int(segment_count))
+    cap = min(cap, 5)
+    if cap <= 1:
+        return [(0, total_points)]
+
+    boundaries = []
+    for idx in range(cap):
+        start = idx * (total_points // cap)
+        end = total_points if idx == cap - 1 else (idx + 1) * (total_points // cap)
+        boundaries.append((start, end))
+    return boundaries
+
+
+def _resolve_ui_analysis_segment(series: pd.Series) -> pd.Series:
+    """Return the same final-regime segment that the UI uses for decomposition."""
+    cadence = infer_cadence_from_series(series)
+    min_points = resolve_minimum_segment_points(cadence=cadence)
+    segment_count = max(1, min(5, len(series) // max(1, min_points)))
+    boundaries = _compute_ui_segment_boundaries(len(series), segment_count)
+    if not boundaries:
+        return series
+
+    last_index = len(boundaries) - 1
+    selected_start, selected_end = boundaries[last_index]
+    half_life = float(ConfigurationManager.get("segmentation.final_segment_half_life", 30.0))
+    threshold = float(ConfigurationManager.get("segmentation.final_segment_weight_threshold", 0.95))
+    adjustment = build_adjusted_analysis_segment(
+        series.to_numpy(),
+        segments=boundaries,
+        min_points=min_points,
+        half_life=half_life,
+        threshold=threshold,
+        cadence=cadence,
+    )
+    if adjustment.get("is_adjusted") and last_index == len(boundaries) - 1:
+        selected_start, selected_end = adjustment["selected_segment"]
+
+    return series.iloc[selected_start:selected_end]
 
 
 def _has_component(explained_variance: dict[str, float], component_name: str) -> bool:
@@ -44,12 +96,13 @@ def test_comprehensive_dataset_test(tmp_path: Path):
         series = load_series_from_csv(dataset_path)
         assert not series.empty, f"Dataset {name} produced an empty time series."
 
-        api = NotebookThreeStepAPI(series)
+        analysis_series = _resolve_ui_analysis_segment(series)
+        api = NotebookThreeStepAPI(analysis_series)
         suitability = api.get_suitability_result()
 
         result: dict[str, object] = {
             "dataset": name,
-            "samples": len(series),
+            "samples": len(analysis_series),
             "window": api.get_window(),
             "suitability_passed": suitability.is_suitable,
             "top_k_ratio": suitability.top_k_ratio,
@@ -103,7 +156,7 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                         "noise_explained": 0.0,
                         "durbin_watson": None,
                         "change_points": "none",
-                        "component_rows": len(series),
+                    "component_rows": len(analysis_series),
                     }
                 )
         else:
@@ -115,10 +168,9 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                     "noise_explained": 0.0,
                     "durbin_watson": None,
                     "change_points": "rejected",
-                    "component_rows": len(series),
+                    "component_rows": len(analysis_series),
                 }
             )
-
         results.append(result)
 
     assert len(results) == len(DATASETS)

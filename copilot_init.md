@@ -1,30 +1,32 @@
 # tseda Copilot Initialization
 
-This repository implements `tseda`, a Python package for automated time series decomposition, diagnostics, and signal validation. It combines a notebook-oriented API with an interactive Dash UI and configuration-driven heuristics.
+This repository implements `tseda`, a Python package for analyst-guided time series decomposition, diagnostics, and signal validation. It combines a notebook API, a Dash UI, and configuration-driven heuristics for segment-aware analysis.
 
 ## Project context
 
-- Product overview: `README.md`
-- Product value and user outcomes: `documents/PRODUCT.md`
-- Architecture and module responsibilities: `documents/ARCHITECTURE.md`
-- Contributor workflow and testing expectations: `documents/CONTRIBUTING.md`
-- Default repo guidance for AI agents: `.github/copilot-instructions.md`
+Use these files as the primary sources of project context before making changes:
+
+- [README.md](README.md) — package overview, installation, and quick-start usage
+- [documents/PRODUCT.md](documents/PRODUCT.md) — product goals and value proposition
+- [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md) — system architecture and design principles
+- [documents/CONTRIBUTING.md](documents/CONTRIBUTING.md) — contributor workflow and expectations
+- [.github/copilot-instructions.md](.github/copilot-instructions.md) — repo-specific AI guidance
 
 ## Working conventions
 
-- Prefer `PYTHONPATH=src` when running tests or importing `tseda` from the repo.
-- Keep changes inside the repository root unless the user explicitly asks otherwise.
-- Follow the package layout in `src/tseda` instead of introducing ad hoc module structures.
-- Add or update unit tests under `tests/` whenever modifying behavior.
-- Treat configuration thresholds in `src/tseda/config/tseda_config.yaml` as the source of tunable algorithm behavior.
+- Run Python commands with `PYTHONPATH=src` when working from the repo root.
+- Keep edits within the repository root unless the user explicitly requests otherwise.
+- Follow the existing `src/tseda` package layout instead of creating ad hoc modules.
+- Add or update tests under [tests/](tests/) when behavior changes.
+- Treat threshold and heuristic settings in [src/tseda/config/tseda_config.yaml](src/tseda/config/tseda_config.yaml) as the configuration source of truth.
 
-## Package shape
+## Package map
 
-- Main package: `src/tseda/`
-- Notebook workflow API: `src/tseda/notebook_api.py`
-- UI entrypoint: `src/tseda/user_interface/ts_analyze_ui.py`
-- Tests: `tests/`
-- Documentation: `docs/` and `documents/`
+- Main package: [src/tseda/](src/tseda/)
+- Notebook workflow: [src/tseda/notebook_api.py](src/tseda/notebook_api.py)
+- UI entrypoint: [src/tseda/user_interface/ts_analyze_ui.py](src/tseda/user_interface/ts_analyze_ui.py)
+- Documentation: [docs/](docs/) and [documents/](documents/)
+- Tests: [tests/](tests/)
 
 ## Typical validation commands
 
@@ -32,7 +34,7 @@ This repository implements `tseda`, a Python package for automated time series d
 PYTHONPATH=src pytest -q
 ```
 
-For more targeted checks:
+For narrower validation:
 
 ```bash
 PYTHONPATH=src pytest tests/test_notebook_api.py -q
@@ -41,27 +43,18 @@ PYTHONPATH=src pytest tests/test_ssa_decomposition.py -q
 
 ## Design principles
 
-- UI and notebook parity: features in the dashboard should also be available to Python users.
-- Configuration-first behavior: heuristics and thresholds live in YAML, not hard-coded.
-- Explicit decomposition controls: window size and grouping remain first-class inputs.
-- Separation of business logic from UI wiring.
-- Test-driven implementation for new functionality.
+- UI and notebook parity: features should be available in both the Dash UI and Python API.
+- Configuration-first behavior: heuristic thresholds live in YAML, not hard-coded.
+- Segment-aware analysis: the selected regime is the analytical target while the full series remains context.
+- Separation of concerns: UI wiring stays separate from decomposition and diagnostics logic.
+- Test-backed change requests: prefer small, validated updates aligned with existing architecture.
 
 ## Implementation guidance
 
-Use the repository docs as primary context before editing code. For feature work, prefer a small, test-backed change that follows existing module boundaries and architecture.
+Use the repository docs as the primary context before editing code. Prefer a minimal, test-backed change that follows the package's existing interface and modular boundaries.
 
-## Documentation task status
+## Ready status
 
-Current status: README rewrite work is in progress, and a separate enterprise-readiness backlog is now tracked in [to_do.md](/home/rajiv/programming/tseda/to_do.md).
+This initialization file is ready for the next session. The repo is prepared to continue work in a focused, repo-aware manner.
 
-- A rewrite brief was created at [README_rewrite_points.md](/home/rajiv/programming/tseda/README_rewrite_points.md) and used to shape the documentation direction.
-- The project introduction language was refined, including a clearer framing for the "About tseda" narrative.
-- The workflow section now includes a dedicated Model Validation and Observation Logging subsection emphasizing:
-  - AIC/BIC-based validation of decomposition choices,
-  - the effect of window selection on model fit and complexity,
-  - the need to preserve analytical decisions for reproducibility,
-  - and the value of KMDS for natural-language review and historical retrieval.
-- The next iteration should continue from this draft and turn the rewrite brief into a clean README-style narrative, with emphasis on: what tseda does, why it matters, who it is for, quick-start usage, and the three-step workflow.
-- The repo now has a broader enterprise-readiness backlog to maintain in [to_do.md](/home/rajiv/programming/tseda/to_do.md), covering release/versioning, dependency security, governance, deployment documentation, onboarding, and documentation maturity.
-- This file is ready for the next session to resume from the agreed documentation direction while keeping the repo's maturity work tracked separately.
+Status: standing by.
