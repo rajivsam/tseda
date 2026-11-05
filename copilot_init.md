@@ -4,6 +4,8 @@ This repository implements `tseda`, a Python package for analyst-guided time ser
 
 ## Project context
 
+A useful framing for the repo is that `tseda` is an aid for the cold-start problem in time-series analysis: when an analyst is faced with a new or unfamiliar series, the first challenge is deciding where to begin, which regime to inspect, what window to use, and which components are trustworthy enough to build upon. `tseda` helps reduce that startup burden by guiding the analyst through a structured decomposition workflow.
+
 Use these files as the primary sources of project context before making changes:
 
 - [README.md](README.md) — package overview, installation, and quick-start usage
