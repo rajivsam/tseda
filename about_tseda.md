@@ -61,6 +61,8 @@ In SSA, the window length is the key structural choice. It determines how many c
 
 Interested readers can refer to the [window selection algorithm document](window_selection_algorithm.md) for a more detailed explanation of the heuristic used to choose and refine the window.
 
+Once a window size is selected and an eigen decomposition is obtained, we need to group these components. `tseda` groups the extracted SSA components into three interpretable families: Trend/Trend-cycle, Seasonal, and Noise. A seasonal component is a recurring, mathematically regular signal that repeats at a characteristic time span; in the eigen-spectrum it often appears as a paired set of eigenvalues of similar magnitude, reflecting the paired structure of the underlying seasonal oscillation. Both trend and seasonal components contribute to explained variance, and the size of an eigenvalue provides a measure of how much a component contributes to explaining that variance. In practical terms, the leading eigenvalues identify the dominant trend and seasonal structure, while the smaller eigenvalues are treated as residual noise. These are the same SSA ideas described in the references cited in [window_selection_algorithm.md](window_selection_algorithm.md): seasonal structure is regular and recurring, and spectral magnitude is used as a proxy for how much variance a component explains.
+
 At this stage, the analyst can also assess how well the decomposition explains the underlying signal. Two practical questions are especially relevant:
 
 1. How much of the variation in the original series is explained by the extracted components, and can we visualize that contribution?
