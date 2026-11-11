@@ -132,16 +132,18 @@ frequency-domain signal decomposition.
    - this is the standard SSA signature of a paired seasonal mode, where a recurring
      cyclical component is represented by a conjugate pair of eigenmodes.
 
-2. Detrended spectral check
-   - when the pair rule alone is inconclusive, the series is detrended and the dominant
-     cyclical peak is examined in the frequency domain,
-   - the method measures whether that peak carries a substantial share of the power in
-     the seasonal band after removing the low-frequency trend,
+2. Detrended spectral verification
+   - the detrended seasonal-band spectrum is computed as an always-on verification step,
+   - this is especially important for short series or terminal segments where the
+     eigen-pair signature can be weak even though the underlying signal is periodic,
+   - the method measures whether the dominant cyclical peak carries a substantial share
+     of the power in the seasonal band after removing the low-frequency trend,
    - the signal is treated as seasonal only when the cyclical power is strong enough to
      stand out above broad-band noise and trend contamination.
 
 Taken together, these checks aim to distinguish a consistent seasonal signal from
-broad-band noise or trend-dominated variation.
+broad-band noise or trend-dominated variation while avoiding a brittle dependence on a
+single eigen-pair heuristic.
 
 ## Installation
 

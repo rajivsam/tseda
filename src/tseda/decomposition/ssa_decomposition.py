@@ -97,15 +97,15 @@ class SSADecomposition:
         return float(np.max(seasonal_power) / total_power)
 
     def seasonality_check_heuristic(self) -> bool:
-        """Return True when SSA structure or spectral energy indicates seasonality.
+        """Return True when SSA structure and/or spectral evidence indicates seasonality.
 
-        The SSA eigen-pair heuristic remains the first-line structural check, but it
-        is supplemented by a detrended Fourier-domain signal. A real seasonal
-        process must either (a) show a near-equal seasonal pair in the leading SSA
-        spectrum with supporting power in the seasonal band, or (b) produce a
-        dominant cyclical peak after detrending that explains a meaningful share of
-        the seasonal-band variance. This keeps the rule theory-grounded without
-        treating random noise as a recurring seasonal signal.
+        The SSA eigen-pair check remains the first structural indicator, but the
+        detrended Fourier-domain signal is always computed as a verification step.
+        This matters when a short or terminal segment does not produce a clean
+        adjacent eigen-pair even though the underlying series is periodic. The
+        spectral check tests whether the detrended signal has a dominant recuring
+        cycle in the seasonal band; that gives an independent, theory-grounded
+        validation of the seasonal interpretation.
         """
         heuristic = self.get_automatic_grouping_heuristic()
         max_components = min(self.SEASONALITY_HEURISTIC_LEADING_EIGENVALUES, len(heuristic.eigenvalues))

@@ -101,6 +101,16 @@ def test_seasonality_check_heuristic_detects_dominant_fourier_peak():
     assert ssa.seasonality_check_heuristic() is True
 
 
+def test_seasonality_check_heuristic_uses_spectral_verification_on_short_series():
+    t = np.arange(32)
+    values = 0.2 * t + np.sin(2 * np.pi * t / 8)
+    series = pd.Series(values, index=pd.date_range("2021-01-01", periods=32, freq="D"))
+    ssa = SSADecomposition(series, window=12)
+    ssa._eigenvalues = np.array([18.0, 12.0, 8.0, 4.0, 2.0, 1.0])
+
+    assert ssa.seasonality_check_heuristic() is True
+
+
 def test_seasonality_check_heuristic_rejects_white_noise():
     rng = np.random.default_rng(42)
     values = rng.standard_normal(240)
