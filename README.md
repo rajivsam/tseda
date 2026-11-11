@@ -123,9 +123,8 @@ model and the spectral evidence.
 
 ### 2) Seasonality determination
 
-Seasonality is not determined by loosening one heuristic until more datasets pass. The
-implementation uses two checks that are grounded in the theory of SSA and frequency-domain
-signal decomposition.
+Seasonality is assessed with two complementary checks grounded in SSA and
+frequency-domain signal decomposition.
 
 1. SSA structural check
    - the algorithm first looks for a near-equal adjacent pair among the leading
@@ -133,19 +132,16 @@ signal decomposition.
    - this is the standard SSA signature of a paired seasonal mode, where a recurring
      cyclical component is represented by a conjugate pair of eigenmodes.
 
-2. Detrended spectral fallback
+2. Detrended spectral check
    - when the pair rule alone is inconclusive, the series is detrended and the dominant
      cyclical peak is examined in the frequency domain,
    - the method measures whether that peak carries a substantial share of the power in
      the seasonal band after removing the low-frequency trend,
-   - it only accepts seasonality when the cyclical power is strong enough to stand out
-     above broad-band noise and trend contamination.
+   - the signal is treated as seasonal only when the cyclical power is strong enough to
+     stand out above broad-band noise and trend contamination.
 
-The logic therefore requires both a structural SSA indicator and a frequency-domain
-seasonality signal. This is more defensible than simply broadening a single tolerance rule:
-real seasonal data should show coherent low-frequency structure in the SSA spectrum and a
-concentrated seasonal-band peak once the trend is removed. Pure noise and trend-dominated
-series fail this combined test.
+Taken together, these checks aim to distinguish a consistent seasonal signal from
+broad-band noise or trend-dominated variation.
 
 ## Installation
 
