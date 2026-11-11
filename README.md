@@ -20,6 +20,8 @@ For the fuller product story, design rationale, and detailed explanation of the 
 
 `tseda` helps analysts move from raw data to a defensible decomposition without sacrificing transparency. It supports exploratory analysis and model development by surfacing a signal's variance structure, highlighting regime changes, and making analytical choices easy to revisit and refine.
 
+Note: `tseda` is not a full model-building framework. It is designed to help analysts understand a time series by separating trend, seasonality, and noise, identifying regime changes, and checking whether the decomposition is statistically reasonable. That gives a strong starting point for forecasting, anomaly detection, and other modeling tasks, but the final model specification, tuning, and validation remain user-specific and domain-dependent.
+
 ## What it helps with
 
 - understanding whether a signal has meaningful structure,
