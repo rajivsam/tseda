@@ -45,15 +45,90 @@ class SSADecomposition:
         self._seasonality_check_heuristic = False
         self._reset_reconstruction_cache()
 
-    def seasonality_check_heuristic(self) -> bool:
-        """Heuristic seasonality check based on near-equal leading eigenvalues.
+    def _dominant_seasonal_power_ratio(
+        self,
+        min_period_points: int = 2,
+        max_period_fraction: float = 0.33,
+    ) -> float:
+        """Return the normalized seasonal-band peak concentration.
 
-        If any pair among the configured leading eigenvalues has a smaller/larger ratio of
-        at least 0.95, mark the internal seasonality flag as True.
+        The spectral fallback is grounded in classical frequency-domain theory:
+        after detrending the signal, a seasonal process concentrates a
+        substantial fraction of its cyclic power in a recurring low-order mode.
+        White noise spreads that energy broadly and does not produce a dominant
+        seasonal-band peak.
+        """
+        values = pd.to_numeric(self._series, errors="coerce").dropna().to_numpy(dtype=float)
+        if values.size < 8:
+            return 0.0
+
+        n = values.size
+        t = np.arange(n, dtype=float)
+
+        slope, intercept = np.polyfit(t, values, 1)
+        detrended = values - (slope * t + intercept)
+        if np.allclose(detrended, 0.0):
+            detrended = values - np.mean(values)
+
+        centered = detrended - np.mean(detrended)
+        spectrum = np.fft.rfft(centered)
+        power = np.abs(spectrum) ** 2
+        freqs = np.fft.rfftfreq(n, d=1.0)
+        if freqs.size == 0:
+            return 0.0
+
+        periods = np.divide(
+            1.0,
+            freqs,
+            out=np.full_like(freqs, np.inf, dtype=float),
+            where=freqs > 0.0,
+        )
+
+        max_period = max(float(min_period_points + 1.0), float(n) * float(max_period_fraction))
+        seasonal_mask = (freqs > 0.0) & (periods >= max(2, int(min_period_points))) & (periods <= max_period)
+        if not np.any(seasonal_mask):
+            return 0.0
+
+        seasonal_power = power[seasonal_mask]
+        total_power = float(np.sum(seasonal_power))
+        if total_power <= 0.0:
+            return 0.0
+
+        return float(np.max(seasonal_power) / total_power)
+
+    def seasonality_check_heuristic(self) -> bool:
+        """Return True when SSA structure or spectral energy indicates seasonality.
+
+        The SSA eigen-pair heuristic remains the first-line structural check, but it
+        is supplemented by a detrended Fourier-domain signal. A real seasonal
+        process must either (a) show a near-equal seasonal pair in the leading SSA
+        spectrum with supporting power in the seasonal band, or (b) produce a
+        dominant cyclical peak after detrending that explains a meaningful share of
+        the seasonal-band variance. This keeps the rule theory-grounded without
+        treating random noise as a recurring seasonal signal.
         """
         heuristic = self.get_automatic_grouping_heuristic()
         max_components = min(self.SEASONALITY_HEURISTIC_LEADING_EIGENVALUES, len(heuristic.eigenvalues))
-        self._seasonality_check_heuristic = heuristic.has_seasonal_pair(max_components=max_components)
+        pair_flag = heuristic.has_seasonal_pair(max_components=max_components)
+
+        spectral_threshold = float(
+            ConfigurationManager.get("seasonality_heuristic.spectral_peak_threshold", 0.15)
+        )
+        min_period_points = int(
+            ConfigurationManager.get("seasonality_heuristic.min_seasonal_period_points", 2)
+        )
+        max_period_fraction = float(
+            ConfigurationManager.get("seasonality_heuristic.max_seasonal_period_fraction", 0.33)
+        )
+        spectral_ratio = self._dominant_seasonal_power_ratio(
+            min_period_points=min_period_points,
+            max_period_fraction=max_period_fraction,
+        )
+
+        pair_supported = bool(pair_flag and (spectral_ratio >= (spectral_threshold * 0.5)))
+        spectral_supported = bool(spectral_ratio >= spectral_threshold)
+
+        self._seasonality_check_heuristic = bool(pair_supported or spectral_supported)
         return self._seasonality_check_heuristic
 
     def get_automatic_grouping_heuristic(
@@ -123,6 +198,31 @@ class SSADecomposition:
         
         heuristic = self.get_automatic_grouping_heuristic(grouping_config=grouping_config)
         assignment = heuristic.suggest_reconstruction()
+
+        if self.seasonality_check_heuristic() and not assignment.get("Seasonality"):
+            # The seasonality flag is intended to represent a final, theory-grounded
+            # verdict from both the SSA eigen-pair structure and the detrended spectral
+            # peak. When the initial grouping does not already assign a seasonal set,
+            # we promote the leading eligible components into Seasonality before the
+            # DW-guided expansion step so the final grouping reflects the seasonal
+            # evidence rather than only the raw pair heuristic.
+            eligible = heuristic.eligible_component_indices()
+            seasonal_candidates = [idx for idx in eligible if idx not in assignment.get("Trend", [])]
+            if not seasonal_candidates:
+                seasonal_candidates = list(eligible)
+
+            this_seasonality = sorted(
+                dict.fromkeys(seasonal_candidates[: min(2, len(seasonal_candidates))])
+            )
+            if this_seasonality:
+                assignment["Seasonality"] = this_seasonality
+                assignment["Trend"] = [
+                    idx for idx in assignment.get("Trend", []) if idx not in this_seasonality
+                ]
+                assigned = set(assignment.get("Trend", [])) | set(assignment["Seasonality"])
+                assignment["Noise"] = [
+                    idx for idx in range(len(self._eigenvalues)) if idx not in assigned
+                ]
 
         dw = self._compute_dw_for_assignment(assignment)
         if dw is not None and dw_low <= dw <= dw_high:

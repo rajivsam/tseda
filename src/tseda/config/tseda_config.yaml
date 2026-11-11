@@ -94,9 +94,9 @@ grouping_heuristic:
   # When two adjacent eigenvalues differ by <= this fraction, they are
   # considered a pair and assigned to seasonality.
   # Formula: (larger - smaller) / larger <= pair_similarity_tolerance
-  # Default: 0.05
-  # Suggested range: 0.02 - 0.10
-  pair_similarity_tolerance: 0.05
+  # Default: 0.20
+  # Suggested range: 0.05 - 0.25
+  pair_similarity_tolerance: 0.20
 
   # Minimum normalized knee distance required to accept a detected elbow.
   # Larger values make the algorithm more conservative (smaller signal pool).
@@ -156,6 +156,24 @@ seasonality_heuristic:
   # Default: 6
   # Suggested range: 4 - 12
   leading_eigenvalues_to_check: 6
+
+  # Strongest cyclical peak in the detrended signal must account for at least
+  # this fraction of the seasonal-band power for the frequency-domain fallback
+  # to count as evidence of seasonality. A value near 0.15 is strict enough to
+  # reject white noise while still admitting recurring seasonal structure in
+  # monthly, quarterly, and daily business-cycle data.
+  # Default: 0.15
+  # Suggested range: 0.10 - 0.20
+  spectral_peak_threshold: 0.15
+
+  # Shortest allowed period to consider as seasonal structure, in samples.
+  # Default: 2
+  min_seasonal_period_points: 2
+
+  # Ignore periods longer than roughly one-third of the series length; this
+  # keeps the test focused on recurring cycles rather than low-frequency drift.
+  # Default: 0.33
+  max_seasonal_period_fraction: 0.33
 
 # ============================================================================
 # Section 7: Periodicity Analysis (FFT / Lomb-Scargle)

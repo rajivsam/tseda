@@ -3,6 +3,7 @@ import pandas as pd
 
 from tseda.decomposition.automatic_grouping_heuristic import AutomaticGroupingHeuristic
 from tseda.decomposition.ssa_decomposition import SSADecomposition
+from tseda.notebook_api import load_series_from_csv
 
 
 def build_series(n=60):
@@ -70,14 +71,43 @@ def test_seasonality_check_heuristic_detects_near_equal_leading_eigenvalues():
 
 
 def test_seasonality_check_heuristic_returns_false_when_no_close_pair_exists():
-    series = build_series()
-    ssa = SSADecomposition(series, window=12)
+    rng = np.random.default_rng(7)
+    series = pd.Series(
+        rng.standard_normal(240),
+        index=pd.date_range("2021-01-01", periods=240, freq="D"),
+    )
+    ssa = SSADecomposition(series, window=24)
     ssa._eigenvalues = np.array([10.0, 8.0, 6.0, 4.0, 2.0, 1.0])
 
     result = ssa.seasonality_check_heuristic()
 
     assert result is False
     assert ssa._seasonality_check_heuristic is False
+
+
+def test_seasonality_check_heuristic_detects_known_seasonal_dataset():
+    series = load_series_from_csv("data/ticket_resolution_hourly_nyc311.csv")
+    ssa = SSADecomposition(series, window=min(24, len(series) - 1))
+
+    assert ssa.seasonality_check_heuristic() is True
+
+
+def test_seasonality_check_heuristic_detects_dominant_fourier_peak():
+    t = np.arange(240)
+    values = 0.5 * t + np.sin(2 * np.pi * t / 12) + 0.1 * np.sin(2 * np.pi * t / 5)
+    series = pd.Series(values, index=pd.date_range("2021-01-01", periods=240, freq="D"))
+    ssa = SSADecomposition(series, window=24)
+
+    assert ssa.seasonality_check_heuristic() is True
+
+
+def test_seasonality_check_heuristic_rejects_white_noise():
+    rng = np.random.default_rng(42)
+    values = rng.standard_normal(240)
+    series = pd.Series(values, index=pd.date_range("2021-01-01", periods=240, freq="D"))
+    ssa = SSADecomposition(series, window=24)
+
+    assert ssa.seasonality_check_heuristic() is False
 
 
 def test_signal_reconstruction_plot_updates_seasonality_heuristic_flag():

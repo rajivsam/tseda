@@ -21,7 +21,7 @@ class AutomaticGroupingHeuristic:
     eigenvalues: np.ndarray
     pool_selection_method: str = "kneedle"
     variance_threshold: float = 0.10
-    pair_similarity_tolerance: float = 0.05
+    pair_similarity_tolerance: float = 0.20
     kneedle_min_distance: float = 0.03
     min_signal_components: int = 1
     min_noise_components: int = 2
@@ -48,24 +48,46 @@ class AutomaticGroupingHeuristic:
         return self.eigenvalues / total_variance
 
     def is_near_equal_pair(self, left_index: int, right_index: int) -> bool:
-        """Return True when two eigenvalues differ by at most the configured tolerance."""
+        """Return True when two eigenvalues differ by at most the configured tolerance.
+
+        The leading pair can be a dominant trend component rather than a true
+        seasonal cycle, so we keep the primary tolerance for deeper adjacent
+        pairs but apply a stricter cap to the first pair to avoid false positives
+        on smooth monotonic spectra.
+        """
         left_value = float(self.eigenvalues[left_index])
         right_value = float(self.eigenvalues[right_index])
         larger = max(left_value, right_value)
         smaller = min(left_value, right_value)
         if larger <= 0:
             return False
-        return ((larger - smaller) / larger) <= self.pair_similarity_tolerance
+
+        ratio = (larger - smaller) / larger
+        if left_index == 0 and right_index == 1:
+            return ratio <= min(float(self.pair_similarity_tolerance), 0.10)
+        return ratio <= float(self.pair_similarity_tolerance)
 
     def has_seasonal_pair(self, max_components: int | None = None) -> bool:
-        """Return True when any adjacent eligible pair satisfies the similarity rule."""
+        """Return True when a near-equal adjacent pair appears in the leading spectrum.
+
+        Real seasonal structure is often present but reveals itself as a broader
+        near-equal pair in the first several eigenvalues rather than only inside
+        the elbow-selected signal pool. We therefore check a widened leading window
+        and accept either the eligible pool or the broader leading spectrum when it
+        captures the seasonal signal more faithfully.
+        """
+        limit = len(self.eigenvalues) if max_components is None else max(2, min(int(max_components), len(self.eigenvalues)))
         eligible = self.eligible_component_indices()
         if max_components is not None:
-            eligible = [index for index in eligible if index < max_components]
+            eligible = [index for index in eligible if index < limit]
 
-        for offset in range(len(eligible) - 1):
-            left_index = eligible[offset]
-            right_index = eligible[offset + 1]
+        search_space = list(range(limit))
+        if eligible:
+            search_space = sorted(set(eligible) | set(search_space[: min(len(search_space), max(2, len(eligible) + 1))]))
+
+        for offset in range(len(search_space) - 1):
+            left_index = search_space[offset]
+            right_index = search_space[offset + 1]
             if right_index == left_index + 1 and self.is_near_equal_pair(left_index, right_index):
                 return True
         return False

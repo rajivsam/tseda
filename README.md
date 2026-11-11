@@ -76,6 +76,75 @@ This progression makes the analytical decisions visible: first define the regime
 studied, then identify its components, and finally check whether the result is
 statistically reasonable and worth preserving.
 
+## How trend and seasonality are determined
+
+`tseda` uses an SSA-first workflow with a theory-grounded check for seasonality. The
+intent is to separate low-frequency structure (trend/trend-cycle) from recurrent
+oscillatory structure (seasonality) without forcing a seasonal label onto every signal.
+
+### 1) Trend / trend-cycle determination
+
+The trend component is inferred from the SSA eigenvalue spectrum after the analysis
+window has been selected and refined.
+
+1. Window construction and refinement
+   - the decomposition is built with the requested SSA window,
+   - if the tail of the eigen-spectrum is too flat or too dominated by a single leading
+     component (controlled by the window-refinement configuration), the window is
+     adjusted and recomputed,
+   - this keeps the decomposition from being driven by an artificially narrow or poorly
+     conditioned window.
+
+2. Signal-pool selection
+   - the leading eigenvalues are ranked and a signal pool is selected,
+   - the default method is the `kneedle` elbow rule on the log-eigenvalue profile,
+   - if that elbow cannot be identified, the code falls back to a minimum-count rule,
+   - the remaining components are treated as the noise pool.
+
+3. Initial group assignment
+   - large low-frequency components are treated as trend-like structure,
+   - a near-equal adjacent eigenvalue pair is interpreted as the standard SSA signature
+     of a seasonal mode,
+   - components outside the signal pool are assigned to the noise pool unless they are
+     explicitly part of a seasonal pairing.
+
+4. Durbin-Watson validation and refinement
+   - the residual noise is checked using the Durbin-Watson statistic,
+   - if the residual autocorrelation remains too high, extra components are recruited from
+     the noise pool while preserving the same structural logic,
+   - the result is an explicit trend/trend-cycle assignment rather than a hard-coded
+     seasonal shortcut.
+
+This is the operational meaning of trend in the code: the dominant low-frequency
+structure is treated as trend until a seasonal mode is independently supported by the
+model and the spectral evidence.
+
+### 2) Seasonality determination
+
+Seasonality is not determined by loosening one heuristic until more datasets pass. The
+implementation uses two checks that are grounded in the theory of SSA and frequency-domain
+signal decomposition.
+
+1. SSA structural check
+   - the algorithm first looks for a near-equal adjacent pair among the leading
+     eigenvalues,
+   - this is the standard SSA signature of a paired seasonal mode, where a recurring
+     cyclical component is represented by a conjugate pair of eigenmodes.
+
+2. Detrended spectral fallback
+   - when the pair rule alone is inconclusive, the series is detrended and the dominant
+     cyclical peak is examined in the frequency domain,
+   - the method measures whether that peak carries a substantial share of the power in
+     the seasonal band after removing the low-frequency trend,
+   - it only accepts seasonality when the cyclical power is strong enough to stand out
+     above broad-band noise and trend contamination.
+
+The logic therefore requires both a structural SSA indicator and a frequency-domain
+seasonality signal. This is more defensible than simply broadening a single tolerance rule:
+real seasonal data should show coherent low-frequency structure in the SSA spectrum and a
+concentrated seasonal-band peak once the trend is removed. Pure noise and trend-dominated
+series fail this combined test.
+
 ## Installation
 
 ```bash

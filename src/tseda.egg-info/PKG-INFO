@@ -53,6 +53,8 @@ Dynamic: license-file
 
 `tseda` is a Python package for analyst-guided time-series decomposition, diagnostics, and signal validation. It helps analysts turn regularly sampled operational data into interpretable components such as trend, seasonality, and noise while keeping the analysis explicit, repeatable, reviewable, and auditable.
 
+A useful way to think about `tseda` is as a tool for the cold-start problem in time-series analysis: when a series is unfamiliar or poorly understood, the first challenge is deciding where to begin, which regime to inspect, what window to use, and which signals are worth trusting. `tseda` gives analysts a structured starting point for those decisions.
+
 For the fuller product story, design rationale, and detailed explanation of the workflow, see [about_tseda.md](about_tseda.md).
 
 `tseda` helps analysts move from raw data to a defensible decomposition without sacrificing transparency. It supports exploratory analysis and model development by surfacing a signal's variance structure, highlighting regime changes, and making analytical choices easy to revisit and refine.

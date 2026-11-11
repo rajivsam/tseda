@@ -30,6 +30,71 @@ An analyst starts by launching the `tseda` application and uploading a CSV or si
 
 The overall workflow is organized into three stages:
 
+`tseda` identifies seasonal structure with a two-part rule that is grounded in SSA and frequency-domain theory rather than a brittle one-size-fits-all heuristic. First, it looks for a near-equal adjacent eigenvalue pair in the leading SSA spectrum, which is the standard structural signal of a paired seasonal mode. Second, it applies a detrended spectral fallback: after removing a linear trend, it examines the dominant cyclical peak in the frequency domain and tests whether that peak is strong enough to explain a meaningful share of the seasonal-band power. This guards against false negatives on real seasonal series, while still rejecting pure noise and trend-dominated series.
+
+## Algorithmic description: how trend and seasonality are determined
+
+### 1) Trend / trend-cycle determination
+
+The trend component is inferred from the SSA eigenvalue spectrum after the analysis window has been selected and, if necessary, refined.
+
+1. Window construction and refinement
+   - `NotebookThreeStepAPI._build_decomposition` builds an SSA model using the requested window.
+   - If the smallest eigenvalue explains too much of the total variance (controlled by `window_refinement.min_tail_spread`), the window is doubled and recomputed until the tail spread is acceptable or the maximum practical limit is reached.
+   - This keeps the decomposition from being dominated by an artificially flat spectrum.
+
+2. Signal-pool selection
+   - `AutomaticGroupingHeuristic.eligible_component_indices` chooses the initial signal pool from the leading eigenvalues.
+   - The default method is `kneedle`: it converts the eigenvalues to log scale, normalizes them, and computes the largest positive distance from a straight-line baseline to find the elbow/noise floor.
+   - If no elbow is found, the method falls back to a minimum signal count; a legacy `variance_threshold` mode remains available as a configurable alternative.
+
+3. Initial group assignment
+   - `AutomaticGroupingHeuristic.suggest_reconstruction` walks the eligible components from the largest eigenvalue downward.
+   - If two adjacent eligible components form a near-equal pair (`is_near_equal_pair`), they are assigned to `Seasonality`; otherwise the component is assigned to `Trend`.
+   - Components outside the signal pool become `Noise`.
+
+4. DW-guided expansion
+   - `SSADecomposition.suggest_reconstruction_groups` then computes the Durbin-Watson statistic for the residual noise.
+   - If the noise residual is not yet in the acceptable range, the algorithm expands the assignment from the noise pool, one component at a time, while preserving the same near-equal-pair logic. This is the main operational meaning of “trend/trend-cycle” in the code: the dominant low-frequency structure is treated as trend until a stronger seasonal structure is explicitly identified.
+
+In other words, the code does not search for a single fixed “trend formula.” It identifies the dominant low-frequency SSA components as the trend/trend-cycle pool and keeps those components separate from the seasonal pair and the residual noise.
+
+### 2) Seasonality determination
+
+Seasonality is determined by a two-stage rule that checks both SSA structure and the frequency-domain signature of recurring cyclical behavior.
+
+1. SSA structural check
+   - `SSADecomposition.seasonality_check_heuristic` calls `get_automatic_grouping_heuristic()` and then tests whether the leading eigen-spectrum contains a near-equal adjacent pair via `has_seasonal_pair(max_components=leading_eigenvalues_to_check)`.
+   - This is the classical SSA indicator: a real seasonal mode often appears as a pair of nearly equal leading eigenvalues.
+   - The configuration parameter `seasonality_heuristic.leading_eigenvalues_to_check` bounds the search window for that check.
+
+2. Detrended spectral fallback
+   - If the pair check is weak or absent, the code computes a Fourier-domain signal diagnostic in `_dominant_seasonal_power_ratio()`.
+   - It removes a linear trend from the signal using a least-squares line fit and then centers the detrended series.
+   - It computes the FFT magnitude spectrum and keeps only frequencies corresponding to recurring cycles, not low-frequency drift.
+   - The seasonal band is defined by:
+     - `min_seasonal_period_points`: shortest cycle length in samples;
+     - `max_seasonal_period_fraction`: upper bound on the seasonal period, capped at roughly one third of the series length;
+   - The ratio returned is the largest seasonal-band power component divided by total seasonal-band power.
+
+3. Decision rule
+   - `seasonality_check_heuristic` sets:
+     - `pair_flag = has_seasonal_pair(...)`
+     - `spectral_ratio = _dominant_seasonal_power_ratio(...)`
+     - `pair_supported = pair_flag and spectral_ratio >= 0.5 * spectral_peak_threshold`
+     - `spectral_supported = spectral_ratio >= spectral_peak_threshold`
+   - The final seasonal verdict is `True` only when either:
+     - a near-equal SSA pair is present and supported by non-trivial spectral concentration, or
+     - the detrended spectral peak alone is strong enough to explain a meaningful share of seasonal-band power.
+   - The threshold is configured by `seasonality_heuristic.spectral_peak_threshold`.
+
+4. Grouping reconciliation
+   - `SSADecomposition.suggest_reconstruction_groups` checks `self.seasonality_check_heuristic()` before finalizing the grouping.
+   - If the seasonal verdict is `True` but the current assignment has no `Seasonality` bucket, the method assigns the leading eligible components into `Seasonality` (up to two indices) before recomputing the noise residual and DW fit.
+   - This is the explicit bridge between the theory-grounded seasonal flag and the final reconstruction grouping.
+
+This is deliberately not a crude “tune until it passes” rule. It combines a structural SSA signature with a detrended frequency-domain test, which is much closer to the classical time-series interpretation of seasonal structure: a real seasonal signal has both a characteristic SSA eigen-pair morphology and a concentration of energy at a recurring cycle after trend removal.
+
 ### Preliminary Analysis
 
 The goal of this stage is to understand the signal before applying decomposition. The application presents a set of diagnostic views, including:
