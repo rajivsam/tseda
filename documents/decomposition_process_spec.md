@@ -148,6 +148,28 @@ The tests are ordered because later tests require conclusions from earlier ones.
 Do not independently label a leading SSA component as trend or seasonality and
 then test for incompatibilities afterward.
 
+### High-level flow: 6 coarse stages with process classification
+
+The full procedure can be read as six logical stages instead of a long chain of
+fine-grained checks. The first and most important abstraction is the process
+classification gate: the series type must be identified before meaningful
+component attribution is attempted.
+
+1. Define the analysis scope and confirm the data are valid.
+2. Check whether the series is identifiable and has enough signal support.
+3. Identify the dominant process class: diffuse noise, stochastic persistence,
+   deterministic trend, periodic structure, or mixed evidence.
+4. Only if the process is not blocked by persistence/noise, verify whether a
+   deterministic trend is actually supported.
+5. Test whether verified oscillatory pairs constitute seasonality.
+6. Attribute variance, assess residuals, and report the outcome with caveats.
+
+This abstraction matches the detailed procedure below but reduces the cognitive
+load for readers who need the process map, not the implementation-level
+threshold checklist. The process-type decision is intentionally placed early
+because a random walk with drift is blocked before a deterministic trend label is
+accepted.
+
 ## Step 0 — Select and describe the scope
 
 1. Construct the full-series analysis range.
@@ -585,95 +607,63 @@ innovation series to be supplied as a new independent analysis.
 
 ### Rendered flow (Mermaid)
 
-This version renders directly in GitHub Markdown and in common Markdown previews;
-it does not require a D2 extension.
+This version emphasizes the classification-first view and makes the blocking
+behavior explicit. The process-type decision happens before deterministic trend
+or seasonality is accepted.
 
 ```mermaid
 flowchart TD
-    A[Regular time series] --> B[Define full-series and active-regime scopes]
-    B --> C{Input identifiable?}
-    C -->|No| I[Indeterminate<br/>retain reason metadata]
-    C -->|Yes| D[Evaluate candidate periods and cycle support]
-    D --> E[SSA diagnostics<br/>level, difference, EOF, ADF/KPSS]
-    E --> F{Diffuse noise?}
-    F -->|Yes| N[Diffuse noise<br/>unsuitable for SSA decomposition]
-    F -->|No| G{Stochastic persistence?}
-    G -->|Yes| P[Recommend stochastic-trend<br/>or differenced analysis]
-    G -->|No| H{Verified oscillatory pair?}
-    P --> RH[Residual/difference series<br/>may be analyzed separately]
-    RH --> O
-    H -->|Yes| S[Seasonality<br/>complete verified pair]
-    H -->|No| T{Deterministic trend verified?}
-    S --> T
-    T -->|Yes| TR[Trend group]
-    T -->|No / unresolved| U[Unclassified or indeterminate]
-    TR --> R[Final grouping]
-    S --> R
-    R --> V[Variance attribution]
-    V --> Q[Residual diagnostics<br/>DW, ACF/PACF, KDE, change points]
-    Q --> O[Report both scopes,<br/>confidence, periods, and caveats]
+    A[Series + scope] --> B[Validate input and cadence]
+    B --> C[Check identifiability and cycle support]
+    C --> D{Process type?}
+    D -->|Diffuse noise| N[Stop: diffuse_noise]
+    D -->|Stochastic persistence| P[Stop: stochastic_persistence<br/>recommend differenced model]
+    D -->|Deterministic trend| E[Verify trend + residual behavior]
+    D -->|Periodic / mixed| F[Verify periodic pairs and trend interactions]
+    E --> G[Group components and attribute variance]
+    F --> G
+    G --> H[Residual diagnostics and final report]
 ```
+
+This high-level schema is intentionally coarse, but it preserves the crucial
+sequence: a random walk with drift is blocked by the persistence gate before a
+trend label is accepted.
 
 ### D2 source
 
 ```d2
 direction: down
 
-input: "Regular time series" {
+series: "Series + scope" {
   shape: cylinder
 }
-scope: "Select scopes" {
-  full: "Full series"
-  active: "Active regime\nPELT / explicit bounds /\nhalf-life lookback"
-}
-validate: "Validate input" {
-  shape: diamond
-}
-indeterminate: "Indeterminate\n+ reason metadata" {
-  style.fill: "#fff3cd"
-}
-periods: "Candidate periods\ncadence + domain periods\ncycle-count floor"
-ssa: "SSA diagnostics\nlevel + differences\nEOF + ADF/KPSS"
-noise: "Diffuse spectrum?"
-noise_result: "diffuse_noise\nunsuitable" {
+validate: "Validate input\n& cadence"
+identify: "Check identifiability\n& cycle support"
+classify: "Process type?\n(diffuse / persistent / trend / periodic / mixed)"
+noise: "Stop: diffuse_noise" {
   style.fill: "#fde2e2"
 }
-persistence: "Stochastic persistence?"
-persistence_group: "Stop deterministic SSA\nrecommend stochastic/differenced model" {
+persistence: "Stop: stochastic_persistence\nrecommend differenced model" {
   style.fill: "#e7f0ff"
 }
-period_pair: "Verified SSA pair?\nperiod band + quadrature\n+ independent strength"
-seasonality: "Seasonality\ncomplete verified pair(s)" {
-  style.fill: "#e8f7e8"
-}
-trend: "Deterministic trend?\nafter persistence safeguard"
-trend_group: "Trend" {
+trend: "Verify deterministic trend\n+ residual behavior" {
   style.fill: "#f3e8ff"
 }
-group: "Final semantic grouping\nTrend / Seasonality /\nPersistence / Noise"
-variance: "Variance attribution\nspectral share\nreconstruction variance\ncovariance-adjusted share"
-residual: "Residual diagnostics\nDW / ACF / PACF / KDE\nvariance and change points"
-report: "Report both scopes\nclassification + confidence\nperiods + caveats + artifact metadata" {
+periodic: "Verify periodic pairs\n& trend interactions" {
+  style.fill: "#e8f7e8"
+}
+component: "Group components\n& attribute variance"
+residual: "Residual diagnostics\n& final report" {
   shape: document
 }
 
-input -> scope -> validate
-validate -> indeterminate: "invalid / too short / no qualifying run"
-validate -> periods: "identifiable"
-periods -> ssa
-ssa -> noise
-noise -> noise_result: "yes"
-noise -> persistence: "no"
-persistence -> persistence_group: "yes"
-persistence -> period_pair: "no"
-period_pair -> seasonality: "yes"
-period_pair -> trend: "no / also continue"
-persistence_group -> report: "record stop and action; no Step 2"
-seasonality -> trend: "remaining low-frequency modes"
-trend -> trend_group: "yes"
-trend_group -> group
-seasonality -> group
-group -> variance -> residual -> report
+series -> validate -> identify -> classify
+classify -> noise: "diffuse"
+classify -> persistence: "persistent"
+classify -> trend: "deterministic trend"
+classify -> periodic: "periodic / mixed"
+trend -> component
+periodic -> component -> residual
 ```
 
 To render the standalone source:
