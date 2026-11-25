@@ -376,11 +376,30 @@ def build_reconstruction_metadata(ssa_obj: Any, recon_dict: dict[str, list[int]]
         ])
         for group_name in recon_dict.keys()
     ]
+    variance_timestamps: list[object] = []
+    timestamp_getter = getattr(ssa_obj, "get_variance_change_point_timestamps", None)
+    if callable(timestamp_getter):
+        variance_timestamps = timestamp_getter()
+    process_text = "Not available"
+    process_getter = getattr(ssa_obj, "get_process_analysis", None)
+    if callable(process_getter):
+        process_analysis = process_getter()
+        process_classification = process_analysis.process_classification
+        process_text = process_classification.label
+        if process_classification.subtype:
+            process_text += f" ({process_classification.subtype})"
 
     return html.Div([
         html.Ul([
             *variation_items,
             html.Li([html.Strong("Durbin-Watson Statistic: "), dw_text]),
+            html.Li([
+                html.Strong("Residual Variance Change Points: "),
+                ", ".join(str(timestamp) for timestamp in variance_timestamps)
+                if variance_timestamps
+                else "None detected",
+            ]),
+            html.Li([html.Strong("Process Classification: "), process_text]),
         ]),
         html.Small(
             "A Durbin-Watson value between 1.5 and 2.5 implies that the noise is uncorrelated.",
@@ -406,7 +425,7 @@ def build_suggested_grouping_table(
     """
     exp_var = getattr(ssa_obj, "_exp_var", {})
     rows = []
-    for group_name in ("Trend", "Seasonality", "Noise"):
+    for group_name in ("Trend", "Seasonality", "Persistence", "Noise"):
         indices = recon_dict.get(group_name, [])
         variance_pct = sum(float(exp_var.get(f"var_comp-{index}", 0.0)) for index in indices) * 100
         rows.append(

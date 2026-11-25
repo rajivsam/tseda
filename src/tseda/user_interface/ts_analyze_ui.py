@@ -43,6 +43,7 @@ from tseda.decomposition.ssa_decomposition import SSADecomposition
 from tseda.decomposition.ssa_result_summary import SSAResultSummary
 from tseda.change_point.change_point_estimator import PELT_ChangePointEstimator
 from tseda.config.config_loader import ConfigurationManager
+from tseda.decomposition.process_guidance import stochastic_persistence_stop_message
 from tseda.segmentation.pelt_segmentation import (
     build_adjusted_analysis_segment,
     get_short_segment_confirmation_message,
@@ -129,6 +130,34 @@ def navigate_steps(
                     if adjustment.get("is_adjusted"):
                         segment_start, segment_end = adjusted_segment
                 active_segment = series.iloc[segment_start:segment_end]
+                if len(active_segment) < 4:
+                    return (
+                        {'display': 'block'},
+                        {'display': 'none'},
+                        {'display': 'none'},
+                        1,
+                        True,
+                        True,
+                        dash.no_update,
+                        dash.no_update,
+                    )
+                active_window = min(
+                    int(SamplingProp(active_segment)._freq_window or window_size or 2),
+                    len(active_segment) // 2,
+                )
+                assessment_ssa = SSADecomposition(active_segment, active_window)
+                assessment = assessment_ssa.get_process_analysis(scope="active_regime")
+                if assessment.decomposition_suitability.status == "unsuitable":
+                    return (
+                        {'display': 'block'},
+                        {'display': 'none'},
+                        {'display': 'none'},
+                        1,
+                        True,
+                        True,
+                        dash.no_update,
+                        dash.no_update,
+                    )
                 series = active_segment
                 if len(series) > 0:
                     sampling_props = SamplingProp(series)
@@ -200,7 +229,10 @@ def store_uploaded_file(
 
         window_size = int(freq_window)
         ssa_obj = None
-        return {'contents': contents, 'filename': filename}, None, False, dash.no_update, dash.no_update, 0
+        return {
+            'contents': contents,
+            'filename': filename,
+        }, None, False, dash.no_update, dash.no_update, 0
     except ValueError as e:
         series = None
         window_size = 0
@@ -541,6 +573,92 @@ def relay_loess_fraction(value: float | None) -> float:
     return value if value is not None else 0.05
 
 
+def _process_stop_message(process_class: str, reason: str) -> dbc.Alert:
+    """Explain why process-aware SSA exploration should stop at assessment."""
+    if process_class == "stochastic_persistence":
+        detail = stochastic_persistence_stop_message()
+    else:
+        detail = (
+            "The spectrum is diffuse and does not support a stable deterministic SSA "
+            "decomposition. Investigate a white-noise, ARMA, count, anomaly, or "
+            "domain-specific model instead."
+        )
+    return dbc.Alert(
+        [
+            html.Strong("Stop after initial assessment. "),
+            detail,
+            html.Br(),
+            html.Small(f"Diagnostic reason: {reason}.", className="text-muted"),
+        ],
+        color="warning",
+        className="mt-2",
+    )
+
+
+def update_process_gate_message(
+    uploaded_file: dict[str, str] | None,
+    selected_segment_value: int | str | None,
+) -> Any:
+    """Show Step-1 stop guidance for the currently selected analysis segment."""
+    if uploaded_file is None or series is None or len(series) == 0:
+        return None
+
+    required_points = resolve_minimum_segment_points(
+        cadence=infer_cadence_from_series(series)
+    )
+    boundaries = compute_segment_boundaries(
+        len(series),
+        max(1, min(5, len(series) // max(1, required_points))),
+    )
+    if not boundaries:
+        return None
+    selected_index = coerce_segment_index(
+        selected_segment_value,
+        fallback=max(0, len(boundaries) - 1),
+    )
+    selected_index = min(max(selected_index, 0), len(boundaries) - 1)
+    adjusted_segment, adjustment = _resolve_segment_adjustment(
+        series,
+        boundaries,
+        selected_index,
+    )
+    segment_range = tuple(adjusted_segment) if adjustment.get("is_adjusted") else boundaries[selected_index]
+    active_segment = series.iloc[segment_range[0] : segment_range[1]]
+    if len(active_segment) < 4:
+        return dbc.Alert(
+            "The active regime is too short for reliable process classification. "
+            "This tool cannot proceed to SSA for this segment.",
+            color="warning",
+            className="mt-2",
+        )
+    active_window = min(
+        int(SamplingProp(active_segment)._freq_window or window_size or 2),
+        len(active_segment) // 2,
+    )
+    assessment = SSADecomposition(active_segment, active_window).get_process_analysis(
+        scope="active_regime"
+    )
+    suitability = assessment.decomposition_suitability
+    if suitability.status == "unsuitable":
+        return _process_stop_message(
+            assessment.process_classification.label,
+            suitability.reason,
+        )
+    full_window = min(
+        int(SamplingProp(series)._freq_window or window_size or 2),
+        len(series) // 2,
+    )
+    full_assessment = SSADecomposition(series, full_window).get_process_analysis(
+        scope="full_series"
+    )
+    if full_assessment.decomposition_suitability.status == "unsuitable":
+        return _process_stop_message(
+            full_assessment.process_classification.label,
+            full_assessment.decomposition_suitability.reason,
+        )
+    return None
+
+
 def update_ssa_plots(
     current_step: int,
     analysis_complete: bool,
@@ -554,8 +672,8 @@ def update_ssa_plots(
     ctx = dash.callback_context
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
 
-    empty_suggestions = ("", "", "", "", "", "")
-    preserve_suggestions = (dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update)
+    empty_suggestions = ("", "", "", "", "", "", "", "")
+    preserve_suggestions = tuple([dash.no_update] * 8)
     
     if current_step != 2 or series is None or window_size <= 0:
         empty_fig = empty_figure("No data available")
@@ -612,22 +730,41 @@ def update_ssa_plots(
         total_var = float(np.sum(eigenvalues)) if eigenvalues.size > 0 else 0.0
         k = min(top_k, eigenvalues.size)
         top_k_ratio = (float(np.sum(eigenvalues[:k])) / total_var) if total_var > 0 else 0.0
-        noisy_series = top_k_ratio < min_ev
+        process_getter = getattr(ssa_obj, "get_process_analysis", None)
+        process_analysis = process_getter() if callable(process_getter) else None
+        process_class = (
+            process_analysis.process_classification.label
+            if process_analysis is not None
+            else None
+        )
+        process_suitability = (
+            process_analysis.decomposition_suitability
+            if process_analysis is not None
+            else None
+        )
+        noisy_series = top_k_ratio < min_ev or (
+            process_suitability is not None
+            and process_suitability.status == "unsuitable"
+        )
         ssa_obj._noisy_series = noisy_series
 
         noisy_message = None
         if noisy_series:
-            noisy_message = dbc.Alert(
-                [
-                    html.Strong("Dataset not suitable for SSA decomposition. "),
-                    f"The top {k} eigenvectors explain only {top_k_ratio:.1%} of total variance "
-                    f"(minimum required: {min_ev:.0%}). The eigenspectrum is too diffuse — "
-                    "this application is SSA-focused. Please try an external stochastic approach "
-                    "such as random walk/Brownian-motion-style models or ARIMA/SARIMA.",
-                ],
-                color="danger",
-                className="mb-0",
-            )
+            if process_class in {"stochastic_persistence", "diffuse_noise"}:
+                noisy_message = _process_stop_message(
+                    process_class,
+                    process_suitability.reason,
+                )
+            else:
+                noisy_message = dbc.Alert(
+                    [
+                        html.Strong("Dataset not suitable for SSA decomposition. "),
+                        f"The top {k} eigenvectors explain only {top_k_ratio:.1%} of total variance "
+                        f"(minimum required: {min_ev:.0%}). The eigenspectrum is too diffuse.",
+                    ],
+                    color="danger",
+                    className="mb-0",
+                )
 
         # Re-run the heuristic on any trigger except the Apply Grouping confirmation
         # (analysis-complete-store) so that the user's manual edits are not
@@ -635,7 +772,7 @@ def update_ssa_plots(
         # with trigger_id == 'ssa-window-slider', which correctly lands in the
         # heuristic branch and updates the prepopulated fields.
         run_heuristic = trigger_id != 'analysis-complete-store'
-        if run_heuristic:
+        if run_heuristic and not noisy_series:
             suggested_groups, dw_satisfied = ssa_obj.suggest_reconstruction_groups()
             suggestion_children = build_suggested_grouping_table(
                 ssa_obj=ssa_obj,
@@ -649,12 +786,15 @@ def update_ssa_plots(
                 format_component_indices(suggested_groups.get("Seasonality", [])),
                 "Noise",
                 "*",
+                "Persistence",
+                format_component_indices(suggested_groups.get("Persistence", [])),
             )
         else:
             suggestion_children = dash.no_update
-            suggestion_values = preserve_suggestions
+            suggestion_values = preserve_suggestions if not noisy_series else empty_suggestions
 
-        return eigen_fig, img_src, noisy_series, noisy_message, noisy_series, suggestion_children, *suggestion_values, window_size
+        displayed_message = None if noisy_series else noisy_message
+        return eigen_fig, img_src, noisy_series, displayed_message, noisy_series, suggestion_children, *suggestion_values, window_size
         
     except Exception as err:
         empty_fig = empty_figure(f"Error: {str(err)[:80]}")
@@ -670,9 +810,11 @@ def validate_components(
     list2: str | None,
     name3: str | None,
     list3: str | None,
-    slider_window_size: int | None,
-    refined_window: int | None,
-    loess_fraction: float | None,
+    name4: str | None = None,
+    list4: str | None = None,
+    slider_window_size: int | None = None,
+    refined_window: int | None = None,
+    loess_fraction: float | None = None,
 ) -> tuple[Any, go.Figure, go.Figure, str, Any, go.Figure, bool, bool]:
     """Validate component inputs and return DW validity status."""
     global series, window_size, ssa_obj
@@ -718,9 +860,31 @@ def validate_components(
         window_size = selected_window_size
         ssa_obj = SSADecomposition(series, window_size)
 
-    rows = [(name1, list1), (name2, list2), (name3, list3)]
+    rows = [(name1, list1), (name2, list2), (name3, list3), (name4, list4)]
 
     try:
+        process_getter = (
+            getattr(ssa_obj, "get_process_analysis", None)
+            if ssa_obj is not None
+            else None
+        )
+        if callable(process_getter):
+            process_result = process_getter()
+            if process_result.decomposition_suitability.status == "unsuitable":
+                return (
+                    _process_stop_message(
+                        process_result.process_classification.label,
+                        process_result.decomposition_suitability.reason,
+                    ),
+                    empty_fig,
+                    empty_fig,
+                    "",
+                    empty_metadata,
+                    empty_fig,
+                    False,
+                    False,
+                )
+
         recon_dict = parse_reconstruction_groups(rows=rows, window_size=window_size)
 
         if recon_dict:
@@ -1354,6 +1518,13 @@ def register_callbacks(dash_app: dash.Dash) -> None:
     )(store_uploaded_file)
 
     dash_app.callback(
+        Output('process-guidance-message', 'children'),
+        [Input('uploaded-file-store', 'data'),
+         Input('selected-segment-dropdown', 'value')],
+        prevent_initial_call=True,
+    )(update_process_gate_message)
+
+    dash_app.callback(
         [Output('data-preview-container', 'children'),
          Output('kde-plot-container', 'children'),
          Output('box-plot-container', 'children'),
@@ -1470,6 +1641,8 @@ def register_callbacks(dash_app: dash.Dash) -> None:
          Output('component-list-2', 'value'),
          Output('component-name-3', 'value'),
          Output('component-list-3', 'value'),
+         Output('component-name-4', 'value'),
+         Output('component-list-4', 'value'),
          Output('refined-window-store', 'data')],
         [Input('step-tracker', 'data'),
          Input('analysis-complete-store', 'data'),
@@ -1493,6 +1666,7 @@ def register_callbacks(dash_app: dash.Dash) -> None:
         [State('component-name-1', 'value'), State('component-list-1', 'value'),
          State('component-name-2', 'value'), State('component-list-2', 'value'),
          State('component-name-3', 'value'), State('component-list-3', 'value'),
+         State('component-name-4', 'value'), State('component-list-4', 'value'),
          State('ssa-window-slider', 'value'),
          State('refined-window-store', 'data'),
          State('loess-fraction-store', 'data')],

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import pytest
 import tseda.user_interface.ts_analyze_ui as ui
 import tseda.user_interface.callback_services as callback_services
 
@@ -27,6 +28,140 @@ def test_store_uploaded_file_clear_resets_kb_location_state(monkeypatch):
     )
 
     assert result == (None, None, False, None, None, 0)
+
+
+def test_process_stop_message_recommends_stochastic_models():
+    alert = ui._process_stop_message(
+        "stochastic_persistence",
+        "stochastic_persistence_requires_stochastic_or_differenced_analysis",
+    )
+
+    rendered = str(alert)
+    assert "This tool is not the right exploration choice" in rendered
+    assert "random-walk" in rendered
+    assert "ARIMA/differenced" in rendered
+    assert "Stop after initial assessment" in rendered
+    assert "pareidolia" in rendered
+    assert "Do not interpret smooth SSA level modes" in rendered
+
+
+def test_process_gate_message_blocks_selected_persistent_regime(monkeypatch):
+    ui.series = pd.Series(
+        np.cumsum(np.random.default_rng(13).standard_normal(240)),
+        index=pd.date_range("2021-01-01", periods=240, freq="h"),
+    )
+    ui.window_size = 24
+
+    message = ui.update_process_gate_message(
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        selected_segment_value=None,
+    )
+
+    assert "not the right exploration choice" in str(message)
+
+
+def test_update_ssa_plots_does_not_relocate_process_guidance_to_step_two(monkeypatch):
+    ui.series = pd.Series(
+        np.cumsum(np.random.default_rng(22).standard_normal(240)),
+        index=pd.date_range("2021-01-01", periods=240, freq="h"),
+    )
+    ui.window_size = 24
+
+    monkeypatch.setattr(
+        ui.dash,
+        "callback_context",
+        type("Ctx", (), {"triggered": [{"prop_id": "step-tracker.data"}]})(),
+    )
+
+    result = ui.update_ssa_plots(
+        current_step=2,
+        analysis_complete=False,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        slider_window_size=24,
+    )
+
+    assert result[2] is True
+    assert result[5] is dash.no_update
+    assert result[3] is None
+
+
+@pytest.mark.parametrize(
+    "dataset_path",
+    [
+        "data/coffee_prices.csv",
+        "data/hyndman_goog_daily_close.csv",
+    ],
+)
+def test_persistent_benchmarks_show_stop_message_on_initial_assessment(dataset_path):
+    from tseda.notebook_api import load_series_from_csv
+
+    ui.series = load_series_from_csv(dataset_path)
+    ui.window_size = 24 if "coffee" in dataset_path else 5
+
+    message = ui.update_process_gate_message(
+        uploaded_file={"contents": "stub", "filename": dataset_path},
+        selected_segment_value=None,
+    )
+
+    rendered = str(message)
+    assert "Stop after initial assessment" in rendered
+    assert "not the right exploration choice" in rendered
+
+
+def test_update_ssa_plots_stops_stochastic_persistence_before_grouping(monkeypatch):
+    ui.series = pd.Series(
+        np.cumsum(np.random.default_rng(4).standard_normal(240)),
+        index=pd.date_range("2021-01-01", periods=240, freq="h"),
+    )
+    ui.window_size = 24
+
+    heuristic_calls = []
+
+    class Process:
+        label = "stochastic_persistence"
+
+    class Suitability:
+        status = "unsuitable"
+        reason = "stochastic_persistence_requires_stochastic_or_differenced_analysis"
+
+    class Analysis:
+        process_classification = Process()
+        decomposition_suitability = Suitability()
+
+    class FakeSSA:
+        def __init__(self, series, window):
+            self._window = window
+            self._eigenvalues = np.array([10.0, 1.0, 0.8, 0.5], dtype=float)
+
+        def eigenplot(self):
+            return go.Figure()
+
+        def eigen_vector_plot(self):
+            return plt.figure()
+
+        def get_process_analysis(self):
+            return Analysis()
+
+        def suggest_reconstruction_groups(self):
+            heuristic_calls.append(True)
+            raise AssertionError("grouping must not run for stochastic persistence")
+
+    class Ctx:
+        triggered = [{"prop_id": "uploaded-file-store.data"}]
+
+    monkeypatch.setattr(ui, "SSADecomposition", FakeSSA)
+    monkeypatch.setattr(ui.dash, "callback_context", Ctx())
+
+    result = ui.update_ssa_plots(
+        current_step=2,
+        analysis_complete=False,
+        uploaded_file={"contents": "stub", "filename": "stub.csv"},
+        slider_window_size=24,
+    )
+
+    assert result[2] is True
+    assert heuristic_calls == []
+    assert result[3] is None
 
 
 def test_validate_components_reuses_existing_ssa_and_renders_outputs(monkeypatch):
@@ -857,4 +992,3 @@ def test_save_kb_handles_exception_gracefully(tmp_path, monkeypatch):
 
     assert result.color == "danger"
     assert "disk full" in result.children
-

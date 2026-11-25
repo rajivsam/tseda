@@ -3,10 +3,53 @@
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 import pandas as pd
 import ruptures as rpt
+
+
+def detect_variance_change_points(
+	series: pd.Series | np.ndarray,
+	penalty_multiplier: float = 2.0,
+	min_segment_points: int = 10,
+) -> list[int]:
+	"""Detect within-series variance shifts with PELT's Gaussian cost model.
+
+	The input is centered and standardized so the PELT cost is driven by
+	changes in residual dispersion rather than the series scale.
+
+	Args:
+		series: Detrended or deseasonalized residual values.
+		penalty_multiplier: Multiplier applied to ``log(n)`` for the PELT penalty.
+		min_segment_points: Minimum observations allowed on either side of a split.
+
+	Returns:
+		Interior zero-based change-point indices. The terminal endpoint emitted
+		by ruptures is not included.
+	"""
+	values = np.asarray(series, dtype=float).reshape(-1)
+	n = int(values.size)
+	min_size = max(2, int(min_segment_points))
+	if n < 2 * min_size or not np.all(np.isfinite(values)):
+		return []
+
+	scale = float(np.std(values))
+	if not np.isfinite(scale) or scale <= np.finfo(float).eps:
+		return []
+
+	standardized = ((values - float(np.mean(values))) / scale).reshape(-1, 1)
+	penalty = float(penalty_multiplier) * float(np.log(n))
+	with warnings.catch_warnings():
+		warnings.filterwarnings(
+			"ignore",
+			message=r"New behaviour in v1\.1\.5: a small bias is added.*",
+			category=UserWarning,
+			module=r"ruptures\.costs\.costnormal",
+		)
+		breakpoints = rpt.Pelt(model="normal", min_size=min_size).fit(standardized).predict(pen=penalty)
+	return [int(point) for point in breakpoints if 0 < point < n]
 
 
 def _resolve_minimum_segment_points(series: pd.Series) -> int:

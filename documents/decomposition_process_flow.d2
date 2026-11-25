@@ -1,0 +1,65 @@
+direction: down
+
+input: "Regular time series" {
+  shape: cylinder
+}
+scope: "Select scopes" {
+  full: "Full series"
+  active: "Active regime\nPELT / explicit bounds /\nhalf-life lookback"
+}
+validate: "Validate input" {
+  shape: diamond
+}
+indeterminate: "Indeterminate\n+ reason metadata" {
+  style.fill: "#fff3cd"
+}
+periods: "Candidate periods\ncadence + domain periods\ncycle-count floor"
+ssa: "SSA diagnostics\nlevel + differences\nEOF + ADF/KPSS"
+noise: "Diffuse spectrum?" {
+  shape: diamond
+}
+noise_result: "diffuse_noise\nunsuitable" {
+  style.fill: "#fde2e2"
+}
+persistence: "Stochastic persistence?" {
+  shape: diamond
+}
+persistence_group: "Stop deterministic SSA\nrecommend stochastic/differenced model" {
+  style.fill: "#e7f0ff"
+}
+period_pair: "Verified SSA pair?\nperiod band + quadrature\n+ independent strength" {
+  shape: diamond
+}
+seasonality: "Seasonality\ncomplete verified pair(s)" {
+  style.fill: "#e8f7e8"
+}
+trend: "Deterministic trend?\nafter persistence safeguard" {
+  shape: diamond
+}
+trend_group: "Trend" {
+  style.fill: "#f3e8ff"
+}
+group: "Final semantic grouping\nTrend / Seasonality /\nPersistence / Noise"
+variance: "Variance attribution\nspectral share\nreconstruction variance\ncovariance-adjusted share"
+residual: "Residual diagnostics\nDW / ACF / PACF / KDE\nvariance and change points"
+report: "Report both scopes\nclassification + confidence\nperiods + caveats + artifact metadata" {
+  shape: document
+}
+
+input -> scope -> validate
+validate -> indeterminate: "invalid / too short / no qualifying run"
+validate -> periods: "identifiable"
+periods -> ssa
+ssa -> noise
+noise -> noise_result: "yes"
+noise -> persistence: "no"
+persistence -> persistence_group: "yes"
+persistence -> period_pair: "no"
+period_pair -> seasonality: "yes"
+period_pair -> trend: "no / also continue"
+persistence_group -> report: "record stop and action; no Step 2"
+seasonality -> trend: "remaining low-frequency modes"
+trend -> trend_group: "yes"
+trend_group -> group
+seasonality -> group
+group -> variance -> residual -> report

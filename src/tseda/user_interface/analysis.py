@@ -63,6 +63,7 @@ def build_initial_assessment_layout() -> html.Div:
                 ),
                 dbc.Button("Clear Uploaded File", id="clear-upload-btn", color="danger", className="mt-3"),
                 html.Div(id="upload-error-message", className="mt-3"),
+                html.Div(id="process-guidance-message", className="mt-3"),
             ]), width=4),
             dbc.Col(html.Div(PLACEHOLDER_TEXT["preview"], id="data-preview-container", className="p-3 border bg-light"), width=8),
         ]),

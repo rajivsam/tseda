@@ -18,6 +18,41 @@ The current implementation follows a segment-first analysis design: the full tim
 - **Configuration-first**: Thresholds and heuristics are centralized in `src/tseda/config/tseda_config.yaml`.
 - **Auditability**: Analytical outputs and decisions can be exported and logged using KMDS writer support.
 - **Incremental validation**: The core workflow validates input suitability before producing decomposition and change-point diagnostics.
+- **Process-aware classification**: stochastic persistence, deterministic trend, periodic structure, and diffuse noise are distinct outputs rather than interchangeable interpretations of eigenvalue concentration.
+- **Scope separation**: full-series structure and active-regime behavior are computed and reported independently.
+
+## Process-aware SSA revision
+
+The current implementation revision identifies only reconstruction groups. The
+next architecture revision must first classify the process behavior represented
+by the spectrum, then derive compatible decomposition labels. In particular,
+high concentration in the leading SSA eigenspectrum is not by itself evidence of
+deterministic trend or seasonality: a random walk can produce one extremely smooth
+dominant mode and a steep power-law tail.
+
+The canonical revision specification is
+[`process_aware_ssa_design.md`](process_aware_ssa_design.md). It requires:
+
+- level and first-difference eigen-spectrum diagnostics;
+- smooth low-frequency EOF evidence;
+- stationarity and unit-root diagnostics;
+- matched Monte Carlo random-walk/red-noise calibration;
+- periodicity confirmation through an actual SSA pair, expected period, and
+  enough complete cycles;
+- independent full-series and active-regime results;
+- Durbin-Watson as a residual diagnostic rather than a semantic grouping target;
+- an `indeterminate` suitability state for short or contradictory evidence.
+- explicit `Persistence` reconstruction for stochastic low-frequency modes.
+- a pareidolia warning and hard stop for stochastic-persistence level series:
+  smooth random-walk realizations must not be presented as deterministic trend
+  or seasonality.
+
+The diagnostic and decomposition decisions are separate: a series can support a
+reliable random-walk/persistence classification while being unsuitable for a
+deterministic SSA reconstruction.
+
+No user-facing labels or example narratives should be changed for this revision
+until the corresponding process-aware API and acceptance tests are implemented.
 
 ## Data flow
 
@@ -25,14 +60,29 @@ The current implementation follows a segment-first analysis design: the full tim
 2. A candidate segmentation is derived from the full series and compared with the current analysis target.
 3. The user selects the active segment for downstream analysis; the full series remains available as context for visualization.
 4. SSA is performed on the selected segment with a candidate window size.
-5. Eigen-spectrum heuristics identify trend, seasonality, and noise components.
-6. Reconstructed signals are evaluated for structural suitability and optionally refined.
-7. Change-point detectors run on trend, seasonal amplitude, and seasonal phase signals.
-8. Results are exposed through plots, a notebook API, and export utilities.
+5. Full-series and active-regime SSA diagnostics are evaluated independently.
+6. Process evidence classifies diffuse noise, deterministic structure, stochastic
+   persistence, periodic structure, mixed behavior, or indeterminate evidence.
+7. Verified pairs and cadence-appropriate periods determine periodic components;
+   singleton eigentriples are not labeled as seasonality.
+8. Reconstructed signals are evaluated for structural suitability and residual
+   behavior without forcing Durbin-Watson into range.
+9. Change-point detectors run on the process-appropriate residual transform.
+10. Results are exposed through plots, a notebook API, and export utilities with
+    explicit scope and confidence metadata.
+
+Active-regime boundaries are produced by a shared pure segmentation service used
+by both UI and notebook/batch paths. Gaps are not silently interpolated; SSA runs
+on qualifying contiguous spans while irregular timestamps use a separate
+irregular-series periodic diagnostic.
 
 ## Segment-first analysis procedure
 
-The interface now treats the selected segment as the single source of truth for analysis. The full series remains visible in the exploratory scatter plot and baseline diagnostics, but the downstream decomposition and statistical reporting operate on the active segment only.
+The interface treats the selected segment as the primary local analytical target,
+but it is not the only source of structural truth. Full-series diagnostics are
+required for slow and cadence-spanning structure. Results must state their scope
+so a 12-month period observed over the full series is not discarded because the
+current segment contains only two cycles.
 
 This is important because a short or final regime in a time series can exaggerate noise and produce unstable estimates if the analyst tries to infer structure from the entire series without isolating the regime of interest. When the final segment has insufficient history, the workflow uses a half-life-weighted lookback from the immediately preceding segment instead of blindly fitting on too little data.
 

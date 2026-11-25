@@ -124,7 +124,13 @@ def test_reconstruction_metadata_and_export_dataframe_produce_expected_output():
     assert "durbin_watson" in metadata
 
     df = api.export_components_dataframe()
-    assert list(df.columns) == ["timestamp", "Trend", "Seasonality", "Noise"]
+    assert list(df.columns) == [
+        "timestamp",
+        "Trend",
+        "Seasonality",
+        "Persistence",
+        "Noise",
+    ]
     assert len(df) == 6
 
 

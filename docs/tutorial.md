@@ -163,6 +163,11 @@ api.set_grouping(grouping=grouping)
 eigen_fig  = api.get_eigen_plot()
 recon_fig  = api.get_reconstruction_plot()
 cp_fig     = api.get_change_point_plot()
+process = api.get_process_analysis()
+monte_carlo_process = api.get_process_analysis(run_monte_carlo=True)
+scope_process = api.get_process_analyses_by_scope()
+variance_cp = api.get_variance_change_points()
+variance_cp_times = api.get_variance_change_point_timestamps()
 
 eigen_fig.show()
 recon_fig.show()
@@ -292,14 +297,25 @@ White noise has no trend or seasonality; variance is spread uniformly across all
 
 1. Upload `data/white_noise_data.csv`.
 2. Switch to **Decomposition**.
-3. Click **Suggest Grouping** (or attempt to apply a grouping manually).
-4. The suitability check runs. Because the top-5 eigenvectors explain less than 40% of total variance, the app displays a prominent alert:
+3. The initial assessment classifies the process before Step 2.
+4. Because the spectrum is diffuse, the app displays a prominent alert:
 
-   > *Top 5 eigenvectors explain X% — minimum required 40%. Apply Grouping is disabled. Consider external stochastic modelling approaches (e.g. random walk, ARIMA/SARIMA).*
+   > *This diffuse-noise process is not suitable for deterministic SSA. Remain in initial assessment and use a white-noise, ARMA, count, anomaly, or domain-specific model.*
 
 5. The **Apply Grouping** button is disabled. No reconstruction is computed.
 
 This is the correct outcome — SSA decomposition on white noise would produce meaningless components.
+
+Random walks are a distinct stop case. They can produce a concentrated, smooth
+spectrum even though the level process is stochastic. For a pure random walk,
+visual smoothing can create pareidolia—apparent trends or cycles in
+random/stochastic variation. The app therefore says:
+
+> *Stochastic persistence is consistent with a random walk or persistent AR
+> process. Do not interpret smooth SSA level modes as deterministic trend or
+> seasonality. This tool is not the right exploration choice for the level
+> process. Investigate random-walk, ARIMA/differenced, local-level, or
+> state-space models.*
 
 ---
 
@@ -329,7 +345,8 @@ if not suitability.is_suitable:
         f"The top-{suitability.top_k} eigenvectors explain only "
         f"{suitability.top_k_ratio * 100:.1f}% of total variance "
         f"(minimum required: {suitability.threshold * 100:.1f}%).\n"
-        f"Recommended: use a stochastic model (e.g. random walk, ARIMA/SARIMA)."
+        f"Recommended: use an appropriate noise-oriented model. Do not infer "
+        f"deterministic structure from visual smoothness."
     )
 
 # ── Auto-tune also handles this gracefully ────────────────────────────────────
@@ -377,9 +394,13 @@ series = load_series_from_csv("path/to/file.csv", timestamp_col=0, value_col=1)
 | `suggest_grouping_with_window_autotune()` | `GroupingAutoTuneResult` | Retries with doubled windows |
 | `set_grouping(grouping)` | `None` | Apply a custom or suggested grouping |
 | `get_reconstruction_plot()` | `go.Figure` | Requires grouping to be set |
-| `get_change_points()` | `dict[str, list[int]]` | Detected change points for grouped reconstruction |
+| `get_process_analysis(run_monte_carlo=True)` | `dict` | Process class, verified periods, persistence evidence, suitability, and optional Monte Carlo null percentile |
+| `get_process_analyses_by_scope()` | `dict` | Independent full-series and active-regime classifications |
+| `get_change_points()` | `dict[str, list[int]]` | Trend, seasonal, phase, and residual-variance change points |
+| `get_variance_change_points()` | `list[int]` | Residual-variance PELT change-point indices |
+| `get_variance_change_point_timestamps()` | `list[object]` | Index labels for residual-variance change points |
 | `get_noise_kde_plot(bandwidth="scott")` | `go.Figure` | KDE plot for the Noise component |
-| `get_reconstruction_metadata()` | `dict` | Reconstruction diagnostics including Durbin-Watson |
+| `get_reconstruction_metadata()` | `dict` | Process, Durbin-Watson, variance attribution, and change-point diagnostics |
 | `get_noise_variance_plot()` | `go.Figure` | Remaining noise variance vs rank plot |
 | `export_components_dataframe()` | `pd.DataFrame` | Auto-suggests grouping if missing; returns component data |
 | `generate_observation_text()` | `str` | Auto-generated narrative |

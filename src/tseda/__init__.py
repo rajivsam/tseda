@@ -19,6 +19,13 @@ from tseda.segmentation.pelt_segmentation import (
     resolve_minimum_segment_points,
     select_pelt_model,
 )
+from tseda.decomposition.process_diagnostics import (
+	PeriodicComponent,
+	PersistentComponent,
+	ProcessAnalysisResult,
+	ProcessClassification,
+	DecompositionSuitability,
+)
 
 
 def get_agent_instructions() -> str:
@@ -36,6 +43,11 @@ __all__ = [
 	"EXAMPLE_DATASETS",
 	"DEFAULT_MIN_SEGMENT_POINTS",
 	"NotebookThreeStepAPI",
+	"DecompositionSuitability",
+	"PeriodicComponent",
+	"PersistentComponent",
+	"ProcessAnalysisResult",
+	"ProcessClassification",
 	"SuitabilityResult",
 	"build_adjusted_analysis_segment",
 	"get_short_segment_confirmation_message",

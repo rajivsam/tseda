@@ -47,7 +47,7 @@ def analysis_layout() -> html.Div:
                         dbc.CardHeader(html.H5("Component Grouping", className="mb-0")),
                         dbc.CardBody([
                             dbc.Alert(
-                                "Please review the eigen vector plot and the variation associated with the components. Each component has a number going from 0 to one less than the window size. In the table below, you can group the components into a set of up to 3 groups. In the first column, name the component, in the second column input the list of components that you think go into the definition of that component. For example, if you call a component, \"Trend\" and think components, 0,1,2 are associated with it. Put Trend in the first column and 0,1,2 in the second. For the Noise row, you can enter * to automatically assign all remaining indices. When you are done, press \"Apply Grouping\"",
+                                "Please review the eigen vector plot and variation associated with the components. You may define up to 4 groups, including Persistence for stochastic low-frequency structure. A valid seasonal group must contain a verified oscillatory pair. For the Noise row, enter * to assign all remaining indices, then press \"Apply Grouping\".",
                                 color="info",
                                 className="mb-3"
                             ),
@@ -69,6 +69,10 @@ def analysis_layout() -> html.Div:
                                     html.Tr([
                                         html.Td(dbc.Input(id='component-name-3', type='text', placeholder='e.g., Noise', className='form-control')),
                                         html.Td(dbc.Input(id='component-list-3', type='text', placeholder='e.g., 4,5 or *', className='form-control'))
+                                    ]),
+                                    html.Tr([
+                                        html.Td(dbc.Input(id='component-name-4', type='text', placeholder='e.g., Persistence', className='form-control')),
+                                        html.Td(dbc.Input(id='component-list-4', type='text', placeholder='e.g., 0 or 0,1', className='form-control'))
                                     ]),
                                 ]),
                             ], borderless=True, style={'width': '100%'}),

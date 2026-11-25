@@ -182,10 +182,23 @@ api.set_window(api.get_window(), apply_window_refinement=True)
 grouping, dw_ok = api.suggest_grouping()
 api.set_grouping(grouping)
 recon_fig = api.get_reconstruction_plot()
+process = api.get_process_analysis()
+monte_carlo_process = api.get_process_analysis(run_monte_carlo=True)
+scopes = api.get_process_analyses_by_scope()
+variance_change_points = api.get_variance_change_points()
+variance_change_times = api.get_variance_change_point_timestamps()
+metadata = api.get_reconstruction_metadata()
+variance_attribution = metadata["variance_attribution"]
 
 summary = api.generate_observation_text()
 print(summary[:500])
 ```
+
+For a stochastic-persistence result, `tseda` stops deterministic SSA exploration.
+This guardrail matters because visual smoothing of a pure random walk can create
+pareidolia: apparent trends or cycles that are not deterministic structure. The
+recommended next step is a random-walk, ARIMA/differenced, local-level, or
+state-space model; any residual or innovation series is a separate new analysis.
 
 ## UI Example Illustrations
 
@@ -198,7 +211,14 @@ For examples of using tseda with the UI, please see the following links:
 
 ## Testing
 
-Testing covers heterogeneous real-world and benchmark conditions to verify that the workflow produces actionable diagnostics rather than a single narrow, tuned outcome. As described above, clearly patterned data such as coffee prices show stronger decomposition, while irregular or noisy series retain more residual variation. The Durbin-Watson statistic remains within the healthy 1.5 to 2.5 range across the evaluated datasets, indicating limited residual autocorrelation and statistically stable results. For the detailed test setup, generated report, full results table, exact running instructions, and complete outcomes, see [documents/test_datasets_report.md](documents/test_datasets_report.md).
+Testing covers heterogeneous real-world and benchmark conditions with explicit
+full-series and active-regime process classifications. The suite distinguishes
+diffuse noise, stochastic persistence, deterministic trend, stationary irregular
+variation, and verified periodic structure. Durbin-Watson is reported as a
+residual diagnostic and boundary distance, not used to force a semantic
+decomposition. For the detailed test setup, generated report, full results table,
+exact running instructions, and complete outcomes, see
+[documents/test_datasets_report.md](documents/test_datasets_report.md).
 
 ## More information
 

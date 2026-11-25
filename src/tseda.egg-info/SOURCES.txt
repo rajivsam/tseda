@@ -25,6 +25,8 @@ src/tseda/dataloader/ticket_resolution_data_loader.py
 src/tseda/dataloader/uci_air_quality_data_loader.py
 src/tseda/dataloader/white_noise_data_loader.py
 src/tseda/decomposition/automatic_grouping_heuristic.py
+src/tseda/decomposition/process_diagnostics.py
+src/tseda/decomposition/process_guidance.py
 src/tseda/decomposition/ssa_decomposition.py
 src/tseda/decomposition/ssa_result_summary.py
 src/tseda/images/tseda_workflow.png
@@ -57,6 +59,7 @@ tests/test_fft_analyzer.py
 tests/test_notebook_api.py
 tests/test_notebook_api_additional.py
 tests/test_pelt_change_point_estimator.py
+tests/test_process_diagnostics.py
 tests/test_sampling_prop.py
 tests/test_segment_selection.py
 tests/test_series_histogram_visualizer.py

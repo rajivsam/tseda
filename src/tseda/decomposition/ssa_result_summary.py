@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 
 from tseda.series_stats.sampling_prop import SamplingProp
 from tseda.series_stats.summary_statistics import SummaryStatistics
+from tseda.decomposition.process_guidance import stochastic_persistence_stop_message
 
 
 class SSAResultSummary:
@@ -248,12 +249,87 @@ class SSAResultSummary:
 
     def _modeling_recommendation(self) -> str:
         """Return a standard recommendation paragraph for the analyst."""
+        getter = getattr(self._ssa_obj, "get_process_analysis", None)
+        if callable(getter):
+            analysis = getter()
+            if analysis.process_classification.label == "stochastic_persistence":
+                return (
+                    "Recommendation: Stop deterministic SSA exploration for this level "
+                    "series. "
+                    + stochastic_persistence_stop_message()
+                )
+            if analysis.process_classification.label == "diffuse_noise":
+                return (
+                    "Recommendation: Stop deterministic SSA exploration. The spectrum "
+                    "is diffuse; investigate a white-noise, ARMA, count, anomaly, or "
+                    "domain-specific model instead of forcing a decomposition."
+                )
         return (
             "Recommendation: Please correlate the findings above with your modeling, "
             "control, and monitoring objectives. The decomposition provides a basis for "
             "understanding the trend, periodic behaviour, and noise characteristics of "
             "the series, which should inform feature engineering, model selection, and "
             "appropriate monitoring thresholds."
+        )
+
+    def _variance_change_point_observation(self) -> str:
+        """Summarize residual-variance changes detected within the active regime."""
+        ssa = self._ssa_obj
+        if not hasattr(ssa, "_recon"):
+            return (
+                "Residual-variance change point: Not available. Apply component grouping "
+                "in Step 2 to compute this diagnostic."
+            )
+
+        indices = ssa.get_variance_change_points()
+        if not indices:
+            return (
+                "Residual-variance change point: No within-regime variance shift was "
+                "detected by PELT."
+            )
+
+        timestamps = ssa.get_variance_change_point_timestamps()
+        locations = ", ".join(
+            f"{timestamp} (index {index})"
+            for index, timestamp in zip(indices, timestamps)
+        )
+        return (
+            "Residual-variance change point: PELT detected a shift in reconstructed "
+            f"residual dispersion at {locations}. Consider heteroscedastic modeling "
+            "or regime-specific variance estimates."
+        )
+
+    def _process_classification_observation(self) -> str:
+        """Summarize process-aware interpretation before reconstruction labels."""
+        getter = getattr(self._ssa_obj, "get_process_analysis", None)
+        if not callable(getter):
+            return "Process classification: Not available for this decomposition."
+        analysis = getter()
+        classification = analysis.process_classification
+        periodic = analysis.periodic_components
+        if periodic:
+            period_text = ", ".join(
+                f"{component.period:.4g} observations "
+                f"(confidence {component.confidence:.2f})"
+                for component in periodic
+            )
+            period_sentence = f" Verified periodic structure was found at {period_text}."
+        else:
+            period_sentence = " No deterministic periodic component passed verification."
+        confidence = (
+            f" with confidence {classification.confidence:.2f}"
+            if classification.confidence is not None
+            else ""
+        )
+        stop_guidance = (
+            f" {stochastic_persistence_stop_message()}"
+            if classification.label == "stochastic_persistence"
+            else ""
+        )
+        return (
+            f"Process classification: {classification.label}"
+            f"{f' ({classification.subtype})' if classification.subtype else ''}{confidence}."
+            f"{period_sentence}{stop_guidance}"
         )
 
     def build_observation_text(self) -> str:
@@ -266,7 +342,9 @@ class SSAResultSummary:
             self._sampling_observation(),
             self._statistics_observation(),
             self._ssa_decomposition_observation(),
+            self._process_classification_observation(),
             self._durbin_watson_observation(),
+            self._variance_change_point_observation(),
             self._modeling_recommendation(),
         ]
         return "\n\n".join(sections)

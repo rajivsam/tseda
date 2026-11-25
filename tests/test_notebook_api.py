@@ -44,6 +44,22 @@ def test_notebook_api_kde_bin_algorithm_and_step3_outputs():
     assert len(txt) > 20
 
 
+def test_notebook_api_exposes_variance_change_point_locations_and_plot_markers(monkeypatch):
+    series = _build_daily_series(n=120)
+    api = NotebookThreeStepAPI(series, window=12)
+    grouping, _ = api.suggest_grouping()
+    api.set_grouping(grouping=grouping)
+
+    monkeypatch.setattr(api._ssa, "_variance_change_points", [60])
+
+    assert api.get_variance_change_points() == [60]
+    assert api.get_variance_change_point_timestamps() == [series.index[60]]
+
+    fig = api.get_reconstruction_plot(show_variance_change_points=True)
+    assert any(shape.line.color == "#d62728" for shape in fig.layout.shapes)
+    assert "Residual-variance change point" in api.generate_observation_text()
+
+
 def test_notebook_api_exposes_grouping_configuration_and_override():
     series = _build_daily_series()
     api = NotebookThreeStepAPI(series, window=12)

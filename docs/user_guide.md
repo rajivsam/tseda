@@ -233,7 +233,22 @@ Before the grouping controls are activated, the app automatically checks whether
 
 **Why this check exists.** SSA decomposes a series by finding a small number of dominant directions (eigenvectors) that capture most of the variance. This works well when the series has real structure — a trend pulling values in a consistent direction, or a seasonal oscillation repeating at a known period. Those structures produce large, concentrated eigenvalues at the top of the spectrum. The remaining eigenvectors, which correspond to noise, are small and comparably sized.
 
-When a series is dominated by noise — white noise, a random walk with no drift, or any process without persistent structure — the eigenspectrum looks completely different: variance is spread roughly equally across all eigenvectors. No single component stands out. Applying SSA to such a series still produces a mathematically valid result, but the Trend and Seasonality groups it generates are statistical artefacts rather than meaningful signal components. The decomposition cannot be trusted, and the Durbin-Watson check on the noise residual will rarely give a clean result because there is no coherent structure left to separate.
+Diffuse white noise and stochastic persistence are separate cases.
+
+For diffuse white noise, variance is spread roughly equally across the
+eigenvectors and no coherent deterministic component stands out. Applying SSA
+can produce mathematically valid but uninterpretable Trend and Seasonality groups.
+
+A random walk can instead produce a highly concentrated, smooth eigen spectrum.
+That concentration is not evidence of deterministic trend or seasonality. Visual
+smoothing of a pure random walk can create pareidolia—the tendency to see a
+meaningful pattern in random/stochastic variation. `tseda` therefore classifies
+this case as `stochastic_persistence` and stops deterministic SSA exploration.
+
+For stochastic persistence, investigate a random-walk, ARIMA/differenced,
+local-level, or state-space model. If that analysis produces a separately
+defined residual, innovation, or differenced series, submit that series as a new
+analysis only after it passes its own cadence and identifiability checks.
 
 The suitability check quantifies this directly: it sums the explained variance of the top `k` eigenvectors and requires that sum to reach a minimum threshold. If it does not, the Apply Grouping button is disabled and a red alert explains what was found:
 
@@ -245,18 +260,23 @@ Params: top_k = 5, min_explained_variance = 0.40
 3.  top_k_ratio ← Σᵢ₌₁ᵏ λᵢ / total
 4.  If top_k_ratio < min_explained_variance:
         → Block Apply Grouping
-        → Show: "Top k eigenvectors explain X.X% — minimum required Y%"
-  → Recommend: external stochastic modelling (outside this SSA app)
+        → Show a diffuse-noise stop message
+  → Recommend external stochastic modeling
 5.  Else:
-        → Allow grouping to proceed
+        → Apply process classification
+        → If stochastic_persistence: stop and warn against pareidolia
+        → Otherwise allow grouping to proceed when process evidence is supported
 ```
 
 The alert reports the **actual ratio** alongside the threshold so you can judge whether the dataset is marginally below the cutoff (and perhaps worth trying with a different window) or deeply unsuitable. Both `top_k` and `min_explained_variance` are configurable — see [Section 10 of the Configuration reference](#10-dataset-suitability-check).
 
 **What to do if the check fails:**
-- Try a larger SSA window using the slider. Sometimes a cadence-based default window is too small to reveal seasonal structure.
-- Inspect the eigenvalue profile plot — if the bars form a steep drop-off rather than a flat line, the series may still be worth exploring at a different scale.
-- If the spectrum remains flat at all window sizes, the series is most likely noise-dominated. Since this tool is SSA-focused, switch to an external stochastic approach (for example random walk/Brownian-motion-style models or ARIMA/SARIMA).
+- For an indeterminate short-regime result, obtain more observations/cycles or
+  inspect the full series.
+- For diffuse noise, use a stochastic/noise-oriented model instead of SSA.
+- For stochastic persistence, do not “try a bigger smoothing window.” Investigate
+  random-walk/differenced/state-space methods. A smooth curve is not proof of a
+  deterministic pattern.
 
 #### Seasonality Heuristic
 

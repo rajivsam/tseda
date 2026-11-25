@@ -10,6 +10,11 @@
 - Detects structural changes such as trend shifts, seasonal amplitude shifts, and seasonal phase shifts.
 - Exports results in tabular form and integrates with a KMDS ontology-backed knowledge graph for lineage and observation logging.
 
+For stochastic-persistence series such as random walks, `tseda` intentionally
+stops deterministic SSA exploration. Visual smoothing can create pareidolia—an
+apparent trend or cycle in random/stochastic variation—so the user is directed
+to random-walk, ARIMA/differenced, local-level, or state-space methods.
+
 ## Primary users
 
 - Data scientists who need reliable pre-processing for forecasting, anomaly detection, and signal modeling.

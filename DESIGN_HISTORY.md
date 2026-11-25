@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document chronicles the iterative design and development of `tseda`, with emphasis on the explicit technical checks, architectural decisions, and quality gates that ensured correctness and usability. The project evolved through ten sequential design decisions, each introducing new requirements, triggering validation checks, and refining the core architecture.
+This document chronicles the iterative design and development of `tseda`, with emphasis on the explicit technical checks, architectural decisions, and quality gates that ensured correctness and usability. The project evolved through sequential design decisions, each introducing new requirements, triggering validation checks, and refining the core architecture.
 
 ---
 
@@ -20,6 +20,38 @@ This document chronicles the iterative design and development of `tseda`, with e
 | 8 | KMDS OWL knowledge-capture integration | Confirm observation write/read round-trips without ontology corruption | ✅ `KMDSDataWriter.add_exploratory_obs` verified on coffee KB |
 | 9 | Automatic window refinement loop | Verify tail eigenvalue spread criterion correctly doubles window until spectrum is non-flat | ✅ Invariant `tail_ratio < 0.10` holds after refinement on all test datasets |
 | 10 | Dual-detector change-point analysis (trend + seasonal amplitude) | Verify two independent PELT detectors find distinct, meaningful breakpoints | ✅ Trend-shift and seasonal-amplitude-shift breakpoints correctly separated across datasets |
+| 11 | Process-aware SSA interpretation | Separate stochastic persistence, deterministic periodicity, diffuse noise, and indeterminate short-window evidence | Design review approved; implementation and user-facing revision pending |
+
+## Revision 11: Process-Aware SSA Interpretation
+
+**Problem Statement:** The existing suitability and grouping pipeline interprets
+eigenvalue concentration as deterministic structure. Random walks and other
+highly persistent stochastic processes can instead create steep, smooth spectra
+with one dominant mode. This allows a non-periodic level process to be labeled as
+seasonality or trend, and makes fixed top-k thresholds uninformative at very
+small windows.
+
+**Decision:** Add process classification before reconstruction grouping. The
+classifier combines level-spectrum decay, EOF smoothness, first-difference
+spectrum behavior, unit-root/stationarity tests, matched Monte Carlo SSA nulls,
+and cadence-specific periodic verification.
+
+**Invariants:**
+
+- A singleton eigentriple cannot become a seasonal group.
+- A random-walk-consistent spectrum is reported as stochastic persistence, not
+  deterministic seasonality.
+- Durbin-Watson is a residual diagnostic, not a target that changes semantic
+  classification.
+- Full-series and active-regime findings are reported separately.
+- A short or contradictory result is `indeterminate`, not a forced pass/fail.
+
+**Canonical specification:**
+`documents/process_aware_ssa_design.md`.
+
+**Implementation status:** Design review approved on 25 November 2026. Runtime
+implementation, acceptance tests, and user-visible artifact updates are the next
+work phase.
 
 ---
 

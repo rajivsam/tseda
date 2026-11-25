@@ -163,7 +163,13 @@ A complementary example is [documents/car_sales_example.md](documents/car_sales_
 
 A further example is [documents/biomass_power_gen_example.md](documents/biomass_power_gen_example.md). It examines biomass power generation from the European electricity dataset and shows how a signal can be dominated by evolving trend behavior rather than stable seasonality. This is a useful case for analysts working with renewable-generation data, where structural change and regime shifts can be more informative than a recurring seasonal cycle.
 
-The [white-noise example](documents/white_noise_example.md) illustrates the complementary case: when the eigenspectrum is diffuse and the variance is spread broadly across the spectrum, SSA is not the right tool for the signal. In this situation, `tseda` warns the user that the decomposition is not suitable and recommends switching to a stochastic/noise-based model such as a random-walk/Brownian-motion style approach or an ARIMA/SARIMA workflow.
+The [white-noise example](documents/white_noise_example.md) illustrates one
+complementary stop case: a diffuse spectrum is unsuitable for deterministic SSA.
+Random-walk-like stochastic persistence is a distinct stop case even when the
+spectrum is highly concentrated. Visual smoothing can create pareidolia—apparent
+patterns in random/stochastic variation—so `tseda` warns that this tool is not
+the right exploration choice for the level process and recommends
+random-walk, ARIMA/differenced, local-level, or state-space methods.
 
 
 Notebook parity is effectively 100 percent: everything that can be done in the UI can also be done in the notebook workflow. The notebook API supports the same decomposition, validation, plotting, and reporting steps, so users can reproduce the UI-driven analysis and extend it with custom code. Stay tuned for updated documentation that brings together installation guidance, notebook walkthroughs, and the full UI-to-notebook parity story.

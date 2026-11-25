@@ -2,7 +2,11 @@ import pandas as pd
 import numpy as np
 import pytest
 
-from tseda.change_point.change_point_estimator import PELT_ChangePointEstimator, ChangePointEstimator
+from tseda.change_point.change_point_estimator import (
+    ChangePointEstimator,
+    PELT_ChangePointEstimator,
+    detect_variance_change_points,
+)
 
 
 def test_pelt_estimator_rejects_empty_series():
@@ -50,3 +54,23 @@ def test_change_point_estimator_segment_labels_are_consistent():
     assert list(labels.index) == list(range(len(series)))
     assert all(lbl.startswith("segment-") for lbl in labels)
     assert len(labels.unique()) == 1
+
+
+def test_variance_change_point_detector_rejects_homoscedastic_residuals():
+    rng = np.random.default_rng(42)
+    residuals = rng.normal(0.0, 1.0, 240)
+
+    assert detect_variance_change_points(residuals) == []
+
+
+def test_variance_change_point_detector_finds_step_variance_shift():
+    rng = np.random.default_rng(42)
+    residuals = np.concatenate([
+        rng.normal(0.0, 0.5, 120),
+        rng.normal(0.0, 4.0, 120),
+    ])
+
+    change_points = detect_variance_change_points(residuals)
+
+    assert len(change_points) == 1
+    assert abs(change_points[0] - 120) <= 2

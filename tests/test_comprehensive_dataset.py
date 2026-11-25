@@ -26,6 +26,20 @@ DATASETS = [
     ("hyndman_usconsumption_quarterly_consumption", "data/hyndman_usconsumption_quarterly_consumption.csv"),
 ]
 
+GROUND_TRUTH = {
+    "coffee_prices": {"class": "stochastic_persistence"},
+    "white_noise_data": {"class": "diffuse_noise"},
+    "trimmed_biomass": {"class": "deterministic_trend"},
+    "monthly_car_sales": {"class": "periodic", "period": 12.0},
+    "uci_air_quality_hourly_co": {"class": "periodic", "period": 24.0},
+    "ticket_resolution_hourly_nyc311": {"class": "periodic", "period": 24.0},
+    "hyndman_arrivals_quarterly_japan": {"class": "periodic", "period": 4.0},
+    "hyndman_goog_daily_close": {"class": "stochastic_persistence"},
+    "hyndman_hyndsight_daily_pageviews": {"class": "periodic", "period": 7.0},
+    "hyndman_sunspot_monthly_area": {"class": "periodic", "period": 132.0},
+    "hyndman_usconsumption_quarterly_consumption": {"class": "stationary_irregular"},
+}
+
 
 def _compute_ui_segment_boundaries(total_points: int, segment_count: int) -> list[tuple[int, int]]:
     """Mirror the UI's boundary logic for the selected analysis segment."""
@@ -97,18 +111,41 @@ def test_comprehensive_dataset_test(tmp_path: Path):
         assert not series.empty, f"Dataset {name} produced an empty time series."
 
         analysis_series = _resolve_ui_analysis_segment(series)
+        full_api = NotebookThreeStepAPI(series)
+        full_process = full_api._ensure_ssa().get_process_analysis(scope="full_series")
         api = NotebookThreeStepAPI(analysis_series)
         suitability = api.get_suitability_result()
+        active_process = api._ensure_ssa().get_process_analysis(scope="active_regime")
 
         result: dict[str, object] = {
             "dataset": name,
-            "samples": len(analysis_series),
+            "full_samples": len(series),
+            "active_samples": len(analysis_series),
+            "full_process_class": full_process.process_classification.label,
+            "active_process_class": active_process.process_classification.label,
+            "full_periods": ", ".join(
+                f"{component.period:.2f}"
+                for component in full_process.periodic_components
+            ),
+            "active_periods": ", ".join(
+                f"{component.period:.2f}"
+                for component in active_process.periodic_components
+            ),
             "window": api.get_window(),
             "suitability_passed": suitability.is_suitable,
             "top_k_ratio": suitability.top_k_ratio,
             "top_k": suitability.top_k,
             "threshold": suitability.threshold,
         }
+
+        expected = GROUND_TRUTH[name]
+        assert full_process.process_classification.label == expected["class"]
+        expected_period = expected.get("period")
+        if expected_period is not None:
+            assert any(
+                abs(component.period - float(expected_period)) / float(expected_period) <= 0.15
+                for component in full_process.periodic_components
+            ), f"{name} missing full-series period {expected_period}"
 
         if suitability.is_suitable:
             grouping_autotune = api.suggest_grouping_with_window_autotune()
@@ -138,6 +175,9 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                     {
                         "trend": "✔" if _has_component(explained_variance, "Trend") else "–",
                         "seasonality": "✔" if has_seasonality else "–",
+                        "persistence": "✔"
+                        if _has_component(explained_variance, "Persistence")
+                        else "–",
                         "signal_explained": signal_explained,
                         "noise_explained": noise_explained,
                         "durbin_watson": float(reconstructed.get("durbin_watson", float("nan")))
@@ -152,6 +192,7 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                     {
                         "trend": "n/a",
                         "seasonality": "n/a",
+                        "persistence": "n/a",
                         "signal_explained": 0.0,
                         "noise_explained": 0.0,
                         "durbin_watson": None,
@@ -164,6 +205,7 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                 {
                     "trend": "rejected",
                     "seasonality": "rejected",
+                    "persistence": "rejected",
                     "signal_explained": 0.0,
                     "noise_explained": 0.0,
                     "durbin_watson": None,
@@ -186,19 +228,22 @@ def test_comprehensive_dataset_test(tmp_path: Path):
     pd.DataFrame(results).to_csv(output_csv, index=False)
 
     markdown_lines = [
-        "| Dataset | Trend | Seasonality | Signal Explained | Noise | Change Points | Durbin–Watson |",
-        "|---|---|---|---|---|---|---|",
+        "| Dataset | Full Process | Active Process | Full Periods | Trend | Seasonality | Persistence | Signal Explained | Noise | Durbin–Watson |",
+        "|---|---|---|---|---|---|---|---:|---:|---:|",
     ]
     for row in results:
         markdown_lines.append(
-            "| {dataset} | {trend} | {seasonality} | {signal_explained:.2f} | {noise_explained:.2f} | {change_points} | {durbin_watson} |".format(
+            "| {dataset} | {full_process} | {active_process} | {periods} | {trend} | {seasonality} | {persistence} | {signal_explained:.2f} | {noise_explained:.2f} | {durbin_watson} |".format(
                 **{
                     "dataset": row["dataset"],
+                    "full_process": row["full_process_class"],
+                    "active_process": row["active_process_class"],
+                    "periods": row["full_periods"] or "—",
                     "trend": row["trend"],
                     "seasonality": row["seasonality"],
+                    "persistence": row["persistence"],
                     "signal_explained": float(row["signal_explained"]),
                     "noise_explained": float(row.get("noise_explained", 0.0)),
-                    "change_points": row["change_points"],
                     "durbin_watson": row["durbin_watson"] if row["durbin_watson"] is not None else "n/a",
                 }
             )
@@ -211,7 +256,12 @@ def test_comprehensive_dataset_test(tmp_path: Path):
         "Field | Description | Computation / Input",
         "--- | --- | ---",
         "dataset | Identifier for the dataset being tested. | This is an input.",
-        "samples | Number of rows in the loaded time series. | This is an input computed from `len(series)`, the loaded series length.",
+        "full_samples | Number of rows in the full time series. | Derived from the loaded series.",
+        "active_samples | Number of rows in the active regime. | Derived from shared segmentation logic.",
+        "full_process_class | Process classification for the full series. | Derived from process-aware SSA diagnostics.",
+        "active_process_class | Process classification for the active regime. | Derived from process-aware SSA diagnostics.",
+        "full_periods | Verified full-series periods. | Derived from verified SSA pairs and cadence evidence.",
+        "active_periods | Verified active-regime periods. | Derived from verified SSA pairs and cadence evidence.",
         "window | Window size suggested or used by the API. | Derived from the API's internal suitability and window selection logic.",
         "suitability_passed | Whether the series passed the suitability gate. | Derived from `api.get_suitability_result().is_suitable`.",
         "top_k_ratio | Ratio used to determine the top-k reconstruction components. | Derived from the suitability result returned by the API.",
@@ -219,6 +269,7 @@ def test_comprehensive_dataset_test(tmp_path: Path):
         "threshold | Suitability threshold value for the dataset. | Derived from the suitability result returned by the API.",
         "trend | Whether a Trend component was identified in the reconstruction. | Derived from the explained variance output; checks if `Trend` variance percent is greater than zero.",
         "seasonality | Whether a Seasonality component was identified. | Derived from the explained variance output; checks if `Seasonality` variance percent is greater than zero.",
+        "persistence | Whether a stochastic low-frequency Persistence component was identified. | Derived from the explained variance output.",
         "variance_explained | Total explained variance percent across all identified components. | Derived by summing all values in `reconstructed['explained_variance_percent']`.",
         "durbin_watson | Durbin–Watson statistic for reconstructed residuals. | Derived from `reconstructed.get('durbin_watson')` when reconstruction metadata is available.",
         "change_points | Summary of detected change points in trend and seasonal behavior. | Derived from `api.get_change_points()` and formatted as a summary string.",
@@ -246,4 +297,16 @@ def test_generate_test_dataset_report(tmp_path: Path):
     assert "## Dataset summary" in content
     assert "coffee_prices" in content
     assert "hyndman_goog_daily_close" in content
-    assert "| Dataset | Trend | Seasonality | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |" in content
+    assert "| Dataset | Full Process | Active Process | Full Periods | Trend | Seasonality | Persistence | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |" in content
+    assert "## Ground-truth due diligence" in content
+    assert "## Scope and suitability terminology" in content
+    assert "**Active Process**" in content
+    assert "`indeterminate` means" in content
+    assert "## Indeterminate and unsuitable cases in this run" in content
+    assert "| Dataset | Expected Process | Produced Process | Expected Period | Produced Period | Comparison |" in content
+    assert "| hyndman_goog_daily_close | stochastic_persistence | stochastic_persistence | — | — | Matches |" in content
+    assert "| monthly_car_sales | periodic | periodic | 12.00 | 12.00 | Matches |" in content
+    assert "monthly_car_sales | periodic | indeterminate" in content
+    assert "white_noise_data | diffuse_noise | diffuse_noise | unsuitable" in content
+    assert "pareidolia" in content
+    assert "This tool is not the right exploration choice" in content

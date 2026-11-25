@@ -13,7 +13,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from tseda.decomposition.automatic_grouping_heuristic import AutomaticGroupingHeuristic
+from tseda.change_point.change_point_estimator import detect_variance_change_points
 from tseda.config.config_loader import ConfigurationManager
+from tseda.decomposition.process_diagnostics import ProcessAnalysisResult, analyze_process
 
 
 class SSADecomposition:
@@ -44,6 +46,7 @@ class SSADecomposition:
         self._cum_var = {"var_comp-" + str(i) : (np.sum(self._eigenvalues[:i+1])/self._total_variance).item() for i in range(self._eigenvalues.shape[0])}
         self._seasonality_check_heuristic = False
         self._reset_reconstruction_cache()
+        self._process_analysis: ProcessAnalysisResult | None = None
 
     def _dominant_seasonal_power_ratio(
         self,
@@ -107,29 +110,84 @@ class SSADecomposition:
         cycle in the seasonal band; that gives an independent, theory-grounded
         validation of the seasonal interpretation.
         """
-        heuristic = self.get_automatic_grouping_heuristic()
-        max_components = min(self.SEASONALITY_HEURISTIC_LEADING_EIGENVALUES, len(heuristic.eigenvalues))
-        pair_flag = heuristic.has_seasonal_pair(max_components=max_components)
-
-        spectral_threshold = float(
-            ConfigurationManager.get("seasonality_heuristic.spectral_peak_threshold", 0.15)
-        )
-        min_period_points = int(
-            ConfigurationManager.get("seasonality_heuristic.min_seasonal_period_points", 2)
-        )
-        max_period_fraction = float(
-            ConfigurationManager.get("seasonality_heuristic.max_seasonal_period_fraction", 0.33)
-        )
-        spectral_ratio = self._dominant_seasonal_power_ratio(
-            min_period_points=min_period_points,
-            max_period_fraction=max_period_fraction,
-        )
-
-        pair_supported = bool(pair_flag and (spectral_ratio >= (spectral_threshold * 0.5)))
-        spectral_supported = bool(spectral_ratio >= spectral_threshold)
-
-        self._seasonality_check_heuristic = bool(pair_supported or spectral_supported)
+        analysis = self.get_process_analysis()
+        self._seasonality_check_heuristic = bool(analysis.periodic_components)
         return self._seasonality_check_heuristic
+
+    def get_process_analysis(
+        self,
+        scope: str = "active_regime",
+        run_monte_carlo: bool = False,
+    ) -> ProcessAnalysisResult:
+        """Return process-aware classification and verified periodic evidence."""
+        if (
+            self._process_analysis is not None
+            and self._process_analysis.scope == scope
+            and (not run_monte_carlo or self._process_analysis.evidence.monte_carlo_status == "completed")
+        ):
+            return self._process_analysis
+        self._process_analysis = analyze_process(
+            self._series,
+            window=self._window,
+            scope=scope,
+            run_monte_carlo=run_monte_carlo,
+        )
+        return self._process_analysis
+
+    def _filter_assignment_by_process(
+        self,
+        assignment: dict[str, list[int]],
+    ) -> dict[str, list[int]]:
+        """Remove singleton or stochastic-evidence 'seasonality' assignments."""
+        filtered = {name: list(indices) for name, indices in assignment.items()}
+        analysis = self.get_process_analysis()
+        verified_pairs = {
+            component.eigenvalue_pair
+            for component in analysis.periodic_components
+            if component.window == self._window
+        }
+        verified_seasonal = sorted(
+            {
+                index
+                for pair in verified_pairs
+                for index in pair
+            }
+        )
+        current_seasonal = list(filtered.get("Seasonality", []))
+        rejected = [index for index in current_seasonal if index not in verified_seasonal]
+        filtered["Seasonality"] = verified_seasonal
+        filtered["Trend"] = sorted(
+            (set(filtered.get("Trend", [])) | set(rejected)) - set(verified_seasonal)
+        )
+        persistent_indices = sorted(
+            {
+                index
+                for component in analysis.persistent_components
+                for index in component.component_indices
+                if index < self._window
+            }
+        )
+        if persistent_indices:
+            filtered["Persistence"] = persistent_indices
+            filtered["Trend"] = [
+                index for index in filtered["Trend"] if index not in set(persistent_indices)
+            ]
+            filtered["Seasonality"] = [
+                index
+                for index in filtered["Seasonality"]
+                if index not in set(persistent_indices)
+            ]
+        assigned = (
+            set(filtered["Trend"])
+            | set(filtered["Seasonality"])
+            | set(filtered.get("Persistence", []))
+        )
+        filtered["Noise"] = [
+            index
+            for index in filtered.get("Noise", [])
+            if index not in assigned
+        ]
+        return filtered
 
     def get_automatic_grouping_heuristic(
         self,
@@ -224,6 +282,7 @@ class SSADecomposition:
                     idx for idx in range(len(self._eigenvalues)) if idx not in assigned
                 ]
 
+        assignment = self._filter_assignment_by_process(assignment)
         dw = self._compute_dw_for_assignment(assignment)
         if dw is not None and dw_low <= dw <= dw_high:
             return assignment, True
@@ -236,6 +295,7 @@ class SSADecomposition:
             if not did_expand:
                 break
             assignment = expanded
+            assignment = self._filter_assignment_by_process(assignment)
             dw = self._compute_dw_for_assignment(assignment)
             if dw is not None:
                 dist = abs(dw - 2.0)
@@ -243,10 +303,12 @@ class SSADecomposition:
                     best_assignment = expanded
                     best_dw_distance = dist
                 if dw_low <= dw <= dw_high:
+                    best_assignment = self._filter_assignment_by_process(best_assignment)
                     return best_assignment, True
 
         if best_assignment is not assignment:
             self._compute_dw_for_assignment(best_assignment)
+        best_assignment = self._filter_assignment_by_process(best_assignment)
         return best_assignment, False
 
     def _compute_dw_for_assignment(self, assignment: dict[str, list[int]]) -> float | None:
@@ -269,6 +331,7 @@ class SSADecomposition:
         self._group_signals = {}
         self._durbin_watson = None
         self._variation_by_group = {}
+        self._variance_change_points: list[int] | None = None
 
     def _build_reconstruction_cache(self) -> None:
         """Build cached reconstructed series for raw, smoothed, noise, and each named group."""
@@ -383,11 +446,127 @@ class SSADecomposition:
         cbar.set_label('Weighted Correlation Values')
         return fig
     
-    def signal_reconstruction_plot(self) -> go.Figure:
+    def _detect_variance_change_points(self) -> list[int]:
+        """Detect variance shifts in the reconstructed residual series."""
+        if self._variance_change_points is not None:
+            return list(self._variance_change_points)
+
+        self._ensure_reconstruction_cache()
+        residual = self.get_reconstructed_series("noise")
+        if residual is None:
+            raw_signal = self.get_reconstructed_series("raw_signal")
+            smoothed_signal = self.get_reconstructed_series("smoothed_signal")
+            if raw_signal is None or smoothed_signal is None:
+                self._variance_change_points = []
+                return []
+            residual = raw_signal - smoothed_signal
+
+        penalty_multiplier = float(
+            ConfigurationManager.get(
+                "change_point_detection.variance_penalty_multiplier",
+                2.0,
+            )
+        )
+        min_segment_points = int(
+            ConfigurationManager.get(
+                "change_point_detection.variance_min_segment_points",
+                10,
+            )
+        )
+        self._variance_change_points = detect_variance_change_points(
+            residual,
+            penalty_multiplier=penalty_multiplier,
+            min_segment_points=min_segment_points,
+        )
+        return list(self._variance_change_points)
+
+    def get_variance_change_points(self) -> list[int]:
+        """Return zero-based residual-variance change-point indices."""
+        if not hasattr(self, "_recon"):
+            raise ValueError("Reconstruction map is not set. Call set_reconstruction() first.")
+        return self._detect_variance_change_points()
+
+    def get_variance_change_point_timestamps(self) -> list[object]:
+        """Return index labels corresponding to residual-variance change points."""
+        return [self._series.index[idx] for idx in self.get_variance_change_points()]
+
+    def get_variance_attribution(self) -> dict[str, object]:
+        """Return spectral and observation-scale variance attribution by group."""
+        if not hasattr(self, "_recon"):
+            raise ValueError("Reconstruction map is not set. Call set_reconstruction() first.")
+        self._ensure_reconstruction_cache()
+        raw = self.get_reconstructed_series("raw_signal")
+        if raw is None:
+            raise ValueError("Raw reconstructed signal is unavailable.")
+        raw_values = raw.to_numpy(dtype=float)
+        total_variance = float(np.var(raw_values))
+        if total_variance <= 0.0:
+            raise ValueError("Raw reconstructed signal has no finite variance.")
+
+        group_values: dict[str, np.ndarray] = {}
+        spectral_share: dict[str, float] = {}
+        for group_name, indices in self._recon.items():
+            reconstructed = self.get_reconstructed_series(group_name)
+            if reconstructed is None:
+                continue
+            group_values[group_name] = reconstructed.to_numpy(dtype=float)
+            spectral_share[group_name] = float(
+                sum(
+                    self._exp_var.get(f"var_comp-{component_index}", 0.0)
+                    for component_index in indices
+                )
+            )
+
+        reconstructed_total = (
+            sum(group_values.values())
+            if group_values
+            else np.zeros_like(raw_values, dtype=float)
+        )
+        reconstruction_residual = raw_values - reconstructed_total
+        covariance_inputs = {**group_values, "Residual": reconstruction_residual}
+        normalized_share = {
+            group_name: float(np.var(values) / total_variance)
+            for group_name, values in group_values.items()
+        }
+        covariance_adjusted_share: dict[str, float] = {}
+        for group_name, values in covariance_inputs.items():
+            covariance = float(np.var(values))
+            for other_name, other_values in covariance_inputs.items():
+                if other_name != group_name:
+                    covariance += float(np.cov(values, other_values, ddof=0)[0, 1])
+            covariance_adjusted_share[group_name] = covariance / total_variance
+
+        warnings: list[str] = []
+        if any(value < -1e-12 for value in covariance_adjusted_share.values()):
+            warnings.append("negative_covariance_adjusted_attribution")
+        if float(np.var(reconstruction_residual) / total_variance) > 1e-6:
+            warnings.append("nonzero_reconstruction_residual")
+
+        residual_variance_ratio = float(np.var(reconstruction_residual) / total_variance)
+        return {
+            "scale": "ssa_preprocessed",
+            "total_variance": total_variance,
+            "spectral_share": spectral_share,
+            "reconstruction_variance": {
+                group_name: float(np.var(values))
+                for group_name, values in group_values.items()
+            },
+            "normalized_variance_share": normalized_share,
+            "covariance_adjusted_share": covariance_adjusted_share,
+            "residual_variance_ratio": residual_variance_ratio,
+            "reconstruction_r_squared": 1.0 - residual_variance_ratio,
+            "separation_warnings": warnings,
+        }
+
+    def signal_reconstruction_plot(
+        self,
+        show_variance_change_points: bool = True,
+    ) -> go.Figure:
         """Return a signal reconstruction plot for raw, smoothed, and grouped series.
 
         This call also refreshes and caches reconstruction products and updates
-        the seasonality heuristic flag.
+        the seasonality heuristic flag. Residual-variance change points are
+        optionally shown as vertical markers.
         """
 
         if not hasattr(self, "_recon"):
@@ -430,6 +609,16 @@ class SSADecomposition:
                 name=key,
                 line=dict(width=1.5, color=colors[i % len(colors)]),
             ))
+
+        if show_variance_change_points:
+            for i, cp_idx in enumerate(self._detect_variance_change_points()):
+                fig.add_vline(
+                    x=float(pd.Timestamp(dates[cp_idx]).timestamp() * 1000),
+                    line_dash="longdashdot",
+                    line_color="#d62728",
+                    annotation_text=f"V{i + 1}",
+                    annotation_position="top right",
+                )
 
         fig.update_layout(
             title="Signal Reconstruction by Group",
@@ -573,10 +762,11 @@ class SSADecomposition:
             "trend": trend_change_points.tolist(),
             "seasonal_amplitude": seasonal_change_points.tolist(),
             "seasonal_phase": phase_change_points.tolist(),
+            "variance": self._detect_variance_change_points(),
         }
 
     def get_change_points(self) -> dict[str, list[int]]:
-        """Return detected change points for trend, seasonal amplitude, and phase."""
+        """Return detected trend, seasonal, phase, and residual-variance changes."""
         if not hasattr(self, "_recon"):
             raise ValueError("Reconstruction map is not set. Call set_reconstruction() first.")
         self._ensure_reconstruction_cache()
@@ -585,7 +775,7 @@ class SSADecomposition:
     def change_point_plot(self) -> go.Figure:
         """Return a change-point analysis plot using the smoothed signal.
 
-        Two independent PELT detectors are run:
+        PELT is applied to structural and residual diagnostics:
 
         * **Trend shifts** — PELT on the z-score-normalised Trend component
           (``l2`` cost, penalty ``log(n)``).  Rendered as vertical *dashed* lines.
@@ -593,6 +783,8 @@ class SSADecomposition:
           rolling-RMS envelope of the Seasonality component, with a rolling
           window equal to the SSA window size (``l2`` cost, penalty ``log(n)``).
           Rendered as vertical *dotted* lines.
+        * **Residual variance shifts** — PELT with a Gaussian cost on the
+          reconstructed noise component. Rendered as red long-dash-dot lines.
 
         The smoothed signal (trend + all non-noise components) is plotted as a
         single continuous trace.  A plain-language summary of detected changes
@@ -624,6 +816,7 @@ class SSADecomposition:
         seas_signal = self._group_signals.get("seasonality")
         seasonal_change_points: np.ndarray = np.array([], dtype=int)
         phase_change_points: np.ndarray = np.array([], dtype=int)
+        variance_change_points = np.array(self._detect_variance_change_points(), dtype=int)
 
         def _dominant_period(signal: np.ndarray) -> float | None:
             if signal.size < 4:
@@ -743,6 +936,16 @@ class SSADecomposition:
                 annotation_position="bottom left" if i % 2 == 0 else "bottom right",
             )
 
+        # Residual variance change points — red long-dash-dot lines
+        for i, cp_idx in enumerate(variance_change_points):
+            fig.add_vline(
+                x=_ts_to_ms(cp_idx),
+                line_dash="longdashdot",
+                line_color="#d62728",
+                annotation_text=f"V{i + 1}",
+                annotation_position="top left" if i % 2 == 0 else "top right",
+            )
+
         # --- Plain-language summary annotations below the plot ----------------
         def _fmt_dates(indices: np.ndarray) -> str:
             if indices.size == 0:
@@ -761,8 +964,12 @@ class SSADecomposition:
         phase_summary = (
             f"Seasonal phase shifts (-·-): {_fmt_dates(phase_change_points)}"
         )
+        variance_summary = (
+            f"Residual variance shifts (-·- red): {_fmt_dates(variance_change_points)}"
+        )
 
-        for row_idx, text in enumerate([trend_summary, seasonal_summary, phase_summary]):
+        summaries = [trend_summary, seasonal_summary, phase_summary, variance_summary]
+        for row_idx, text in enumerate(summaries):
             fig.add_annotation(
                 text=text,
                 xref="paper", yref="paper",
@@ -778,7 +985,7 @@ class SSADecomposition:
             title="Change Point Analysis",
             xaxis_title="Date",
             yaxis_title="Signal",
-            margin=dict(b=160),
+            margin=dict(b=190),
         )
 
         return fig

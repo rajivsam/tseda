@@ -15,6 +15,27 @@ The three phases are:
 2. Time Series Decomposition
 3. Observation Logging
 
+Process-aware interpretation revision
+--------------------------------------
+
+SSA concentration alone is not a semantic classification of trend or seasonality.
+A random walk or other persistent stochastic process can produce a concentrated,
+steep eigen spectrum and smooth leading eigenvectors. The revised workflow first
+classifies diffuse noise, deterministic structure, stochastic persistence,
+periodic structure, or mixed/indeterminate behavior, then derives decomposition
+groups that are compatible with that classification.
+
+For pure random walks, visual smoothing can create pareidolia: apparent trends or
+cycles in random/stochastic variation. ``stochastic_persistence`` is therefore
+an assessment stop, not a deterministic SSA trend. The UI, notebook, and report
+direct the user to random-walk, ARIMA/differenced, local-level, or state-space
+models. A separately produced residual or innovation series may be analyzed as a
+new input only if it independently passes identifiability checks.
+
+The implementation specification is in
+``documents/process_aware_ssa_design.md``. Runtime behavior, UI labels, notebook
+outputs, and benchmark reports now use this process-aware classification.
+
 Initial Assessment
 ------------------
 
@@ -33,11 +54,12 @@ longer, with missing values handled before upload.
 Segment-first analysis and half-life fallback
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The app no longer treats the full series as the only analytic target. The full
-series remains visible for exploratory context, but the selected segment becomes
-the active analysis target for downstream decomposition, ACF/PACF diagnostics, and
-summary reporting. In other words, the user chooses the segment to analyze, and the
-rest of the app works from that regime instead of silently reusing the full series.
+The app treats the selected segment as the primary local analytic target, while
+retaining the full series as a distinct evaluation scope. Slow structure such as
+annual seasonality or an approximately eleven-year cycle cannot be inferred
+reliably from a short final segment. Results must therefore state whether a
+finding belongs to the full series, the active regime, or is indeterminate at one
+of those scopes.
 
 When the final segment is too short to support a stable estimate, the UI triggers a
 short-tail warning and uses a half-life-weighted lookback from the preceding segment.
@@ -85,9 +107,11 @@ decomposition quality directly in the UI.
 Initial window assignment and refinement
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The initial SSA window is selected from inferred cadence, then refined using a
-tail-spread check on the SSA eigen spectrum. The objective is to avoid starting
-from a window where the smallest eigenvalue still explains too much variance.
+The revision changes a cadence-derived window from a single forced choice into a
+set of candidate periods. The selected window must contain enough observations
+for the intended cycle and retain a meaningful residual tail. A daily series may
+require a seven-day calendar window even when a five-day business-week model is
+also evaluated.
 
 Cadence-to-window mapping:
 
@@ -108,6 +132,11 @@ Cadence-to-window mapping:
 +----------+----------------+
 | Monthly  | 12             |
 +----------+----------------+
+
+The implementation target is to evaluate cadence-appropriate candidate sets:
+hourly ``[24, 168]``, daily ``[5, 7, 14]``, weekly ``[4, 8]``, monthly
+``[12, 24]`` plus configured domain periods, and quarterly ``[4, 8]``. The
+legacy cadence table remains the current implementation until those tests land.
 
 The pseudocode below describes the full setup procedure:
 
@@ -150,21 +179,22 @@ In this step you inspect:
   seasonality, and noise).
 - Residual diagnostics, including Durbin-Watson on the noise component.
 
-Component grouping starts with an automatic heuristic that uses a knee-based
-noise-floor estimate on the eigen spectrum. This type of knee/elbow detection is a
-commonly used heuristic for separating dominant structure from tail components in
-ranked spectra. In ``tseda``, components up to the detected knee are treated as the
-initial signal pool, then scanned in rank order: adjacent pairs within a 5 percent
-eigenvalue difference are suggested as seasonality, remaining eligible components are
-suggested as trend, and everything else is assigned to noise.
+Component grouping currently starts with a knee-based noise-floor estimate and
+adjacent pair similarity. The design revision retains these as features but no
+longer treats them as sufficient semantic evidence. Periodicity must also retain
+an actual oscillatory pair, a cadence-appropriate period, enough complete cycles,
+and support from the reconstructed or detrended signal. A singleton eigentriple
+must not be labeled as seasonality.
 
-The Durbin-Watson (DW) statistic is computed on the noise residual to validate the
-assignment. If DW falls outside [1.5, 2.5] the algorithm expands the assignment one
-component at a time (promoting from the noise pool), tracking the assignment closest
-to DW = 2.0, until the criterion is met or only two noise components remain. If the
-criterion is never met the user is asked to try a different window size.
+The Durbin-Watson (DW) statistic remains a residual independence diagnostic. In
+the revised implementation, the target interval is reported with uncertainty and
+distance from the boundary; components are not added merely to force DW into
+``[1.5, 2.5]``. Process classification and periodic verification are independent
+of that optimization.
 
-The pseudocode below describes the full group-assignment procedure:
+The pseudocode below documents the **current legacy** group-assignment procedure.
+It remains useful for migration and regression comparison, but it is not the
+target process-aware algorithm described above:
 
 .. code-block:: text
 

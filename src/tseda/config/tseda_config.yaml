@@ -262,6 +262,16 @@ change_point_detection:
   # Suggested range: 1.5 - 2.5
   penalty_multiplier: 2.0
 
+  # Penalty multiplier for the second-stage residual-variance PELT pass.
+  # A larger value makes the detector more conservative.
+  # Default: 2.0
+  variance_penalty_multiplier: 2.0
+
+  # Minimum observations on each side of a residual-variance breakpoint.
+  # This prevents unsupported splits in short residual segments.
+  # Default: 10
+  variance_min_segment_points: 10
+
 # ============================================================================
 # Section 10: Dataset Suitability Check
 # ============================================================================
@@ -282,3 +292,39 @@ suitability_check:
   # Default: 0.40
   # Suggested range: 0.30 - 0.55
   min_explained_variance: 0.40
+
+# ============================================================================
+# Section 11: Process-Aware SSA Classification
+# ============================================================================
+process_classification:
+  min_spectrum_tail: 3
+  power_law_slope_target: -2.0
+  power_law_fit_min: 0.90
+  eof_smoothness_max: 0.02
+  differenced_concentration_max: 0.55
+  monte_carlo_replicates: 199
+  fast_monte_carlo_replicates: 49
+  adf_alpha: 0.05
+  kpss_alpha: 0.05
+
+process_periodicity:
+  candidate_periods_by_cadence:
+    subhourly: [288]
+    hourly: [24, 168]
+    business_daily: [5]
+    daily: [7, 14]
+    weekly: [4, 8]
+    monthly: [12, 24]
+    quarterly: [4, 8]
+  max_period_error: 0.15
+  min_complete_cycles: 5
+  pair_similarity_tolerance: 0.22
+  phase_quadrature_tolerance: 0.20
+  min_period_strength: 0.40
+  min_candidate_spectral_strength: 0.025
+
+process_compute:
+  max_candidate_periods: 8
+  max_windows_per_scope: 6
+  max_monte_carlo_seconds: 30
+  interactive_mode: "fast"

@@ -18,6 +18,9 @@ class DummySSA:
         self._variation_by_group = variation_map
         self._durbin_watson = dw_value
 
+    def get_variance_change_point_timestamps(self):
+        return [pd.Timestamp("2024-01-04")]
+
 
 def test_compute_window_slider_config_invalid_inputs():
     assert callback_services.compute_window_slider_config(1, 0, 10) == ({}, 0, 0, 0, None)
@@ -80,6 +83,7 @@ def test_build_reconstruction_metadata_formats_output_correctly():
     assert isinstance(metadata, html.Div)
     assert any("Variation Associated with Trend" in str(child) for child in metadata.children[0].children)
     assert any("Durbin-Watson Statistic" in str(child) for child in metadata.children[0].children)
+    assert any("Residual Variance Change Points" in str(child) for child in metadata.children[0].children)
 
 
 def test_parse_uploaded_series_handles_non_csv_excel_and_validation_errors():

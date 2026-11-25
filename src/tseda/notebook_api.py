@@ -17,6 +17,7 @@ import plotly.graph_objects as go
 from scipy import stats
 
 from tseda.config.config_loader import ConfigurationManager
+from tseda.decomposition.process_guidance import stochastic_persistence_stop_message
 from tseda.decomposition.ssa_decomposition import SSADecomposition
 from tseda.decomposition.ssa_result_summary import SSAResultSummary
 from tseda.series_stats.sampling_prop import SamplingProp
@@ -117,6 +118,9 @@ class SuitabilityResult:
     top_k: int
     threshold: float
     is_suitable: bool
+    status: str = "suitable"
+    reason: str | None = None
+    process_class: str | None = None
 
 
 @dataclass(slots=True)
@@ -273,6 +277,19 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
         ("hyndman_sunspot_monthly_area", "data/hyndman_sunspot_monthly_area.csv"),
         ("hyndman_usconsumption_quarterly_consumption", "data/hyndman_usconsumption_quarterly_consumption.csv"),
     ]
+    ground_truth = {
+        "coffee_prices": {"class": "stochastic_persistence"},
+        "white_noise_data": {"class": "diffuse_noise"},
+        "trimmed_biomass": {"class": "deterministic_trend"},
+        "monthly_car_sales": {"class": "periodic", "period": 12.0},
+        "uci_air_quality_hourly_co": {"class": "periodic", "period": 24.0},
+        "ticket_resolution_hourly_nyc311": {"class": "periodic", "period": 24.0},
+        "hyndman_arrivals_quarterly_japan": {"class": "periodic", "period": 4.0},
+        "hyndman_goog_daily_close": {"class": "stochastic_persistence"},
+        "hyndman_hyndsight_daily_pageviews": {"class": "periodic", "period": 7.0},
+        "hyndman_sunspot_monthly_area": {"class": "periodic", "period": 132.0},
+        "hyndman_usconsumption_quarterly_consumption": {"class": "stationary_irregular"},
+    }
 
     def _has_component(explained_variance: dict[str, float], component_name: str) -> bool:
         return float(explained_variance.get(component_name, 0.0)) > 0.0
@@ -281,15 +298,27 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
     for dataset_name, relative_path in dataset_paths:
         series = load_series_from_csv(project_root / relative_path)
         analysis_series = _resolve_ui_analysis_segment(series)
-        api = NotebookThreeStepAPI(analysis_series)
+        api = NotebookThreeStepAPI(series)
+        active_api = NotebookThreeStepAPI(analysis_series)
+        full_process = api._ensure_ssa().get_process_analysis(scope="full_series")
+        active_process = active_api._ensure_ssa().get_process_analysis(scope="active_regime")
         suitability = api.get_suitability_result()
         row: dict[str, object] = {
             "Dataset": dataset_name,
+            "Full Process": full_process.process_classification.label,
+            "Active Process": active_process.process_classification.label,
+            "Full Periods": ", ".join(
+                f"{component.period:.2f}"
+                for component in full_process.periodic_components
+            ),
             "Trend": "—",
             "Seasonality": "—",
+            "Persistence": "—",
             "Variance Explained (%)": 0.0,
             "Noise Variance (%)": 0.0,
             "Durbin-Watson": "n/a",
+            "Full Suitability": suitability.status,
+            "Suitability Reason": suitability.reason or "",
         }
 
         if not suitability.is_suitable:
@@ -322,6 +351,7 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
 
         row["Trend"] = "✓" if _has_component(explained_variance, "Trend") else "—"
         row["Seasonality"] = "✓" if _has_component(explained_variance, "Seasonality") else "—"
+        row["Persistence"] = "✓" if _has_component(explained_variance, "Persistence") else "—"
         row["Variance Explained (%)"] = variance_explained
         row["Noise Variance (%)"] = noise_variance
         row["Durbin-Watson"] = float(durbin_watson) if durbin_watson is not None else "n/a"
@@ -346,25 +376,136 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
         "",
         "The command generates a Markdown summary and exits without starting the Dash UI.",
         "",
+        "## Scope and suitability terminology",
+        "",
+        "**Full Process** classifies behavior over the complete loaded series. "
+        "**Active Process** classifies only the selected final/current regime, "
+        "using the shared PELT/chunk boundary rules and the half-life lookback "
+        "when that final regime is too short. Active Process may therefore be "
+        "`indeterminate` even when the full series has a confirmed pattern: the "
+        "local segment may not contain enough complete cycles.",
+        "",
+        "`indeterminate` means the package could not separate valid competing "
+        "interpretations with the available scope, cadence, cycle count, or "
+        "diagnostics. It is not evidence of no structure. `unsuitable` means the "
+        "evidence does not support a deterministic SSA decomposition; diffuse "
+        "noise is the canonical example. Stochastic persistence can still be "
+        "classified reliably without being suitable for deterministic "
+        "Trend/Seasonality extraction.",
+        "",
+        "**Pareidolia guardrail.** " + stochastic_persistence_stop_message(),
+        "",
         "## Dataset summary",
         "",
-        "| Dataset | Trend | Seasonality | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |",
-        "|---|---|---|---:|---:|---:|",
+        "| Dataset | Full Process | Active Process | Full Periods | Trend | Seasonality | Persistence | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |",
+        "|---|---|---|---|---|---|---|---:|---:|---:|",
     ]
 
     for row in rows:
         dw_value = row["Durbin-Watson"]
         formatted_dw = f"{float(dw_value):.2f}" if dw_value != "n/a" and dw_value is not None else "n/a"
         lines.append(
-            "| {dataset} | {trend} | {seasonality} | {variance:.2f} | {noise:.2f} | {dw} |".format(
+            "| {dataset} | {full_process} | {active_process} | {periods} | {trend} | {seasonality} | {persistence} | {variance:.2f} | {noise:.2f} | {dw} |".format(
                 dataset=row["Dataset"],
+                full_process=row["Full Process"],
+                active_process=row["Active Process"],
+                periods=row["Full Periods"] or "—",
                 trend=row["Trend"],
                 seasonality=row["Seasonality"],
+                persistence=row["Persistence"],
                 variance=float(row["Variance Explained (%)"]),
                 noise=float(row["Noise Variance (%)"]),
                 dw=formatted_dw,
             )
         )
+
+    lines.extend([
+        "",
+        "## Ground-truth due diligence",
+        "",
+        "The expected process classes and periods below come from "
+        "[`test_case_ground_truth.md`](test_case_ground_truth.md), not "
+        "from the package output. The observed columns are produced independently "
+        "by the process-aware SSA pipeline. A period matches when the package "
+        "estimate is within 15% of the expected value.",
+        "",
+        "| Dataset | Expected Process | Produced Process | Expected Period | Produced Period | Comparison |",
+        "|---|---|---|---:|---:|---|",
+    ])
+
+    for row in rows:
+        dataset = str(row["Dataset"])
+        expected = ground_truth[dataset]
+        expected_class = str(expected["class"])
+        produced_class = str(row["Full Process"])
+        expected_period = expected.get("period")
+        observed_periods = [
+            float(value.strip())
+            for value in str(row["Full Periods"]).split(",")
+            if value.strip() and value.strip() != "—"
+        ]
+        matched_period = None
+        if expected_period is not None:
+            matches = [
+                period
+                for period in observed_periods
+                if abs(period - float(expected_period)) / float(expected_period) <= 0.15
+            ]
+            matched_period = min(matches, key=lambda period: abs(period - float(expected_period))) if matches else None
+            period_match = matched_period is not None
+        else:
+            period_match = True
+        class_match = produced_class == expected_class
+        verdict = "Matches" if class_match and period_match else "Review"
+        expected_period_text = f"{float(expected_period):.2f}" if expected_period is not None else "—"
+        produced_period_text = (
+            f"{matched_period:.2f}"
+            if matched_period is not None
+            else (", ".join(f"{period:.2f}" for period in observed_periods) if observed_periods else "—")
+        )
+        lines.append(
+            f"| {dataset} | {expected_class} | {produced_class} | "
+            f"{expected_period_text} | {produced_period_text} | {verdict} |"
+        )
+
+    lines.extend([
+        "",
+        "## Indeterminate and unsuitable cases in this run",
+        "",
+        "| Dataset | Full Process | Active Process | Full Suitability | Interpretation |",
+        "|---|---|---|---|---|",
+    ])
+    for row in rows:
+        active_class = str(row["Active Process"])
+        suitability_status = str(row["Full Suitability"])
+        interpretation: list[str] = []
+        if active_class == "indeterminate":
+            interpretation.append(
+                "The active regime is underpowered or contradictory; retain the full-series result."
+            )
+        if suitability_status == "unsuitable":
+            if str(row["Full Process"]) == "stochastic_persistence":
+                interpretation.append(stochastic_persistence_stop_message())
+            else:
+                interpretation.append(
+                    str(row["Suitability Reason"])
+                    or "Deterministic SSA reconstruction is unsupported."
+                )
+        if suitability_status == "indeterminate":
+            interpretation.append(
+                str(row["Suitability Reason"]) or "Suitability could not be determined."
+            )
+        if interpretation:
+            lines.append(
+                f"| {row['Dataset']} | {row['Full Process']} | {active_class} | "
+                f"{suitability_status} | {' '.join(interpretation)} |"
+            )
+    if not any(
+        str(row["Active Process"]) == "indeterminate"
+        or str(row["Full Suitability"]) in {"unsuitable", "indeterminate"}
+        for row in rows
+    ):
+        lines.append("| — | — | — | — | No indeterminate or unsuitable cases in this run. |")
 
     output_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_file
@@ -715,12 +856,59 @@ class NotebookThreeStepAPI:
         k = min(max(top_k, 1), eigenvalues.size if eigenvalues.size > 0 else 1)
         ratio = (float(np.sum(eigenvalues[:k])) / total) if total > 0.0 else 0.0
 
+        process_analysis = ssa.get_process_analysis()
+        legacy_suitable = ratio >= threshold
+        process_suitable = process_analysis.decomposition_suitability.status == "suitable"
+        status = process_analysis.decomposition_suitability.status
+        has_explicit_legacy_override = (
+            top_k_eigenvectors is not None or min_explained_variance is not None
+        )
+        if has_explicit_legacy_override:
+            is_suitable = legacy_suitable
+            status = "suitable" if legacy_suitable else "unsuitable"
+        elif legacy_suitable and status == "suitable":
+            is_suitable = True
+        elif legacy_suitable and status == "indeterminate":
+            is_suitable = False
+        else:
+            is_suitable = legacy_suitable and process_suitable
+
         return SuitabilityResult(
-            is_suitable=ratio >= threshold,
+            is_suitable=is_suitable,
             top_k=k,
             top_k_ratio=ratio,
             threshold=threshold,
+            status=status,
+            reason=process_analysis.decomposition_suitability.reason,
+            process_class=process_analysis.process_classification.label,
         )
+
+    def get_process_analysis(
+        self,
+        scope: str = "active_regime",
+        run_monte_carlo: bool = False,
+    ) -> dict[str, Any]:
+        """Return the process-aware classification for the current scope."""
+        if scope not in {"active_regime", "full_series"}:
+            raise ValueError("scope must be 'active_regime' or 'full_series'.")
+        return self._ensure_ssa().get_process_analysis(
+            scope=scope,
+            run_monte_carlo=run_monte_carlo,
+        ).to_dict()
+
+    def get_process_analyses_by_scope(self) -> dict[str, dict[str, Any]]:
+        """Return full-series and reproducible default active-regime analyses."""
+        active_series = _resolve_ui_analysis_segment(self._series)
+        active_api = NotebookThreeStepAPI(
+            active_series,
+            apply_window_refinement=True,
+        )
+        full_result = self._ensure_ssa().get_process_analysis(scope="full_series")
+        active_result = active_api._ensure_ssa().get_process_analysis(scope="active_regime")
+        return {
+            "full_series": full_result.to_dict(),
+            "active_regime": active_result.to_dict(),
+        }
 
     def get_eigen_plot(self) -> go.Figure:
         """Get Step-2 eigenvalue explained-variance plot.
@@ -763,6 +951,16 @@ class NotebookThreeStepAPI:
             ``Trend``, ``Seasonality``, and ``Noise`` keys.
         """
         ssa = self._ensure_ssa()
+        process_analysis = ssa.get_process_analysis()
+        if (
+            process_analysis.decomposition_suitability.status == "unsuitable"
+        ):
+            if process_analysis.process_classification.label == "stochastic_persistence":
+                raise ValueError(stochastic_persistence_stop_message())
+            raise ValueError(
+                "This scope is unsuitable for deterministic SSA decomposition: "
+                f"{process_analysis.decomposition_suitability.reason}."
+            )
         grouping_payload = dict(grouping_config) if grouping_config is not None else None
         grouping, dw_satisfied = ssa.suggest_reconstruction_groups(grouping_config=grouping_payload)
         self._grouping = {k: list(v) for k, v in grouping.items()}
@@ -802,6 +1000,21 @@ class NotebookThreeStepAPI:
         upper_bound = max(1, upper_bound)
 
         windows_tried: list[int] = [current_window]
+        process_analysis = ssa.get_process_analysis()
+        preferred_windows = sorted(
+            {
+                int(component.window)
+                for component in process_analysis.periodic_components
+                if current_window < int(component.window) <= upper_bound
+            }
+        )
+        if preferred_windows:
+            current_window = self.set_window(
+                preferred_windows[0],
+                apply_window_refinement=False,
+            )
+            ssa = self._ensure_ssa()
+            windows_tried.append(current_window)
         grouping_payload = dict(grouping_config) if grouping_config is not None else None
 
         suitability = self.get_suitability_result()
@@ -821,6 +1034,11 @@ class NotebookThreeStepAPI:
         self.set_grouping(grouping=grouping)
         metadata = self.get_reconstruction_metadata(auto_suggest_if_missing=False)
         dw_value = metadata.get("durbin_watson")
+        process_analysis = ssa.get_process_analysis()
+        verified_period_at_current_window = any(
+            component.window == current_window
+            for component in process_analysis.periodic_components
+        )
 
         if dw_ok:
             return GroupingAutoTuneResult(
@@ -832,6 +1050,17 @@ class NotebookThreeStepAPI:
                 windows_tried=windows_tried,
                 suitability_passed=True,
                 reason="dw_satisfied",
+            )
+        if verified_period_at_current_window:
+            return GroupingAutoTuneResult(
+                grouping=self.get_grouping(),
+                dw_in_range=False,
+                durbin_watson=float(dw_value) if dw_value is not None else None,
+                initial_window=initial_window,
+                final_window=current_window,
+                windows_tried=windows_tried,
+                suitability_passed=True,
+                reason="period_verified_dw_outside_target",
             )
 
         while current_window * int(doubling_factor) <= upper_bound:
@@ -917,6 +1146,16 @@ class NotebookThreeStepAPI:
             ValueError: If indices overlap or are out of range.
         """
         ssa = self._ensure_ssa()
+        process_analysis = ssa.get_process_analysis()
+        if (
+            process_analysis.decomposition_suitability.status == "unsuitable"
+        ):
+            if process_analysis.process_classification.label == "stochastic_persistence":
+                raise ValueError(stochastic_persistence_stop_message())
+            raise ValueError(
+                "This scope is unsuitable for deterministic SSA decomposition: "
+                f"{process_analysis.decomposition_suitability.reason}."
+            )
 
         if grouping is None:
             grouping = {
@@ -959,12 +1198,17 @@ class NotebookThreeStepAPI:
             self.set_grouping(grouping=grouping)
         return self._grouping
 
-    def get_reconstruction_plot(self, auto_suggest_if_missing: bool = True) -> go.Figure:
+    def get_reconstruction_plot(
+        self,
+        auto_suggest_if_missing: bool = True,
+        show_variance_change_points: bool = True,
+    ) -> go.Figure:
         """Get Step-2 reconstruction plot for currently grouped components.
 
         Args:
             auto_suggest_if_missing: If True and no grouping exists yet, auto-suggest
                 and apply a grouping first.
+            show_variance_change_points: Whether to mark residual-variance shifts.
 
         Returns:
             Plotly reconstruction figure.
@@ -977,7 +1221,9 @@ class NotebookThreeStepAPI:
                 self._ensure_grouping()
             else:
                 raise ValueError("Grouping is not set. Call suggest_grouping() or set_grouping() first.")
-        return self._ensure_ssa().signal_reconstruction_plot()
+        return self._ensure_ssa().signal_reconstruction_plot(
+            show_variance_change_points=show_variance_change_points
+        )
 
     def get_change_point_plot(self, auto_suggest_if_missing: bool = True) -> go.Figure:
         """Get Step-2 change-point plot from grouped reconstruction.
@@ -993,10 +1239,28 @@ class NotebookThreeStepAPI:
         return self._ensure_ssa().change_point_plot()
 
     def get_change_points(self, auto_suggest_if_missing: bool = True) -> dict[str, list[int]]:
-        """Return detected change points for the current grouped reconstruction."""
+        """Return detected trend, seasonal, and residual-variance change points."""
         if self._grouping is None and auto_suggest_if_missing:
             self._ensure_grouping()
         return self._ensure_ssa().get_change_points()
+
+    def get_variance_change_points(
+        self,
+        auto_suggest_if_missing: bool = True,
+    ) -> list[int]:
+        """Return zero-based residual-variance change-point indices."""
+        if self._grouping is None and auto_suggest_if_missing:
+            self._ensure_grouping()
+        return self._ensure_ssa().get_variance_change_points()
+
+    def get_variance_change_point_timestamps(
+        self,
+        auto_suggest_if_missing: bool = True,
+    ) -> list[object]:
+        """Return timestamps for detected residual-variance change points."""
+        if self._grouping is None and auto_suggest_if_missing:
+            self._ensure_grouping()
+        return self._ensure_ssa().get_variance_change_point_timestamps()
 
     def get_loess_plot(self, fraction: float | None = None) -> go.Figure:
         """Get LOESS verification plot for the reconstructed signal.
@@ -1093,6 +1357,10 @@ class NotebookThreeStepAPI:
             "grouping": grouping,
             "explained_variance_percent": explained_variance,
             "durbin_watson": getattr(ssa, "_durbin_watson", None),
+            "variance_change_points": ssa.get_variance_change_points(),
+            "variance_change_point_timestamps": ssa.get_variance_change_point_timestamps(),
+            "variance_attribution": ssa.get_variance_attribution(),
+            "process_analysis": ssa.get_process_analysis().to_dict(),
         }
 
     def export_components_dataframe(self, auto_suggest_if_missing: bool = True) -> pd.DataFrame:
@@ -1114,9 +1382,11 @@ class NotebookThreeStepAPI:
         trend = ssa.get_reconstructed_series("trend")
         seasonality = ssa.get_reconstructed_series("seasonality")
         noise = ssa.get_reconstructed_series("noise")
+        persistence = ssa.get_reconstructed_series("persistence")
 
         frame["Trend"] = trend.values if trend is not None else np.nan
         frame["Seasonality"] = seasonality.values if seasonality is not None else np.nan
+        frame["Persistence"] = persistence.values if persistence is not None else np.nan
         frame["Noise"] = noise.values if noise is not None else np.nan
         return frame
 
@@ -1155,4 +1425,12 @@ class NotebookThreeStepAPI:
             Multi-paragraph text combining sampling, statistics, decomposition,
             and residual-diagnostic interpretation.
         """
+        ssa = self._ensure_ssa()
+        analysis = ssa.get_process_analysis()
+        if analysis.decomposition_suitability.status == "unsuitable":
+            return SSAResultSummary(
+                ssa_obj=ssa,
+                series=self._series,
+                window_size=self.get_window(),
+            ).build_observation_text()
         return self._build_step3_summary().build_observation_text()
