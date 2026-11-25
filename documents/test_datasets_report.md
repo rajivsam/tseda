@@ -1,7 +1,7 @@
 # Test dataset report
 
 This report exercises the comprehensive dataset validation workflow implemented in `tests/test_comprehensive_dataset.py`.
-Each built-in time series is loaded, evaluated by `NotebookThreeStepAPI`, and summarized for trend/seasonality presence, variance explained, noise variance, and Durbin-Watson behavior.
+Each built-in time series is loaded, evaluated by `NotebookThreeStepAPI`, and summarized for full/active process classification, verified periods, secondary residual-variance changes, reconstruction behavior, and Durbin-Watson diagnostics.
 
 ## How to run
 
@@ -23,19 +23,19 @@ The command generates a Markdown summary and exits without starting the Dash UI.
 
 ## Dataset summary
 
-| Dataset | Full Process | Active Process | Full Periods | Trend | Seasonality | Persistence | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |
-|---|---|---|---|---|---|---|---:|---:|---:|
-| coffee_prices | stochastic_persistence | stochastic_persistence | — | rejected | rejected | — | 0.00 | 0.00 | n/a |
-| white_noise_data | diffuse_noise | diffuse_noise | — | rejected | rejected | — | 0.00 | 0.00 | n/a |
-| trimmed_biomass | deterministic_trend | stationary_irregular | — | ✓ | — | — | 93.79 | 6.21 | 1.72 |
-| monthly_car_sales | periodic | indeterminate | 12.00 | ✓ | ✓ | — | 96.41 | 3.59 | 2.62 |
-| uci_air_quality_hourly_co | periodic | periodic | 23.58 | ✓ | ✓ | — | 86.65 | 13.35 | 1.76 |
-| ticket_resolution_hourly_nyc311 | periodic | periodic | 24.03 | ✓ | ✓ | — | 43.98 | 56.02 | 2.08 |
-| hyndman_arrivals_quarterly_japan | periodic | periodic | 4.00 | — | ✓ | — | 96.29 | 3.71 | 2.06 |
-| hyndman_goog_daily_close | stochastic_persistence | stochastic_persistence | — | rejected | rejected | — | 0.00 | 0.00 | n/a |
-| hyndman_hyndsight_daily_pageviews | periodic | periodic | 7.02 | ✓ | ✓ | — | 87.01 | 12.99 | 2.73 |
-| hyndman_sunspot_monthly_area | periodic | stochastic_persistence | 131.46 | ✓ | ✓ | — | 77.40 | 22.60 | 1.54 |
-| hyndman_usconsumption_quarterly_consumption | stationary_irregular | indeterminate | — | ✓ | — | — | 34.39 | 65.61 | 2.22 |
+| Dataset | Full Process | Active Process | Full Periods | Variance Change-Points | Trend | Seasonality | Persistence | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |
+|---|---|---|---|---|---|---|---|---:|---:|---:|
+| coffee_prices | stochastic_persistence | stochastic_persistence | — | not applicable | rejected | rejected | — | 0.00 | 0.00 | n/a |
+| white_noise_data | diffuse_noise | diffuse_noise | — | not applicable | rejected | rejected | — | 0.00 | 0.00 | n/a |
+| trimmed_biomass | deterministic_trend | stationary_irregular | — | 29 (2018-04-13 02:00:00+00:00 → 2018-07-03 18:00:00+00:00) | ✓ | — | — | 93.79 | 6.21 | 1.72 |
+| monthly_car_sales | periodic | indeterminate | 12.00 | none | ✓ | ✓ | — | 96.41 | 3.59 | 2.62 |
+| uci_air_quality_hourly_co | periodic | periodic | 23.58 | 24 (2005-01-16 01:00:00 → 2005-04-03 18:00:00) | ✓ | ✓ | — | 86.65 | 13.35 | 1.76 |
+| ticket_resolution_hourly_nyc311 | periodic | periodic | 24.03 | 13 (2026-04-04 19:00:00 → 2026-05-03 18:00:00) | ✓ | ✓ | — | 43.98 | 56.02 | 2.08 |
+| hyndman_arrivals_quarterly_japan | periodic | periodic | 4.00 | 1 (2002-04-01 00:00:00) | — | ✓ | — | 96.29 | 3.71 | 2.06 |
+| hyndman_goog_daily_close | stochastic_persistence | stochastic_persistence | — | not applicable | rejected | rejected | — | 0.00 | 0.00 | n/a |
+| hyndman_hyndsight_daily_pageviews | periodic | periodic | 7.02 | 2 (2014-08-28 00:00:00 → 2014-09-07 00:00:00) | ✓ | ✓ | — | 87.01 | 12.99 | 2.73 |
+| hyndman_sunspot_monthly_area | periodic | stochastic_persistence | 131.46 | 34 (1875-08-01 00:00:00 → 2015-03-01 00:00:00) | ✓ | ✓ | — | 77.40 | 22.60 | 1.54 |
+| hyndman_usconsumption_quarterly_consumption | stationary_irregular | indeterminate | — | 1 (1992-07-01 00:00:00) | ✓ | — | — | 34.39 | 65.61 | 2.22 |
 
 ## Ground-truth due diligence
 

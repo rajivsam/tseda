@@ -12,55 +12,37 @@
 
 ---
 
-`tseda` is a Python package for analyst-guided time-series decomposition, diagnostics, and signal validation. It helps analysts turn regularly sampled operational data into interpretable components such as trend, seasonality, and noise while keeping the analysis explicit, repeatable, reviewable, and auditable.
+`tseda` is a Python package for analyst-guided time-series assessment,
+decomposition, diagnostics, and audit-ready observation logging. It first
+determines whether a series is suitable for deterministic SSA. If supported, it
+then applies window selection, component grouping, and periodic verification to
+produce a traceable trend/seasonality/noise analysis.
 
-A useful way to think about `tseda` is as a tool for the cold-start problem in time-series analysis: when a series is unfamiliar or poorly understood, the first challenge is deciding where to begin, which regime to inspect, what window to use, and which signals are worth trusting. `tseda` gives analysts a structured starting point for those decisions.
-
-For the fuller product story, design rationale, and detailed explanation of the workflow, see [about_tseda.md](about_tseda.md).
-
-`tseda` helps analysts move from raw data to a defensible decomposition without sacrificing transparency. It supports exploratory analysis and model development by surfacing a signal's variance structure, highlighting regime changes, and making analytical choices easy to revisit and refine.
-
-Note: `tseda` is not a full model-building framework. It is designed to help analysts understand a time series by separating trend, seasonality, and noise, identifying regime changes, and checking whether the decomposition is statistically reasonable. That gives a strong starting point for forecasting, anomaly detection, and other modeling tasks, but the final model specification, tuning, and validation remain user-specific and domain-dependent.
+The package is intended for cold-start exploration, not automatic model building.
+It explicitly stops deterministic decomposition for diffuse noise or stochastic
+persistence and recommends a more appropriate stochastic/differenced approach.
 
 ## What it helps with
 
-- understanding whether a signal has meaningful structure,
-- separating trend and recurring seasonal behavior from residual noise,
-- identifying regime changes and shifts in operating behavior,
-- deciding whether a series is suitable for decomposition and modeling,
-- preserving earlier analytical decisions so they can be revisited and repeated.
+- classifying a series as [diffuse noise, stochastic persistence, deterministic
+  trend, periodic, mixed, stationary irregular, or indeterminate](documents/process_classification_reference.md);
+- deciding whether deterministic SSA is suitable;
+- identifying reproducible full-series and active-regime scopes;
+- selecting an SSA window and verifying periodic component pairs;
+- reporting residual-variance changes, diagnostics, and evidence.
 
 ## Why it exists
 
-The hard part is not a single plot or statistic, but the sequence of choices needed to reach a defensible decomposition: selecting a sensible window, identifying regime boundaries, choosing component groups, checking whether the result is structurally meaningful, and documenting the reasoning for later reuse. See [about_tseda.md](about_tseda.md) for details.
-
-`tseda` brings those steps together in one workflow.
-
-Say you are analyzing a time series for the first time or have limited interaction with the series recently. For example, you might be a new analyst joining a team, or you might be troubleshooting an operational issue with a process metric you do not know well yet. In either case, the first question is not "which model should I fit?" but "what variance structure is actually present in this signal, and what is a defensible way to separate it into trend, seasonality, and noise?" A theoretically grounded workflow helps answer that quickly, before a team commits to a forecasting or monitoring plan.
-
-Consider a daily operations series such as customer arrivals, energy consumption, or support ticket volume. The signal may contain a long-term shift, a weekly or monthly cycle, and substantial irregular variation. Traditionally, getting this right requires familiarity with tuning the chosen decomposition method.
-
-`tseda` uses Singular Spectrum Analysis (SSA), which requires one main structural parameter: the window size. The package selects a starting window for you. This gives a first-time analyst a way to identify the components without guessing at the window length or grouping. Even an experienced analyst often has to run several experiments, such as trying different windows, checking regime boundaries, testing component groups, and validating the residual structure, before establishing a defensible baseline.
-
-That is the pain point `tseda` solves. It provides a reasonable starting point quickly, with transparent choices and reviewable diagnostics. An experienced analyst can then refine the decomposition using the tool's additional controls and validation checks.
+The first question is not "which model should I fit?" but "is deterministic
+decomposition defensible for this series?" `tseda` makes that assessment before
+presenting SSA grouping controls.
 
 ### Key considerations
 
 - `tseda` is an **exploratory** tool that provides a quick baseline for understanding a dataset's variance components and overall characteristics. It gives analysts a starting point for deeper tuning and refinement, helps modelers understand the variance structure before building a pipeline, and may be sufficient for quick operating-condition checks or a first-pass read of a series.
 - The window size and other analysis parameters can be manually set by the expert user in the UI. All algorithmic parameters are configurable, and by inspecting the repository you can understand the specific methods used in the software and tune them for your context.
-- There is **full notebook parity**: expert users can investigate finer-grained analytical nuances directly in a notebook.
-
-## Why it matters
-
-Variance decomposition is useful not only to modelers, but also to the teams responsible for monitoring and operating systems. Modelers use the extracted behaviors to decide which patterns a forecasting or anomaly-detection model must represent explicitly. Operations teams can use the same information to define alerts and establish guidelines for what behavior is expected from a signal.
-
-Segmentation shows how often a signal changes behavior and identifies the current operating regime. Decomposition then describes that regime in terms of components such as trend, seasonality, and residual noise. Together, these results give an operations team historical evidence about how frequently changes occur, how much variation is normal, and when a signal has moved into a behavior that deserves investigation.
-
-Evaluation across real-world and benchmark datasets shows that explained variance differs substantially by signal, as expected from the diversity of operational data. Structured examples such as coffee prices capture a large share of the signal through trend and/or seasonality, while noisier or weakly structured series retain more residual noise. The method therefore reflects how informative and interpretable a signal is rather than forcing structure onto every dataset.
-
-The evaluation is intended to show that the approach produces useful, stable diagnostics across real datasets rather than a single tuned result. Across the tested benchmark set, the Durbin-Watson statistic remains within the acceptable 1.5 to 2.5 range, indicating limited residual autocorrelation and a statistically reasonable decomposition. These results suggest that `tseda` is suitable for structured exploratory analysis, model development, and monitoring workflows.
-
-For bounded random variables, whose values lie within a known range `[a, b]`, concentration inequalities can provide bounds on unusually large observations within a regime. Support for bounding the maximum value of a signal in this way is an upcoming `tseda` feature. Until then, segmentation and variance decomposition still provide practical inputs for monitoring: they make regime changes, changing component behavior, and the level of background noise visible and reviewable.
+- The notebook API exposes the same process classification, grouping, diagnostics,
+  and reporting workflow as the UI.
 
 ## How is it used?
 
@@ -86,72 +68,16 @@ This progression makes the analytical decisions visible: first define the regime
 studied, then identify its components, and finally check whether the result is
 statistically reasonable and worth preserving.
 
-## How trend and seasonality are determined
+## Method details
 
-`tseda` uses an SSA-first workflow with a theory-grounded check for seasonality. The
-intent is to separate low-frequency structure (trend/trend-cycle) from recurrent
-oscillatory structure (seasonality) without forcing a seasonal label onto every signal.
-
-### 1) Trend / trend-cycle determination
-
-The trend component is inferred from the SSA eigenvalue spectrum after the analysis
-window has been selected and refined.
-
-1. Window construction and refinement
-   - the decomposition is built with the requested SSA window,
-   - if the tail of the eigen-spectrum is too flat or too dominated by a single leading
-     component (controlled by the window-refinement configuration), the window is
-     adjusted and recomputed,
-   - this keeps the decomposition from being driven by an artificially narrow or poorly
-     conditioned window.
-
-2. Signal-pool selection
-   - the leading eigenvalues are ranked and a signal pool is selected,
-   - the default method is the `kneedle` elbow rule on the log-eigenvalue profile,
-   - if that elbow cannot be identified, the code falls back to a minimum-count rule,
-   - the remaining components are treated as the noise pool.
-
-3. Initial group assignment
-   - large low-frequency components are treated as trend-like structure,
-   - a near-equal adjacent eigenvalue pair is interpreted as the standard SSA signature
-     of a seasonal mode,
-   - components outside the signal pool are assigned to the noise pool unless they are
-     explicitly part of a seasonal pairing.
-
-4. Durbin-Watson validation and refinement
-   - the residual noise is checked using the Durbin-Watson statistic,
-   - if the residual autocorrelation remains too high, extra components are recruited from
-     the noise pool while preserving the same structural logic,
-   - the result is an explicit trend/trend-cycle assignment rather than a hard-coded
-     seasonal shortcut.
-
-This is the operational meaning of trend in the code: the dominant low-frequency
-structure is treated as trend until a seasonal mode is independently supported by the
-model and the spectral evidence.
-
-### 2) Seasonality determination
-
-Seasonality is assessed with two complementary checks grounded in SSA and
-frequency-domain signal decomposition.
-
-1. SSA structural check
-   - the algorithm first looks for a near-equal adjacent pair among the leading
-     eigenvalues,
-   - this is the standard SSA signature of a paired seasonal mode, where a recurring
-     cyclical component is represented by a conjugate pair of eigenmodes.
-
-2. Detrended spectral verification
-   - the detrended seasonal-band spectrum is computed as an always-on verification step,
-   - this is especially important for short series or terminal segments where the
-     eigen-pair signature can be weak even though the underlying signal is periodic,
-   - the method measures whether the dominant cyclical peak carries a substantial share
-     of the power in the seasonal band after removing the low-frequency trend,
-   - the signal is treated as seasonal only when the cyclical power is strong enough to
-     stand out above broad-band noise and trend contamination.
-
-Taken together, these checks aim to distinguish a consistent seasonal signal from
-broad-band noise or trend-dominated variation while avoiding a brittle dependence on a
-single eigen-pair heuristic.
+- [Decomposition process specification](documents/decomposition_process_spec.md)
+  describes the sequential suitability gates and the point at which `tseda` stops
+  or proceeds to deterministic SSA.
+- [Window selection](window_selection_algorithm.md) describes cadence-based SSA
+  window initialization, candidate periods, and refinement.
+- [Seasonality decomposition](documents/seasonality_decomposition.md) describes
+  how paired SSA modes, period evidence, cycle support, and independent spectral
+  checks verify a seasonal component.
 
 ## Installation
 
@@ -178,20 +104,17 @@ api = NotebookThreeStepAPI(series)
 kde_fig = api.get_kde_plot(show_kde=True, bin_algorithm="scott")
 acf_fig = api.get_acf_plot(lags=30)
 
-api.set_window(api.get_window(), apply_window_refinement=True)
-grouping, dw_ok = api.suggest_grouping()
-api.set_grouping(grouping)
-recon_fig = api.get_reconstruction_plot()
 process = api.get_process_analysis()
-monte_carlo_process = api.get_process_analysis(run_monte_carlo=True)
-scopes = api.get_process_analyses_by_scope()
-variance_change_points = api.get_variance_change_points()
-variance_change_times = api.get_variance_change_point_timestamps()
-metadata = api.get_reconstruction_metadata()
-variance_attribution = metadata["variance_attribution"]
+print(process["process_classification"])
+
+if process["decomposition_suitability"]["status"] == "suitable":
+    grouping, dw_ok = api.suggest_grouping_with_window_autotune()
+    recon_fig = api.get_reconstruction_plot()
+    metadata = api.get_reconstruction_metadata()
+else:
+    print(process["decomposition_suitability"]["reason"])
 
 summary = api.generate_observation_text()
-print(summary[:500])
 ```
 
 For a stochastic-persistence result, `tseda` stops deterministic SSA exploration.
@@ -223,8 +146,12 @@ exact running instructions, and complete outcomes, see
 ## More information
 
 - [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
+- [documents/decomposition_process_spec.md](documents/decomposition_process_spec.md) — sequential process and suitability specification
+- [documents/process_classification_reference.md](documents/process_classification_reference.md) — first-output category reference and recommended actions
+- [window_selection_algorithm.md](window_selection_algorithm.md) — SSA window initialization and refinement
+- [documents/seasonality_decomposition.md](documents/seasonality_decomposition.md) — periodic-pair verification and seasonal reconstruction
 - [documents/coffee_example.md](documents/coffee_example.md) — worked coffee-prices example showing the segment-first workflow, preliminary diagnostics, and final-segment adjustment
-- [documents/car_sales_example.md](documents/car_sales_example.md) — trend-cycle example with evolving operating behavior and no fixed seasonal rhythm
+- [documents/car_sales_example.md](documents/car_sales_example.md) — monthly trend-plus-seasonality example with a verified 12-month cycle and an underpowered final regime
 - [documents/biomass_power_gen_example.md](documents/biomass_power_gen_example.md) — renewable generation example highlighting non-seasonal trend-driven change
 - [documents/PRODUCT.md](documents/PRODUCT.md) — product and user-value context
 - [documents/ARCHITECTURE.md](documents/ARCHITECTURE.md) — system architecture

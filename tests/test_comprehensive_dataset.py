@@ -136,6 +136,8 @@ def test_comprehensive_dataset_test(tmp_path: Path):
             "top_k_ratio": suitability.top_k_ratio,
             "top_k": suitability.top_k,
             "threshold": suitability.threshold,
+            "variance_change_points": [],
+            "variance_change_times": [],
         }
 
         expected = GROUND_TRUTH[name]
@@ -160,6 +162,12 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                 explained_variance = reconstructed["explained_variance_percent"]
                 change_points = api.get_change_points(auto_suggest_if_missing=False)
                 components = api.export_components_dataframe(auto_suggest_if_missing=False)
+                variance_change_points = api.get_variance_change_points(
+                    auto_suggest_if_missing=False
+                )
+                variance_change_times = api.get_variance_change_point_timestamps(
+                    auto_suggest_if_missing=False
+                )
 
                 signal_explained = float(
                     sum(
@@ -185,6 +193,10 @@ def test_comprehensive_dataset_test(tmp_path: Path):
                         else None,
                         "change_points": _change_point_summary(change_points, has_seasonality),
                         "component_rows": len(components),
+                        "variance_change_points": variance_change_points,
+                        "variance_change_times": [
+                            str(timestamp) for timestamp in variance_change_times
+                        ],
                     }
                 )
             else:
@@ -228,17 +240,30 @@ def test_comprehensive_dataset_test(tmp_path: Path):
     pd.DataFrame(results).to_csv(output_csv, index=False)
 
     markdown_lines = [
-        "| Dataset | Full Process | Active Process | Full Periods | Trend | Seasonality | Persistence | Signal Explained | Noise | Durbin–Watson |",
-        "|---|---|---|---|---|---|---|---:|---:|---:|",
+        "| Dataset | Full Process | Active Process | Full Periods | Variance Change-Points | Trend | Seasonality | Persistence | Signal Explained | Noise | Durbin–Watson |",
+        "|---|---|---|---|---|---|---|---|---:|---:|---:|",
     ]
     for row in results:
         markdown_lines.append(
-            "| {dataset} | {full_process} | {active_process} | {periods} | {trend} | {seasonality} | {persistence} | {signal_explained:.2f} | {noise_explained:.2f} | {durbin_watson} |".format(
+            "| {dataset} | {full_process} | {active_process} | {periods} | {variance_changes} | {trend} | {seasonality} | {persistence} | {signal_explained:.2f} | {noise_explained:.2f} | {durbin_watson} |".format(
                 **{
                     "dataset": row["dataset"],
                     "full_process": row["full_process_class"],
                     "active_process": row["active_process_class"],
                     "periods": row["full_periods"] or "—",
+                    "variance_changes": (
+                        (
+                            f"{len(row['variance_change_times'])} "
+                            f"({row['variance_change_times'][0]} → "
+                            f"{row['variance_change_times'][-1]})"
+                            if len(row["variance_change_times"]) > 1
+                            else f"1 ({row['variance_change_times'][0]})"
+                        )
+                        if row["variance_change_times"]
+                        else "not evaluated"
+                        if row["suitability_passed"] is False
+                        else "none"
+                    ),
                     "trend": row["trend"],
                     "seasonality": row["seasonality"],
                     "persistence": row["persistence"],
@@ -262,6 +287,8 @@ def test_comprehensive_dataset_test(tmp_path: Path):
         "active_process_class | Process classification for the active regime. | Derived from process-aware SSA diagnostics.",
         "full_periods | Verified full-series periods. | Derived from verified SSA pairs and cadence evidence.",
         "active_periods | Verified active-regime periods. | Derived from verified SSA pairs and cadence evidence.",
+        "variance_change_points | Zero-based residual-variance change-point indices. | Derived from PELT on process-appropriate residuals.",
+        "variance_change_times | Timestamps for residual-variance changes. | Derived by mapping change-point indices to the active-regime index.",
         "window | Window size suggested or used by the API. | Derived from the API's internal suitability and window selection logic.",
         "suitability_passed | Whether the series passed the suitability gate. | Derived from `api.get_suitability_result().is_suitable`.",
         "top_k_ratio | Ratio used to determine the top-k reconstruction components. | Derived from the suitability result returned by the API.",
@@ -297,7 +324,9 @@ def test_generate_test_dataset_report(tmp_path: Path):
     assert "## Dataset summary" in content
     assert "coffee_prices" in content
     assert "hyndman_goog_daily_close" in content
-    assert "| Dataset | Full Process | Active Process | Full Periods | Trend | Seasonality | Persistence | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |" in content
+    assert "| Dataset | Full Process | Active Process | Full Periods | Variance Change-Points | Trend | Seasonality | Persistence | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |" in content
+    assert "| hyndman_goog_daily_close | stochastic_persistence | stochastic_persistence | — | not applicable | rejected | rejected" in content
+    assert "| monthly_car_sales | periodic | indeterminate | 12.00 |" in content
     assert "## Ground-truth due diligence" in content
     assert "## Scope and suitability terminology" in content
     assert "**Active Process**" in content
@@ -305,7 +334,21 @@ def test_generate_test_dataset_report(tmp_path: Path):
     assert "## Indeterminate and unsuitable cases in this run" in content
     assert "| Dataset | Expected Process | Produced Process | Expected Period | Produced Period | Comparison |" in content
     assert "| hyndman_goog_daily_close | stochastic_persistence | stochastic_persistence | — | — | Matches |" in content
+    goog_row = next(
+        line
+        for line in content.splitlines()
+        if line.startswith("| hyndman_goog_daily_close |")
+        and "Expected Period" not in line
+    )
+    assert "| not applicable | rejected | rejected |" in goog_row
+
     assert "| monthly_car_sales | periodic | periodic | 12.00 | 12.00 | Matches |" in content
+    car_row = next(
+        line
+        for line in content.splitlines()
+        if line.startswith("| monthly_car_sales | periodic |")
+    )
+    assert "| ✓ | ✓ |" in car_row
     assert "monthly_car_sales | periodic | indeterminate" in content
     assert "white_noise_data | diffuse_noise | diffuse_noise | unsuitable" in content
     assert "pareidolia" in content

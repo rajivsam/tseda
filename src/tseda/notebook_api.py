@@ -317,6 +317,7 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
             "Variance Explained (%)": 0.0,
             "Noise Variance (%)": 0.0,
             "Durbin-Watson": "n/a",
+            "Variance Change-Points": "not applicable",
             "Full Suitability": suitability.status,
             "Suitability Reason": suitability.reason or "",
         }
@@ -355,6 +356,25 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
         row["Variance Explained (%)"] = variance_explained
         row["Noise Variance (%)"] = noise_variance
         row["Durbin-Watson"] = float(durbin_watson) if durbin_watson is not None else "n/a"
+        variance_change_points = api.get_variance_change_points(
+            auto_suggest_if_missing=False
+        )
+        variance_change_times = api.get_variance_change_point_timestamps(
+            auto_suggest_if_missing=False
+        )
+        if variance_change_times:
+            first_time = variance_change_times[0]
+            last_time = variance_change_times[-1]
+            row["Variance Change-Points"] = (
+                f"{len(variance_change_times)} ({first_time} → {last_time})"
+                if len(variance_change_times) > 1
+                else f"1 ({first_time})"
+            )
+        else:
+            row["Variance Change-Points"] = "none"
+        row["Variance Change-Point Indices"] = ", ".join(
+            str(value) for value in variance_change_points
+        )
         rows.append(row)
 
     output_file = Path(output_path) if output_path is not None else project_root / "data" / "comprehensive_test" / "comprehensive_dataset_results.md"
@@ -364,7 +384,7 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
         "# Test dataset report",
         "",
         "This report exercises the comprehensive dataset validation workflow implemented in `tests/test_comprehensive_dataset.py`.",
-        "Each built-in time series is loaded, evaluated by `NotebookThreeStepAPI`, and summarized for trend/seasonality presence, variance explained, noise variance, and Durbin-Watson behavior.",
+        "Each built-in time series is loaded, evaluated by `NotebookThreeStepAPI`, and summarized for full/active process classification, verified periods, secondary residual-variance changes, reconstruction behavior, and Durbin-Watson diagnostics.",
         "",
         "## How to run",
         "",
@@ -397,19 +417,20 @@ def generate_test_dataset_report(output_path: str | Path | None = None) -> Path:
         "",
         "## Dataset summary",
         "",
-        "| Dataset | Full Process | Active Process | Full Periods | Trend | Seasonality | Persistence | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |",
-        "|---|---|---|---|---|---|---|---:|---:|---:|",
+        "| Dataset | Full Process | Active Process | Full Periods | Variance Change-Points | Trend | Seasonality | Persistence | Variance Explained (%) | Noise Variance (%) | Durbin-Watson |",
+        "|---|---|---|---|---|---|---|---|---:|---:|---:|",
     ]
 
     for row in rows:
         dw_value = row["Durbin-Watson"]
         formatted_dw = f"{float(dw_value):.2f}" if dw_value != "n/a" and dw_value is not None else "n/a"
         lines.append(
-            "| {dataset} | {full_process} | {active_process} | {periods} | {trend} | {seasonality} | {persistence} | {variance:.2f} | {noise:.2f} | {dw} |".format(
+            "| {dataset} | {full_process} | {active_process} | {periods} | {variance_changes} | {trend} | {seasonality} | {persistence} | {variance:.2f} | {noise:.2f} | {dw} |".format(
                 dataset=row["Dataset"],
                 full_process=row["Full Process"],
                 active_process=row["Active Process"],
                 periods=row["Full Periods"] or "—",
+                variance_changes=row["Variance Change-Points"],
                 trend=row["Trend"],
                 seasonality=row["Seasonality"],
                 persistence=row["Persistence"],

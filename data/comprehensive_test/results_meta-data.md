@@ -9,6 +9,8 @@ full_process_class | Process classification for the full series. | Derived from 
 active_process_class | Process classification for the active regime. | Derived from process-aware SSA diagnostics.
 full_periods | Verified full-series periods. | Derived from verified SSA pairs and cadence evidence.
 active_periods | Verified active-regime periods. | Derived from verified SSA pairs and cadence evidence.
+variance_change_points | Zero-based residual-variance change-point indices. | Derived from PELT on process-appropriate residuals.
+variance_change_times | Timestamps for residual-variance changes. | Derived by mapping change-point indices to the active-regime index.
 window | Window size suggested or used by the API. | Derived from the API's internal suitability and window selection logic.
 suitability_passed | Whether the series passed the suitability gate. | Derived from `api.get_suitability_result().is_suitable`.
 top_k_ratio | Ratio used to determine the top-k reconstruction components. | Derived from the suitability result returned by the API.
