@@ -5,7 +5,21 @@
 This study evaluates the blind-spot profile of `tseda`'s exploratory
 classifier. It does not ask which decomposition library best fits a supplied
 component model. That question belongs to Item 3's separate cross-method
-validation.
+validation in
+[comparison_validation_similar_methods.md](comparison_validation_similar_methods.md).
+
+The two studies form a combined classifier-validation profile:
+
+- [Synthetic process-identification studies](synthetic_data_studies.md) test
+  what `tseda` does against known DGPs, including AR persistence, local
+  periodicity, and variance shifts.
+- [Cross-method validation](comparison_validation_similar_methods.md) checks
+  whether accepted real-data reconstructions are broadly consistent with
+  established decomposition methods once the alternatives receive the required
+  period information.
+
+Together, they distinguish classifier strengths and blind spots from secondary
+differences in reconstruction fit.
 
 The questions here are:
 

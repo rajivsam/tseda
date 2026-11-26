@@ -144,6 +144,21 @@ decomposition. For the detailed test setup, generated report, full results table
 exact running instructions, and complete outcomes, see
 [documents/test_datasets_report.md](documents/test_datasets_report.md).
 
+Classifier behavior is evaluated in two complementary studies:
+
+- [Synthetic process-identification studies](documents/synthetic_data_studies.md)
+  — known DGPs profile `tseda`'s suitability and process-classification
+  strengths, blind spots, and cases where secondary validation is advisable.
+- [Cross-method validation](documents/comparison_validation_similar_methods.md)
+  — accepted real-data reconstructions are compared with default STL/MSTL
+  after those methods receive the known period, separating conditional
+  reconstruction agreement from blind classifier performance.
+
+The synthetic study establishes how the classifier behaves against ground
+truth; the cross-method study checks whether subsequent reconstruction variance
+is broadly consistent with established decomposition methods. They should be
+read together, not as competing measures of the same task.
+
 ## More information
 
 - [about_tseda.md](about_tseda.md) — fuller product overview and narrative explanation
