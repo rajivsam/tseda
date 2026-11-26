@@ -63,6 +63,28 @@ data-generating context and another describes the relevant testing risk.
    `usconsumption`/`uschange` naming as disclosed provenance caveats—not resolved
    facts.
 
+## Item 3: validation against similar decomposition methods
+
+Item 3 is a separate reproducibility check implemented in
+`tests/test_comparison_validation_similar_methods.py` and reported in
+[comparison_validation_similar_methods.md](comparison_validation_similar_methods.md).
+It compares the reconstruction variance of SSA with default STL and MSTL
+decompositions on five fixed, periodic datasets from this ground-truth set.
+
+The comparator evaluation starts only after the same `tseda` suitability triage
+has accepted each series. The triage is not an SSA-specific formality: assessing
+whether a real-world series is suitable for decomposition is a required first
+step in every exploratory analysis, regardless of which decomposition method is
+selected later. A suitability rejection must not be bypassed by substituting a
+different decomposition tool.
+
+The alternatives are run with the library defaults after supplying the single
+period supported by the ground truth. No smoothing-window, polynomial-degree,
+robustness, iteration, or other parameter search is performed. This keeps the
+test focused on default-tool behavior and preserves the practical contrast with
+SSA: SSA needs tuning only for its window length, for which the repository
+provides a comprehensive tuning guide.
+
 ## Source-quality notes
 
 - FRED/IMF, UCI, NYC Open Data, and the Hyndman R-package pages are first-party or
