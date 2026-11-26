@@ -37,6 +37,26 @@ Core capabilities
 - Observation logging: AIC-by-rank summaries, editable narrative reporting, and
 	validated knowledge-base save locations.
 
+Process flow diagrams
+--------------------
+
+The repository includes a few compact schematic views of the tseda workflow for easy
+reference during analysis and review.
+
+.. figure:: ../diagrams/tseda_workflow.svg
+   :align: center
+   :width: 100%
+
+   End-to-end tseda workflow from raw series assessment through decomposition and
+   report generation.
+
+.. figure:: ../diagrams/tseda_process_classification.svg
+   :align: center
+   :width: 100%
+
+   Decision-oriented process classification for deterministic structure, diffuse noise,
+   stochastic persistence, and periodic evidence.
+
 Design philosophy
 -----------------
 

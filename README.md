@@ -30,6 +30,7 @@ persistence and recommends a more appropriate stochastic/differenced approach.
 - identifying reproducible full-series and active-regime scopes;
 - selecting an SSA window and verifying periodic component pairs;
 - reporting residual-variance changes, diagnostics, and evidence.
+- understanding operational data collection and signal interpretation in the broader workflow described in [documents/operational_context.md](documents/operational_context.md).
 
 ## Why it exists
 
